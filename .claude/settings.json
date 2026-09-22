@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Edit(/learn/**)",
+      "Bash(date *)",
+      "Bash(mkdir *)",
+      "Bash(ls *)",
+      "WebSearch",
+      "WebFetch(domain:*)",
+      "Bash(python3 .claude/hooks/learn-status.py*)",
+      "Bash(python3 ./.claude/hooks/learn-status.py*)",
+      "Bash(python3 .claude/hooks/obsidian-live.py clock*)",
+      "Bash(python3 ./.claude/hooks/obsidian-live.py clock*)",
+      "Bash(python3 .claude/hooks/jev.py*)",
+      "Bash(python3 ./.claude/hooks/jev.py*)"
+    ],
+    "ask": [
+      "Edit(/learn/system/**)",
+      "Edit(/learn/me/**)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/session-start.sh",
+            "args": [],
+            "timeout": 15,
+            "statusMessage": "Reading learning records..."
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/obsidian-live.py",
+              "hook"
+            ],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/obsidian-live.py",
+              "hook"
+            ],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "MessageDisplay": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/obsidian-live.py",
+              "hook"
+            ],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/obsidian-live.py",
+              "hook"
+            ],
+            "timeout": 5
+          }
+        ],
+        "matcher": "AskUserQuestion"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/obsidian-live.py",
+              "hook"
+            ],
+            "timeout": 5
+          }
+        ],
+        "matcher": "AskUserQuestion"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/obsidian-live.py",
+              "hook"
+            ],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/obsidian-live.py",
+              "hook"
+            ],
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "python3 /Users/edisonhui/Desktop/vault/.claude/hooks/obsidian-live.py status"
+  }
+}

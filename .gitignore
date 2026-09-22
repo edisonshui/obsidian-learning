@@ -1,0 +1,38 @@
+# macOS
+.DS_Store
+
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Runtime state for the obsidian-live hook. Regenerated every session, holds raw
+# transcript text, and includes lock files from dead sessions. Not a record.
+.claude/obsidian-live/
+# Jev response cache, keyed by content hash. Regenerated as notes are checked;
+# never a record and never committed (it would also make TypeSafe request/response
+# content, cached from user data, land in git history).
+.claude/jev/
+# Codex hook state is also generated and contains submitted chat text.
+learn/.codex-runtime/
+
+# Generated conversation views. The Claude view streams; the Codex view
+# updates after completed turns. Neither is a learning record.
+learn/subjects/*/log.md
+learn/subjects/*/codex-log.md
+
+# Personal learner data and exported AI conversations. The public repository
+# contains the reusable system, not one learner's records or chat history.
+Claude outputs/
+learn/Dashboard.md
+learn/me/
+learn/subjects/
+learn/reviews/
+
+# Obsidian UI state (pane layout, last open file). Changes constantly.
+.obsidian/workspace.json
+
+# Third-party Obsidian plugins. Reinstallable, and dataview alone is 2.3MB.
+.obsidian/plugins/
