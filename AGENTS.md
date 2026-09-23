@@ -24,7 +24,7 @@ List each subject on one line with title, status, last session, and next step. A
 - In `learn/me/preferences.md`, append to *Observed* only when the stated evidence bar is met. Never edit *Stated*.
 - Follow the reliability rules in `tutor.md`. Verify uncertain claims before the learner builds on them.
 - Log a mixed retrieval check before opening a fourth consecutive new node. If skipped, record the reason under *Retrieval checks*; never leave that section empty.
-- Each node entry needs a `Diagram:` line with its diagram or a sentence explaining why none helps.
+- Each node entry needs a `**Diagram.**` line with its diagram or a sentence explaining why none helps.
 - Never claim a write that did not happen. `$learn-end` re-reads the files it was meant to update and reports their actual state.
 - The five learning skills under `.agents/skills/` describe file mechanics. Read `learn/system/records.md` before writing any learning record.
 
