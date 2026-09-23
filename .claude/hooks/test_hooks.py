@@ -596,6 +596,90 @@ eq("a node entry filed outside Lesson and Retrieval checks is flagged, and nothi
               "*Retrieval checks* (records.md:97)"])
 
 
+# ------------------------------------------------------------------ slot_rotation: the one home of the rule
+
+import slot_rotation  # noqa: E402
+
+section("slot_rotation.breaks — every repeated slot and over-full window, as data")
+eq("a slot repeated from the previous check is a Repeat at the second check",
+   slot_rotation.breaks([("s01", 2), ("s02", 2), ("s03", 1)]),
+   [slot_rotation.Repeat(index=1, name="s02", slot=2)])
+eq("a slot holding the answer three times in five checks is Crowded, named by the window's last check",
+   slot_rotation.breaks([("a", 1), ("b", 2), ("c", 1), ("d", 3), ("e", 1)]),
+   [slot_rotation.Crowded(index=4, name="e", slot=1, count=3)])
+eq("twice in five checks is the limit, not a break",
+   slot_rotation.breaks([("a", 1), ("b", 2), ("c", 1), ("d", 3), ("e", 2)]), [])
+eq("every over-full window is reported, one per window",
+   slot_rotation.breaks([("a", 1), ("b", 2), ("c", 1), ("d", 3), ("e", 1), ("f", 4), ("g", 1)]),
+   [slot_rotation.Crowded(index=4, name="e", slot=1, count=3),
+    slot_rotation.Crowded(index=6, name="g", slot=1, count=3)])
+
+section("slot_rotation.allowed — true when appending the slot adds no break")
+eq("any slot is allowed on an empty history", [slot_rotation.allowed(s, []) for s in (1, 2, 3)], [True] * 3)
+eq("the previous check's slot is not allowed", slot_rotation.allowed(2, [1, 3, 2]), False)
+eq("a third landing in the last four plus the candidate is not allowed",
+   slot_rotation.allowed(1, [1, 2, 1, 3]), False)
+eq("a slot that has fallen out of the window is allowed again",
+   slot_rotation.allowed(1, [1, 2, 1, 3, 2, 3]), True)
+eq("a break already in the history does not block an unrelated slot",
+   slot_rotation.allowed(3, [2, 2, 1]), True)
+
+section("slot_rotation.logged — a folder's key fields in note order")
+SR = fresh()
+SR_FOLDER = SR / "learn/subjects/fx/sessions"
+write(SR_FOLDER / "2026-09-22-s02.md",
+      "Q: x / A: y / Verdict: correct. key: 3/3 — options: a / b / c\n")
+write(SR_FOLDER / "2026-09-22-s01.md",
+      "Q: x / A: y / Verdict: correct. key: 1/3 — options: a / b / c\n\n"
+      "Q: x / A: y / Verdict: correct. key: 2/4 — options: a / b / c\n")
+write(SR_FOLDER / "notes.txt", "key: 9/9\n")
+eq("every key field counts, well-formed or not, sorted by note name and then line",
+   slot_rotation.logged(SR_FOLDER),
+   [("2026-09-22-s01", 1), ("2026-09-22-s01", 2), ("2026-09-22-s02", 3)])
+eq("a folder that does not exist has no history", slot_rotation.logged(SR / "missing"), [])
+
+section("slot_rotation.pending — which prepared entries still count")
+SR_NOW = datetime(2026, 9, 23, 12, 0)
+
+
+def prepared(scope, subject, slot, evidence=None, hours_ago=1):
+    return {"scope": scope, "subject": subject, "slot": slot,
+            "evidence": evidence or "key: %d/3 — options: %s-a / %s-b / %s-c" % (slot, subject, subject, subject),
+            "prepared": (SR_NOW - timedelta(hours=hours_ago)).isoformat(timespec="seconds")}
+
+
+SR_REVIEWS = [prepared("review", subject, slot) for subject, slot in
+              [("oop", 3), ("oop", 2), ("pointers-and-references", 1), ("pointers-and-references", 2),
+               ("quiz2-analects-baijuyi-hakurakuten", 1), ("math241-exam1-review", 3)]]
+eq("a lesson for oop sees none of the review placements, even the ones about oop (the cross-subject case)",
+   slot_rotation.pending(SR_REVIEWS, "lesson", "oop", [], SR_NOW), [])
+SR_LESSONS = [prepared("lesson", "oop", 1), prepared("lesson", "math241-exam1-review", 2)]
+eq("a lesson counts only its own subject's lesson placements",
+   slot_rotation.pending(SR_LESSONS + SR_REVIEWS, "lesson", "oop", [], SR_NOW), [SR_LESSONS[0]])
+eq("a review counts every review placement whatever its subject, and no lesson placement",
+   slot_rotation.pending(SR_LESSONS + SR_REVIEWS, "review", "oop", [], SR_NOW), SR_REVIEWS)
+SR_R02 = "## Checks\n\n" + "\n".join("- Q: x / A: y / Verdict: correct. `%s`" % entry["evidence"]
+                                      for entry in SR_REVIEWS)
+eq("placements already copied verbatim into a note stop counting, so r02 is not counted twice",
+   slot_rotation.pending(SR_REVIEWS, "review", "oop", ["# r01\n", SR_R02], SR_NOW), [])
+eq("only the copied placements drop out",
+   slot_rotation.pending(SR_REVIEWS, "review", "oop", ["answer: " + SR_REVIEWS[0]["evidence"]], SR_NOW),
+   SR_REVIEWS[1:])
+eq("the same slot with different options is a different question, and still counts",
+   slot_rotation.pending([prepared("lesson", "oop", 2, "key: 2/3 — options: p / q / r")], "lesson", "oop",
+                         ["key: 2/3 — options: p / q / s"], SR_NOW),
+   [prepared("lesson", "oop", 2, "key: 2/3 — options: p / q / r")])
+SR_STALE = vaultlib.STALE_HOURS
+eq("a placement prepared and never asked stops counting at vaultlib.STALE_HOURS, and not before",
+   slot_rotation.pending([prepared("lesson", "oop", 1, hours_ago=SR_STALE),
+                          prepared("lesson", "oop", 2, hours_ago=SR_STALE - 0.1)], "lesson", "oop", [], SR_NOW),
+   [prepared("lesson", "oop", 2, hours_ago=SR_STALE - 0.1)])
+eq("a legacy entry with no evidence or time never counts",
+   slot_rotation.pending([{"scope": "review", "subject": "oop", "slot": 3},
+                          dict(prepared("review", "oop", 1), prepared="not a time")],
+                         "review", "oop", ["body"], SR_NOW), [])
+
+
 # ------------------------------------------------------------------ G4: MC slot rotation
 
 def with_keys(vault, subject, *slots):
@@ -606,7 +690,7 @@ def with_keys(vault, subject, *slots):
              % (subject, index, slot))
 
 
-section("G4 — the correct-answer slot rotates (tutor.md, MC construction)")
+section("G4 — the correct-answer slot rotates (slot_rotation.py)")
 G4 = fresh()
 with_keys(G4, "fx", 1, 2, 3, 2, 1)
 eq("a varied rotation across 5 checks passes clean",

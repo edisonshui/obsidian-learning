@@ -23,6 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import session_note  # noqa: E402
+import slot_rotation  # noqa: E402
 from vaultlib import STALE_HOURS, frontmatter, section, strip_frontmatter  # noqa: E402
 
 # Teaching order, worst to best. The order drives the summary table and the legend.
@@ -357,30 +358,20 @@ def g2_session_notes(slug, folder):
 
 
 def g4_mc_slots(slug, folder):
-    """G4: the correct-answer slot on logged MC checks varies, per `tutor.md`'s
-    construction rule -- never the same slot as the previous check, and across
-    any five consecutive checks no slot holds the answer more than twice. Reads
-    the `key: <slot>/<count>` field a logged check carries, in session order.
+    """G4: the correct-answer slot on logged MC checks rotates, per the rule
+    stated in `slot_rotation.py`. Reads the folder's key fields in session
+    order and words each break the module finds.
     """
+    keys = slot_rotation.logged(folder)
     warnings = []
-    if not folder.is_dir():
-        return warnings
-    keys = [(path.stem, key.slot) for path in sorted(folder.glob("*.md"))
-            for key in session_note.read(path).keys]
-    for index in range(1, len(keys)):
-        prev_file, prev_slot = keys[index - 1]
-        file, slot = keys[index]
-        if slot == prev_slot:
+    for found in slot_rotation.breaks(keys):
+        if isinstance(found, slot_rotation.Repeat):
             warnings.append("%s: %s repeats the previous check's correct-answer slot %d "
-                            "(tutor.md, MC construction)" % (slug, file, slot))
-    for index in range(4, len(keys)):
-        window = keys[index - 4:index + 1]
-        slots = [slot for _, slot in window]
-        for slot in sorted(set(slots)):
-            count = slots.count(slot)
-            if count > 2:
-                warnings.append("%s: slot %d holds the correct answer %d times in the 5 checks ending at %s "
-                                "(tutor.md, MC construction)" % (slug, slot, count, window[-1][0]))
+                            "(slot_rotation.py)" % (slug, found.name, found.slot))
+        else:
+            warnings.append("%s: slot %d holds the correct answer %d times in the %d checks ending at %s "
+                            "(slot_rotation.py)" % (slug, found.slot, found.count,
+                                                    slot_rotation.WINDOW, found.name))
     return warnings
 
 
