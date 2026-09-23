@@ -2,7 +2,7 @@
 name: learn-check
 description: Run a mixed retrieval check on the current learning subject — recent nodes plus one older one — grade it, and log the evidence. Use every 2–3 nodes, or when Edison asks to be quizzed.
 argument-hint: "[subject-slug] [node-ids...]"
-allowed-tools: Read, Write, Edit, Glob, Bash(date *), Bash(python3 .claude/hooks/learn-status.py*), AskUserQuestion
+allowed-tools: Read, Write, Edit, Glob, Bash(date *), Bash(python3 .claude/hooks/learn-status.py*), Bash(python3 .claude/hooks/mc-preflight.py*), AskUserQuestion
 ---
 
 Run a retrieval check. Arguments (optional): `$ARGUMENTS` — a subject slug and/or node ids. If no subject is given, use the subject whose session note was opened in this conversation; if none was, ask which subject.

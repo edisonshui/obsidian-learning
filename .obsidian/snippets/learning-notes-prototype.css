@@ -1,0 +1,83 @@
+/* Prototype: Dashboard + OOP progress. Opt in with cssclasses: [learning-note].
+   Status fills match learn-status.py's Mermaid palette in either theme.
+   Text labels and native callout titles remain readable when this is disabled. */
+.learning-note {
+  --file-line-width: 54rem;
+  --line-height-normal: 1.65;
+  /* Full colors: Obsidian reads --callout-color through color-mix(), so a
+     bare "r, g, b" triple is invalid and drops the fill and title color. */
+  --learning-question: rgb(37, 84, 155);
+  --learning-hint: rgb(112, 69, 18);
+  --learning-correction: rgb(165, 42, 51);
+  --learning-next: rgb(32, 101, 70);
+}
+
+.theme-dark .learning-note {
+  --learning-question: rgb(155, 195, 255);
+  --learning-hint: rgb(241, 198, 120);
+  --learning-correction: rgb(255, 166, 171);
+  --learning-next: rgb(131, 218, 174);
+}
+
+.learning-note :is(h2, .HyperMD-header-2) {
+  margin-top: 2rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.learning-note :is(table, .table-wrapper) { max-width: 100%; }
+.learning-note .table-wrapper { overflow-x: auto; }
+.learning-note :is(th, td) { padding: 0.65rem 0.8rem; vertical-align: top; }
+.learning-note th { background: var(--background-secondary); }
+.learning-note :is(a, .internal-link) { text-underline-offset: 0.18em; }
+
+.learning-note code[data-learning-status] {
+  display: inline-block;
+  padding: 0.12em 0.55em;
+  border: 1px solid var(--learning-status-border);
+  border-radius: 0.35rem;
+  background: var(--learning-status-fill);
+  color: #1a202c;
+  font-family: var(--font-interface);
+  font-size: 0.9em;
+  font-weight: 650;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.learning-note [data-learning-status="solid"] {
+  --learning-status-fill: #c6f6d5; --learning-status-border: #2f855a;
+}
+.learning-note [data-learning-status="checked"] {
+  --learning-status-fill: #bee3f8; --learning-status-border: #2b6cb0;
+}
+.learning-note [data-learning-status="introduced"] {
+  --learning-status-fill: #feebc8; --learning-status-border: #b7791f;
+}
+.learning-note [data-learning-status="decayed"] {
+  --learning-status-fill: #fed7d7; --learning-status-border: #c53030;
+}
+.learning-note [data-learning-status="planned"] {
+  --learning-status-fill: #edf2f7; --learning-status-border: #a0aec0;
+}
+.learning-note [data-learning-status="skipped"] {
+  --learning-status-fill: #e9d8fd; --learning-status-border: #6b46c1;
+}
+
+.learning-note .callout[data-callout="question"] { --callout-color: var(--learning-question); }
+.learning-note .callout[data-callout="hint"] { --callout-color: var(--learning-hint); }
+.learning-note .callout[data-callout="failure"] { --callout-color: var(--learning-correction); }
+.learning-note .callout[data-callout="todo"] { --callout-color: var(--learning-next); }
+.learning-note .callout {
+  margin-block: 1.1rem;
+  padding: 0.9rem 1.1rem;
+  border-left: 3px solid var(--callout-color);
+  border-radius: 0.4rem;
+}
+.learning-note .callout-title { line-height: 1.5; }
+.learning-note .callout-content { color: var(--text-normal); }
+.learning-note .callout-content > :last-child { margin-bottom: 0; }
+
+@media (max-width: 600px) {
+  .learning-note :is(th, td) { padding: 0.45rem; }
+  .learning-note .callout { padding: 0.75rem; }
+}

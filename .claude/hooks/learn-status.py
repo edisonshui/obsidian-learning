@@ -511,7 +511,16 @@ def log_links(slug, folder):
                        for name, label in names if (folder / (name + ".md")).is_file())
 
 
+def status_label(status, styled=False):
+    # Literal text survives with the prototype snippet disabled. Only known
+    # statuses enter the HTML attribute; other values keep the existing format.
+    if styled and status in STATUSES:
+        return '<code data-learning-status="%s">%s</code>' % (status, status)
+    return "`%s`" % status
+
+
 def progress_note(slug, folder, fields, nodes, plan_text, record_text, sessions, today):
+    prototype = slug == "oop"  # First visual milestone, expand after learner use.
     total = len(nodes)
     done = sum(1 for node in nodes.values() if node["status"] in COVERED)
     partial = sum(1 for node in nodes.values() if node["status"] in PARTIAL)
@@ -519,7 +528,8 @@ def progress_note(slug, folder, fields, nodes, plan_text, record_text, sessions,
     title = fields.get("title", slug)
 
     out = ["---", "type: learning-progress", 'subject: "%s"' % slug,
-           'updated: "%s"' % today, "generated: true", "---", "",
+           'updated: "%s"' % today, "generated: true",
+           *(["cssclasses: [learning-note]"] if prototype else []), "---", "",
            "# %s — progress" % title, "",
            "> [!warning] Generated file",
            "> Written by `.claude/hooks/learn-status.py` from `record.md` and `plan.md`.",
@@ -527,7 +537,8 @@ def progress_note(slug, folder, fields, nodes, plan_text, record_text, sessions,
            "**%d of %d nodes proven** %s · %s session%s · status **%s**"
            % (done, total, bar(done, partial, total), fields.get("sessions", "0"),
               "" if fields.get("sessions") == "1" else "s", fields.get("status", "unknown")), "",
-           "Next: %s" % fields.get("next", "—"), "",
+           (("> [!todo] Next action\n> " if prototype else "Next: ")
+            + fields.get("next", "—")), "",
            " · ".join(part for part in [
                "[[learn/subjects/%s/record|Record]]" % slug,
                "[[learn/subjects/%s/plan|Plan]]" % slug,
@@ -540,8 +551,9 @@ def progress_note(slug, folder, fields, nodes, plan_text, record_text, sessions,
                 "planned": "not yet taught", "decayed": "failed a later retrieval check",
                 "skipped": "diagnosis showed it was already there", "unknown": "no status recorded"}
     for status in STATUSES + ["unknown"]:
-        if status in groups:
-            out.append("| `%s` | %s | %s |" % (status, meanings[status], ", ".join(groups[status])))
+        if status in groups or (prototype and status not in ("skipped", "unknown")):
+            out.append("| %s | %s | %s |" % (status_label(status, prototype), meanings[status],
+                                             ", ".join(groups.get(status, [])) or "None"))
     out += ["", "## Dependency graph", "",
             "Filled by status, so the plan doubles as the progress view.", ""]
     graphs = colour_graphs(plan_text, nodes)
@@ -550,8 +562,8 @@ def progress_note(slug, folder, fields, nodes, plan_text, record_text, sessions,
     out += ["## Nodes", "", "| Id | Node | Status | Last checked |", "| --- | --- | --- | --- |"]
     for node in sorted(nodes, key=sort_key):
         entry = nodes[node]
-        out.append("| %s | %s | `%s` | %s |" % (entry["id"], entry["name"],
-                                                entry["status"] or "unknown", entry["checked"] or "—"))
+        out.append("| %s | %s | %s | %s |" % (entry["id"], entry["name"],
+                    status_label(entry["status"] or "unknown", prototype), entry["checked"] or "—"))
     strands = section(record_text, "Strands")
     if strands:
         out += ["", "## Strands — floor and ceiling", "", strands]
@@ -567,15 +579,25 @@ def progress_note(slug, folder, fields, nodes, plan_text, record_text, sessions,
                        % (entry.get("session", "?"), entry.get("date", "?"),
                           (entry.get("active_minutes") or "—") + (" min" if entry.get("active_minutes") else ""),
                           ended, entry.get("nodes", "—"), slug, entry["file"]))
+    if prototype:
+        out += ["", "## Callout key", "",
+                "Visual examples only. These are not questions or evidence from a lesson.", "",
+                "> [!question] Question", "> A prompt to answer in the agent chat.", "",
+                "> [!hint] Hint", "> A known fact to use for the next reasoning step.", "",
+                "> [!failure] Correction", "> What was wrong and what replaces it.", "",
+                "> [!todo] Next action", "> The next step to take. Your current action is at the top of this page.", ""]
     return "\n".join(out) + "\n"
 
 
 def dashboard(subjects, today, warnings, openings):
-    out = ["---", "type: learning-dashboard", 'updated: "%s"' % today, "generated: true", "---", "",
+    out = ["---", "type: learning-dashboard", 'updated: "%s"' % today, "generated: true",
+           "cssclasses: [learning-note]", "---", "",
            "# Learning dashboard", "",
            "> [!warning] Generated file",
            "> Written by `.claude/hooks/learn-status.py` at every session start and learning session end.",
-           "> Anything edited here is overwritten. Edit `record.md` instead.", ""]
+           "> Anything edited here is overwritten. Edit `record.md` instead.", "",
+           "Node status key: " + " · ".join(status_label(status, True) for status in
+               ("solid", "checked", "introduced", "decayed", "planned")), ""]
     if not subjects:
         out += ["No subjects yet. Use `/learn-start <subject>` in Claude Code or `$learn-start <subject>` in Codex.", ""]
     for slug, data in subjects:
@@ -588,7 +610,7 @@ def dashboard(subjects, today, warnings, openings):
                 % (bar(done, partial, total), done, total, fields.get("status", "unknown"),
                    fields.get("sessions", "0"), "" if fields.get("sessions") == "1" else "s",
                    fields.get("last_session", "never")), "",
-                "**Next:** %s" % fields.get("next", "—"), "",
+                "> [!todo] Next action\n> %s" % fields.get("next", "—"), "",
                 " · ".join(part for part in [
                     "[[learn/subjects/%s/progress|Progress]]" % slug,
                     "[[learn/subjects/%s/resume|Resume]]" % slug,

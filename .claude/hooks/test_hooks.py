@@ -1266,6 +1266,54 @@ eq("and with no Jev at all it simply does not run, rather than guessing",
 
 
 
+section("Priority 4 — styled Dashboard and oop progress, legible with the snippet off")
+P4 = fresh()
+p4_nodes = {"n1": {"id": "n1", "name": "Classes", "status": "solid", "checked": "2026-09-17"},
+            "n2": {"id": "n2", "name": "Objects", "status": "decayed", "checked": "2026-09-17"},
+            "n3": {"id": "n3", "name": "Mystery", "status": "", "checked": ""}}
+p4_fields = {"title": "OOP", "status": "active", "sessions": "1", "next": "Teach n12."}
+styled = status.progress_note("oop", P4, p4_fields, p4_nodes, "", "", [], "2026-09-23")
+plain = status.progress_note("fx", P4, p4_fields, p4_nodes, "", "", [], "2026-09-23")
+styled_front = styled.split("\n---\n", 1)[0]
+eq("the oop page opts into the snippet in frontmatter",
+   "cssclasses: [learning-note]" in styled_front, True)
+eq("a known status carries its attribute and its literal name as text",
+   '| n1 | Classes | <code data-learning-status="solid">solid</code> |' in styled, True)
+eq("an unrecorded status keeps plain code and never enters the attribute",
+   "| n3 | Mystery | `unknown` |" in styled and 'data-learning-status="unknown"' not in styled, True)
+eq("every styled status label reads as its own name with the CSS off",
+   all(label == value for value, label in re.findall(
+       r'<code data-learning-status="([a-z]+)">([^<]*)</code>', styled)), True)
+eq("the status table lists all five core statuses, empty ones as None",
+   all(re.search(r'data-learning-status="%s">%s</code> \| [^|]+ \| None \|' % (s, s), styled)
+       for s in ("checked", "introduced", "planned")), True)
+eq("the next action is a todo callout at the top",
+   "> [!todo] Next action\n> Teach n12." in styled.split("## Nodes")[0], True)
+eq("the callout key labels its examples as not lesson evidence",
+   "## Callout key" in styled and "not questions or evidence" in styled
+   and all("> [!%s]" % kind in styled for kind in ("question", "hint", "failure", "todo")), True)
+eq("other subjects keep the unstyled page",
+   ("cssclasses" in plain, "data-learning-status" in plain, "Next: Teach n12." in plain,
+    "| n1 | Classes | `solid` |" in plain, "## Callout key" in plain),
+   (False, False, True, True, False))
+
+board = status.dashboard([("oop", {"fields": p4_fields, "nodes": p4_nodes, "folder": P4})],
+                         "2026-09-23", [], [])
+eq("the Dashboard opts into the snippet in frontmatter",
+   "cssclasses: [learning-note]" in board.split("\n---\n", 1)[0], True)
+key_line = next((line for line in board.splitlines() if line.startswith("Node status key: ")), "")
+eq("its status key names all five statuses in text, in order",
+   re.findall(r'data-learning-status="([a-z]+)">\1</code>', key_line),
+   ["solid", "checked", "introduced", "decayed", "planned"])
+eq("each subject's next action is a todo callout",
+   "> [!todo] Next action\n> Teach n12." in board, True)
+
+snippet = (HOOKS.parent.parent / ".obsidian/snippets/learning-notes-prototype.css").read_text()
+eq("callout colors are full colors, since Obsidian reads them through color-mix()",
+   re.findall(r"--learning-[a-z]+:\s*\d+\s*,", snippet), [])
+
+
+
 print()
 if FAILS:
     print("FAILED (%d): %s" % (len(FAILS), ", ".join(FAILS)))

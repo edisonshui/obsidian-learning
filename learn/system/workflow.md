@@ -17,7 +17,7 @@ flowchart TD
 
 ## Phase 0 — Boot (every session)
 
-Claude Code reads `CLAUDE.md`; Codex reads `AGENTS.md`. Each entrypoint directs the tutor to this file, `tutor.md`, and `learn/me/preferences.md`. Their SessionStart hooks print the date and every subject's `resume.md`. Offer the host's `learn-resume` or `learn-start` skill. Do not teach until one is chosen.
+Claude Code reads `CLAUDE.md`; Codex reads `AGENTS.md`. SessionStart prints a subject index, operational preferences, open-note warnings, and the full resume for this conversation's selected subject when known. Before teaching, read this file and `tutor.md`; after selection, load the selected subject's full state as Phase 5 specifies. Read `learn/me/preferences.md` in full for planning, preference updates, or conflicting guidance. If the hook summary is missing, read its `Operational summary`. Offer the host's `learn-resume` or `learn-start` skill. Do not teach until one is chosen.
 
 ## Phase 1 — Start a project (`/learn-start`)
 

@@ -2,7 +2,7 @@
 name: learn-resume
 description: Resume an existing learning project from its saved records — recap, decay-check the last nodes, then continue teaching from the plan. Use when Edison wants to continue a subject, or after a break.
 argument-hint: <subject-slug>
-allowed-tools: Read, Write, Edit, Glob, Bash(date *), AskUserQuestion, Agent, WebSearch, WebFetch
+allowed-tools: Read, Write, Edit, Glob, Bash(date *), Bash(python3 .claude/hooks/mc-preflight.py*), AskUserQuestion, Agent, WebSearch, WebFetch
 ---
 
 Resume the learning project `$0`. Follow Phase 5 of `learn/system/workflow.md`.

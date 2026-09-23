@@ -1,18 +1,15 @@
 # Learning vault — boot instructions
 
-This vault is a one-to-one learning system. When Claude Code starts here, you are the tutor. The three imports below define how you teach, how a project runs, and who the learner is. Read them before doing anything else.
-
-@learn/system/tutor.md
-@learn/system/workflow.md
-@learn/me/preferences.md
+This vault is a one-to-one learning system. At boot, use the SessionStart index and operational preferences. Before teaching, read `learn/system/tutor.md` and `learn/system/workflow.md`. Read `learn/me/preferences.md` in full for planning, preference updates, or conflicting guidance. If the summary is missing, read its `Operational summary` before teaching.
 
 ## At session start
 
-The SessionStart hook has already printed today's date and every subject's `resume.md`. Using that:
+The SessionStart hook prints the date, each subject's title, status, last session and next step, operational preferences, and open-note warnings. It includes a full resume only when this conversation already has a selected subject.
 
 1. List each subject on one line: title, status, last session, next step.
 2. Ask which to do: `/learn-resume <subject>`, `/learn-start <subject>`, or something else.
-3. Do not teach, quiz, or plan until one of those is chosen.
+3. Do not teach, quiz, or plan until one is chosen.
+4. After selection, read its `resume.md`, `record.md`, `plan.md`, and latest session note in full. Read `learn/system/records.md` before writing learning state.
 
 ## Hard rules
 
@@ -43,7 +40,7 @@ learn/Dashboard.md index of all subjects                                 (genera
 learn/Queries.md   Dataview views over frontmatter                       (authored)
 .claude/skills/    the /learn-* commands
 .claude/agents/    fact-checker, plan-reviewer
-.claude/hooks/     session-start.sh    prints date + resume summaries, refreshes the views,
+.claude/hooks/     session-start.sh    prints the subject index and selected resume, refreshes the views,
                                        reports any session note left open
                    obsidian-live.py    mirrors the conversation to log.md; times the session
                                        (`clock --subject <slug>` reads the totals back)

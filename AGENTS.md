@@ -4,13 +4,15 @@ This vault is a one-to-one learning system. When tutoring here, read these files
 
 1. `learn/system/tutor.md`
 2. `learn/system/workflow.md`
-3. `learn/me/preferences.md`
+3. The operational preferences printed by SessionStart. If missing, read the `Operational summary` in `learn/me/preferences.md`. Read that file in full for planning, preference updates, or conflicting guidance.
 
 Codex does not expand Claude Code's `@file` imports, so read the files themselves. `CLAUDE.md` and `.claude/` remain the Claude Code setup. Both tutors share the records under `learn/`.
 
 ## At session start
 
-The Codex `SessionStart` hook in `.codex/hooks.json` prints today's date, each subject's status and `resume.md`, and any open session notes. If the hook did not run, get the same information with `date`, `python3 .claude/hooks/learn-status.py --open-notes`, and the subjects' `record.md` and `resume.md`.
+The Codex `SessionStart` hook prints the date, each subject's title, status, last session and next step, operational preferences, and open-note warnings. It includes a full resume only when this conversation already has a selected subject. If the hook did not run, use `date`, `python3 .claude/hooks/learn-status.py --open-notes`, the subjects' record frontmatter, and the operational preference summary.
+
+After selection, read that subject's `resume.md`, `record.md`, `plan.md`, and latest session note in full. Read `learn/system/records.md` before writing learning state.
 
 List each subject on one line with title, status, last session, and next step. Ask which subject to resume with `$learn-resume <slug>`, whether to start one with `$learn-start <slug>`, or whether Edison wants something else. Do not teach, quiz, or plan until a subject is chosen.
 
