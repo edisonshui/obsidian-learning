@@ -62,3 +62,13 @@ Obsidian renders mermaid and LaTeX; write diagrams and math per `learn/system/di
 - If the learner says they cannot see something, do not rephrase the question. Resend the material, confirm it is visible, then ask again.
 - The terminal status bar and live note show the actual model and reported effort. `/model` opens model selection; `/effort` opens effort selection. Do not guess the active model or effort.
 
+## Agent skills
+
+### Issue tracker
+
+Local markdown under `.scratch/<feature-slug>/`. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
