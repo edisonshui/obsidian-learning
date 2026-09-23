@@ -7,24 +7,39 @@ import json
 import os
 import re
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 import session_note
+import slot_rotation
 
 
-def logged_slots(vault, scope, subject):
+def notes_folder(vault, scope, subject):
     if scope == "review":
-        files = sorted((vault / "learn/reviews").glob("*.md"))
-    else:
-        files = sorted((vault / "learn/subjects" / subject / "sessions").glob("*.md"))
-    return [key.slot for path in files for key in session_note.read(path).keys]
+        return vault / "learn/reviews"
+    return vault / "learn/subjects" / subject / "sessions"
 
 
-def allowed(slot, history):
-    if history and history[-1] == slot:
-        return False
-    window = history[-4:] + [slot]
-    return window.count(slot) <= 2
+def bodies(folder):
+    return [session_note.read(path).body for path in sorted(folder.glob("*.md"))] if folder.is_dir() else []
+
+
+def still_counting(vault, prepared, now):
+    """The prepared entries that still count for their own scope and subject.
+
+    Everything else was logged, abandoned, or written before entries carried
+    their evidence and time, and is dropped when the file is rewritten.
+    """
+    kept, read = [], {}
+    for entry in prepared:
+        if not isinstance(entry, dict) or entry.get("scope") not in ("lesson", "review") \
+                or not isinstance(entry.get("subject"), str):
+            continue
+        folder = notes_folder(vault, entry["scope"], entry["subject"])
+        if folder not in read:
+            read[folder] = bodies(folder)
+        kept += slot_rotation.pending([entry], entry["scope"], entry["subject"], read[folder], now)
+    return kept
 
 
 def prepare(vault, scope, subject, question, correct, distractors):
@@ -42,11 +57,16 @@ def prepare(vault, scope, subject, question, correct, distractors):
             prepared = json.loads(state_path.read_text())
         except FileNotFoundError:
             prepared = []
-        history = logged_slots(vault, scope, subject) + [entry["slot"] for entry in prepared]
-        candidates = [slot for slot in range(1, len(options) + 1) if allowed(slot, history)]
+        now = datetime.now()
+        prepared = still_counting(vault, prepared, now)
+        folder = notes_folder(vault, scope, subject)
+        history = ([slot for _, slot in slot_rotation.logged(folder)]
+                   + [entry["slot"] for entry in slot_rotation.pending(prepared, scope, subject, bodies(folder), now)])
+        candidates = [slot for slot in range(1, len(options) + 1) if slot_rotation.allowed(slot, history)]
         if not candidates:
             raise ValueError("no key slot satisfies the current sequence; inspect the logged history")
-        slot = min(candidates, key=lambda candidate: (history[-4:].count(candidate), candidate))
+        recent = history[-(slot_rotation.WINDOW - 1):]
+        slot = min(candidates, key=lambda candidate: (recent.count(candidate), candidate))
         ordered = [*distractors]
         ordered.insert(slot - 1, correct)
         result = {
@@ -55,7 +75,8 @@ def prepare(vault, scope, subject, question, correct, distractors):
             "display": question + "\n" + "\n".join(f"{chr(65 + index)}. {option}" for index, option in enumerate(ordered)),
             "evidence": f"key: {slot}/{len(ordered)} — options: " + " / ".join(ordered),
         }
-        prepared.append({"scope": scope, "subject": subject, "slot": slot})
+        prepared.append({"scope": scope, "subject": subject, "slot": slot, "evidence": result["evidence"],
+                         "prepared": now.isoformat(timespec="seconds")})
         with tempfile.NamedTemporaryFile("w", dir=runtime, delete=False) as temporary:
             json.dump(prepared, temporary)
             temporary_path = temporary.name

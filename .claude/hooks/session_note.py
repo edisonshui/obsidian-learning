@@ -14,7 +14,8 @@ it is open -- plus a `malformed` list of lines it recognised but could not
 read. It decides nothing: the rules, thresholds and warning text, with their
 `tutor.md` and `records.md` citations, stay in the gates (`learn-status.py`)
 and the judges (`jev.py`), so a rule is never split between a reader and its
-enforcer.
+enforcer. The one exception is the MC slot-rotation rule, which gate G4 and
+`mc-preflight.py` share, so it lives in `slot_rotation.py` with its thresholds.
 
 `parse` takes a string so tests never touch a live note; `read` is the thin
 wrapper for a path. Dependency-free for the same reason `vaultlib` is.
