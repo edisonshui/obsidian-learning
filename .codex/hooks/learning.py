@@ -3,7 +3,7 @@
 
 Codex hook payloads differ from Claude Code's. Keep separate runtime state and
 conversation logs, while reusing the existing record reader and clock logic.
-The log contains submitted prompts and completed assistant turns only.
+The log uses the transcript when available and falls back to final messages.
 """
 
 import argparse
@@ -11,7 +11,6 @@ import fcntl
 import importlib.util
 import json
 import re
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,7 +18,7 @@ from pathlib import Path
 VAULT = Path(__file__).resolve().parents[2]
 CLAUDE_HOOKS = VAULT / ".claude" / "hooks"
 sys.path.insert(0, str(CLAUDE_HOOKS))
-from vaultlib import frontmatter  # noqa: E402
+from session_context import start_context  # noqa: E402
 
 spec = importlib.util.spec_from_file_location("shared_learning_clock", CLAUDE_HOOKS / "obsidian-live.py")
 shared = importlib.util.module_from_spec(spec)
@@ -65,6 +64,35 @@ def subject_from_prompt(vault, prompt):
     return matches[0] if len(matches) == 1 else None
 
 
+def transcript_messages(path, sid):
+    """Read completed learner-facing messages from the current Codex rollout shape."""
+    if not path:
+        return None
+    try:
+        rows = [json.loads(line) for line in Path(path).read_text().splitlines()]
+        if not rows or rows[0].get("type") != "session_meta" or rows[0]["payload"].get("session_id") != sid:
+            return None
+        messages = {}
+        for row in rows:
+            payload = row.get("payload", {})
+            if row.get("type") != "event_msg" or payload.get("type") != "item_completed":
+                continue
+            item = payload.get("item", {})
+            if item.get("type") != "AgentMessage":
+                continue
+            turn = payload.get("turn_id")
+            parts = item.get("content", [])
+            if not turn or not isinstance(parts, list) or any(part.get("type") != "Text" for part in parts):
+                return None
+            message = "\n".join(part["text"] for part in parts).strip()
+            if message:
+                messages.setdefault(turn, []).append({"turn": turn, "role": "assistant", "text": message,
+                                                     "time": row["timestamp"]})
+        return messages
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
 def save_log(vault, rt, subject):
     folder = vault / "learn" / "subjects" / subject
     if not folder.is_dir():
@@ -77,19 +105,30 @@ def save_log(vault, rt, subject):
             state = json.loads(path.read_text())
         except (OSError, json.JSONDecodeError):
             continue
-        entries = [item for item in state.get("entries", []) if item.get("subject") == subject]
+        captured = transcript_messages(state.get("transcript_path"), state.get("session_id"))
+        entries = []
+        for item in state.get("entries", []):
+            if item.get("subject") != subject:
+                continue
+            if item["role"] == "user":
+                entries.append(item)
+                entries.extend({**reply, "subject": subject} for reply in (captured or {}).get(item.get("turn"), []))
+            elif not captured or item.get("turn") not in captured:
+                entries.append(item)
         if entries:
-            states.append({**state, "entries": entries})
+            states.append({**state, "entries": entries, "transcript_captured": captured is not None})
     states.sort(key=lambda state: (state["entries"][0]["time"], state["session_id"]))
     lines = ["---", "type: learning-chat-log", f"subject: {json.dumps(subject)}",
              "source: codex", f"conversations: {len(states)}",
              f"updated: {json.dumps(datetime.now().strftime('%Y-%m-%d'))}",
              "---", "", "# Codex chat log", "",
-             "> [!info] Turn log", "> Submitted prompts and completed replies appear here after each turn.",
+             "> [!info] Codex chat log", "> Transcript messages appear when available. Otherwise, each turn shows its final reply only.",
              f"> [[learn/subjects/{subject}/record|Record]] · [[learn/subjects/{subject}/plan|Plan]] · [[learn/subjects/{subject}/progress|Progress]]", ""]
     for state in states:
         lines += [f"## Conversation — {state['entries'][0]['time'][:10]}", "",
-                  f"*{state.get('model') or 'Model not reported'}*", ""]
+                  f"*{state.get('model') or 'Model not reported'}*", "",
+                  "Transcript messages" if state["transcript_captured"] else "Completed-turn summary", ""]
+        replied_turns = {item.get("turn") for item in state["entries"] if item["role"] == "assistant"}
         for item in state["entries"]:
             message = item["text"].strip()
             if not message:
@@ -97,38 +136,15 @@ def save_log(vault, rt, subject):
             time = shared.local_clock(item["time"])
             if item["role"] == "user":
                 lines += [f"> [!quote] You · {time}"] + ["> " + line if line else ">" for line in message.splitlines()] + [""]
+                if item.get("turn") not in replied_turns:
+                    lines += ["> [!warning] Reply not captured for this prompt", ""]
             else:
                 lines += [message, ""]
     shared.atomic_write(folder / "codex-log.md", "\n".join(lines))
 
 
-def session_start(vault):
-    status = subprocess.run([sys.executable, str(CLAUDE_HOOKS / "learn-status.py"), "--vault", str(vault), "--quiet"],
-                            cwd=vault, text=True, capture_output=True, check=False)
-    lines = ["## Learning vault session start", "Now: " + datetime.now().astimezone().strftime("%A %Y-%m-%d %H:%M %Z"), ""]
-    if status.returncode:
-        lines += ["Dashboard refresh failed: " + status.stderr.strip()[:300], ""]
-    open_notes = subprocess.run([sys.executable, str(CLAUDE_HOOKS / "learn-status.py"), "--vault", str(vault), "--open-notes"],
-                                cwd=vault, text=True, capture_output=True, check=False)
-    if open_notes.stdout.strip():
-        lines += ["Unfinished session notes:", open_notes.stdout.strip(), "Read the closing rule in learn/system/records.md before teaching.", ""]
-    subjects = vault / "learn" / "subjects"
-    if subjects.is_dir():
-        for folder in sorted(subjects.iterdir()):
-            if not folder.is_dir():
-                continue
-            fields = frontmatter(folder / "record.md")
-            lines += ["### " + folder.name]
-            for key in ("title", "status", "last_session", "sessions", "next"):
-                if fields.get(key):
-                    lines.append(f"- {key}: {fields[key]}")
-            resume = folder / "resume.md"
-            if resume.is_file():
-                parts = resume.read_text().split("---", 2)
-                lines += ["resume.md:", (parts[2] if len(parts) == 3 else resume.read_text()).strip()[:3000]]
-            lines.append("")
-    lines.append("Ask which subject to resume or start before teaching.")
-    return "\n".join(lines)
+def session_start(vault, subject=None):
+    return start_context(vault, subject)
 
 
 def hook(vault, payload):
@@ -143,6 +159,8 @@ def hook(vault, payload):
         state = load_state(path, sid)
         if payload.get("model"):
             state["model"] = payload["model"]
+        if payload.get("transcript_path"):
+            state["transcript_path"] = payload["transcript_path"]
         notice = ""
         previous_subject = state.get("subject")
         if event == "UserPromptSubmit":
@@ -166,7 +184,7 @@ def hook(vault, payload):
         for subject in {previous_subject, state.get("subject")} - {None}:
             save_log(vault, rt, subject)
         if event == "SessionStart":
-            return session_start(vault)
+            return session_start(vault, state.get("subject"))
         return notice
 
 

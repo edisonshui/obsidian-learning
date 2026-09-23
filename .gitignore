@@ -17,6 +17,7 @@ __pycache__/
 .claude/jev/
 # Codex hook state is also generated and contains submitted chat text.
 learn/.codex-runtime/
+learn/.mc-runtime/
 
 # Generated conversation views. The Claude view streams; the Codex view
 # updates after completed turns. Neither is a learning record.

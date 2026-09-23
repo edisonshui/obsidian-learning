@@ -2,7 +2,7 @@
 name: learn-start
 description: Start a new learning project — capture the goal, diagnose current understanding, build and verify a lesson plan, then begin teaching. Use when Edison wants to learn a new subject or topic.
 argument-hint: <subject-slug> [goal in a few words]
-allowed-tools: Read, Write, Edit, Glob, Bash(date *), Bash(mkdir *), Bash(python3 .claude/hooks/learn-status.py*), AskUserQuestion, Agent, WebSearch, WebFetch
+allowed-tools: Read, Write, Edit, Glob, Bash(date *), Bash(mkdir *), Bash(python3 .claude/hooks/learn-status.py*), Bash(python3 .claude/hooks/mc-preflight.py*), AskUserQuestion, Agent, WebSearch, WebFetch
 ---
 
 Start a learning project for `$0`. Goal hint (may be empty): `$ARGUMENTS`

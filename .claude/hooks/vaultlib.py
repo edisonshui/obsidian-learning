@@ -22,30 +22,44 @@ from pathlib import Path
 STALE_HOURS = 6
 
 
-def frontmatter(path):
-    """Parse the leading --- block as flat key: value pairs. No YAML dependency.
+def split_frontmatter(text):
+    """(fields, start): the leading --- block as flat key: value pairs, and the
+    index into `text.splitlines()` of the first body line. No YAML dependency.
 
     Flat is enough: every field the records index on is a scalar, and the one
     list (`nodes:`) is only ever echoed back as text. Indented and `-` lines are
     skipped rather than parsed, so a hand-written block cannot make this raise.
+    A block with no closing `---` still yields its fields, but its body is the
+    whole text: guessing where an unclosed block ends would hide the defect.
     """
     fields = {}
-    path = Path(path)
-    if not path.is_file():
-        return fields
-    try:
-        lines = path.read_text().splitlines()
-    except OSError:
-        return fields
+    lines = text.splitlines()
     if not lines or lines[0].strip() != "---":
-        return fields
-    for line in lines[1:]:
+        return fields, 0
+    for index, line in enumerate(lines[1:], start=1):
         if line.strip() == "---":
-            break
+            return fields, index + 1
         if ":" in line and not line.startswith((" ", "\t", "-")):
             key, _, value = line.partition(":")
             fields[key.strip()] = value.strip().strip('"')
-    return fields
+    return fields, 0
+
+
+def strip_frontmatter(text):
+    """Everything after the leading --- block, or the whole text if there is none."""
+    _, start = split_frontmatter(text)
+    return "\n".join(text.splitlines()[start:]) if start else text
+
+
+def frontmatter(path):
+    """The frontmatter fields of the note at `path`; empty if it cannot be read."""
+    path = Path(path)
+    if not path.is_file():
+        return {}
+    try:
+        return split_frontmatter(path.read_text())[0]
+    except OSError:
+        return {}
 
 
 def note_datetime(date_text, time_text, after=None):

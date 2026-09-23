@@ -1,18 +1,15 @@
 # Learning vault — boot instructions
 
-This vault is a one-to-one learning system. When Claude Code starts here, you are the tutor. The three imports below define how you teach, how a project runs, and who the learner is. Read them before doing anything else.
-
-@learn/system/tutor.md
-@learn/system/workflow.md
-@learn/me/preferences.md
+This vault is a one-to-one learning system. At boot, use the SessionStart index and operational preferences. Before teaching, read `learn/system/tutor.md` and `learn/system/workflow.md`. Read `learn/me/preferences.md` in full for planning, preference updates, or conflicting guidance. If the summary is missing, read its `Operational summary` before teaching.
 
 ## At session start
 
-The SessionStart hook has already printed today's date and every subject's `resume.md`. Using that:
+The SessionStart hook prints the date, each subject's title, status, last session and next step, operational preferences, and open-note warnings. It includes a full resume only when this conversation already has a selected subject.
 
 1. List each subject on one line: title, status, last session, next step.
 2. Ask which to do: `/learn-resume <subject>`, `/learn-start <subject>`, or something else.
-3. Do not teach, quiz, or plan until one of those is chosen.
+3. Do not teach, quiz, or plan until one is chosen.
+4. After selection, read its `resume.md`, `record.md`, `plan.md`, and latest session note in full. Read `learn/system/records.md` before writing learning state.
 
 ## Hard rules
 
@@ -22,7 +19,7 @@ The SessionStart hook has already printed today's date and every subject's `resu
 - **`learn/me/preferences.md`:** append to *Observed* only, with evidence. Never edit *Stated*.
 - **Reliability rules in `tutor.md` are non-negotiable.** Verify before the learner builds on a claim.
 - **A retrieval check is a gate.** Never open a fourth consecutive new node without a logged mixed retrieval check. If one is skipped, the reason goes under *Retrieval checks* in the session note; that section is never left empty.
-- **Every node logs a `Diagram:` line** — the mermaid block, or one sentence on why the idea has no shape worth drawing. A decision that leaves no trace gets skipped by default.
+- **Every node logs a `**Diagram.**` line** — the mermaid block, or one sentence on why the idea has no shape worth drawing. A decision that leaves no trace gets skipped by default.
 - **Never claim a write you did not make.** `/learn-end` re-reads every file it touched and reports what actually changed. If a write was skipped or a permission prompt was declined, say so.
 - Skills describe the file mechanics: `/learn-start`, `/learn-resume`, `/learn-check`, `/learn-end`, `/learn-review`. A review is the only one that is not a session of a single subject: it writes evidence into several `record.md` files and its narrative into `learn/reviews/`, and it changes no subject's `sessions:` or `last_session`. Record schema is in `learn/system/records.md`; read it before writing any record.
 
@@ -43,7 +40,7 @@ learn/Dashboard.md index of all subjects                                 (genera
 learn/Queries.md   Dataview views over frontmatter                       (authored)
 .claude/skills/    the /learn-* commands
 .claude/agents/    fact-checker, plan-reviewer
-.claude/hooks/     session-start.sh    prints date + resume summaries, refreshes the views,
+.claude/hooks/     session-start.sh    prints the subject index and selected resume, refreshes the views,
                                        reports any session note left open
                    obsidian-live.py    mirrors the conversation to log.md; times the session
                                        (`clock --subject <slug>` reads the totals back)
@@ -64,4 +61,14 @@ Obsidian renders mermaid and LaTeX; write diagrams and math per `learn/system/di
 - **A probe must stand alone.** Any code, data, or diagram a question depends on goes *inside the question text itself*, fenced with its language. Never leave it only in a preceding chat message, and never write "this", "the following", or "the code below" pointing at something outside the question. Text that precedes a tool call is not guaranteed to reach the learner. If a snippet is too long for the picker, post it in chat, ask the learner to confirm they can see it, and only then ask. Use normal chat for open-ended reasoning questions and wait for the reply.
 - If the learner says they cannot see something, do not rephrase the question. Resend the material, confirm it is visible, then ask again.
 - The terminal status bar and live note show the actual model and reported effort. `/model` opens model selection; `/effort` opens effort selection. Do not guess the active model or effort.
+
+## Agent skills
+
+### Issue tracker
+
+Local markdown under `.scratch/<feature-slug>/`. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
