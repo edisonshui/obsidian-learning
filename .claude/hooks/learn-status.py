@@ -22,7 +22,8 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from vaultlib import STALE_HOURS, frontmatter, note_datetime, section  # noqa: E402
+import session_note  # noqa: E402
+from vaultlib import STALE_HOURS, frontmatter, section, strip_frontmatter  # noqa: E402
 
 # Teaching order, worst to best. The order drives the summary table and the legend.
 STATUSES = ["decayed", "planned", "introduced", "checked", "solid", "skipped"]
@@ -103,14 +104,11 @@ def read_nodes(record_text, plan_text):
     return nodes
 
 
-def read_sessions(folder):
-    sessions = []
-    for path in sorted(folder.glob("*.md")) if folder.is_dir() else []:
-        fields = frontmatter(path)
-        if fields:
-            fields["file"] = path.stem
-            sessions.append(fields)
-    return sessions
+def read_notes(folder, now):
+    """Every note in `folder` that has frontmatter, parsed, oldest first."""
+    notes = [session_note.read(path, now=now)
+             for path in (sorted(folder.glob("*.md")) if folder.is_dir() else [])]
+    return [note for note in notes if note.fields]
 
 
 # ------------------------------------------------------ the review picker (Phase 5)
@@ -219,7 +217,7 @@ def due_report(rows, undated):
 
 # --------------------------------------------------------------------- checking
 
-def open_notes(sessions, subject, now):
+def open_notes(notes, subject):
     """Report every session note whose `end:` is still empty.
 
     `/learn-resume` is required to finalize a stale or cut-off note before opening
@@ -229,52 +227,36 @@ def open_notes(sessions, subject, now):
     open for twenty-five hours. Surfacing every open note is what turns that rule
     from prose into something whose violation is visible.
 
-    This reports and never repairs, for the same reason `consistency` does: the
-    fix is a judgement about what the session actually covered, and a generator
-    that closed notes on its own would manufacture exactly the false record the
-    system is built to prevent.
+    `session_note` computes the status against the `now` it was parsed with; this
+    only words it. It reports and never repairs, for the same reason
+    `consistency` does: the fix is a judgement about what the session actually
+    covered, and a generator that closed notes on its own would manufacture
+    exactly the false record the system is built to prevent.
     """
     reports = []
-    for fields in sessions:
-        if fields.get("end"):
+    for note in notes:
+        if note.status == "closed":
             continue
-        label = "%s %s" % (subject, fields.get("file", "?"))
-        start = note_datetime(fields.get("date"), fields.get("start"))
-        paused_text = fields.get("paused")
-        paused = note_datetime(fields.get("date"), paused_text, after=start) if paused_text else None
-        anchor = paused or start
-        if anchor is None:
+        label = "%s %s" % (subject, note.name or "?")
+        if note.hours is None:
             reports.append("%s: `end:` is empty and its `date:`/`start:` cannot be read, "
                            "so its age is unknown -- finalize it by hand" % label)
-            continue
-        hours = (now - anchor).total_seconds() / 3600.0
-        if hours < 0:
+        elif note.hours < 0:
             reports.append("%s: `end:` is empty and its %s time is %.1f h in the future -- "
-                           "check the note's `date:` field"
-                           % (label, "paused" if paused else "start", -hours))
-        elif paused is None:
+                           "check the note's `date:` field" % (label, note.anchor, -note.hours))
+        elif note.status == "open":
             reports.append("%s: `end:` is empty with no `paused:` -- cut off %.1f h ago without "
                            "`/learn-end`. `/learn-resume` must finalize it before opening the next note."
-                           % (label, hours))
-        elif hours >= STALE_HOURS:
+                           % (label, note.hours))
+        elif note.status == "stale pause":
             reports.append("%s: paused %.1f h ago, past the %d h bound -- a stale pause, not a break. "
                            "`/learn-resume` must finalize it before opening the next note."
-                           % (label, hours, STALE_HOURS))
+                           % (label, note.hours, STALE_HOURS))
         else:
             reports.append("%s: paused %.1f h ago, inside the %d h bound -- a live break. "
                            "`/learn-resume %s` reopens this note and skips the decay check."
-                           % (label, hours, STALE_HOURS, subject))
+                           % (label, note.hours, STALE_HOURS, subject))
     return reports
-
-
-def body_after_frontmatter(text):
-    """Everything after the leading '---' block, or the whole text if there is none."""
-    lines = text.splitlines()
-    if lines and lines[0].strip() == "---":
-        for index in range(1, len(lines)):
-            if lines[index].strip() == "---":
-                return "\n".join(lines[index + 1:])
-    return text
 
 
 def g1_resume_bounds(slug, resume_path, plan_path):
@@ -288,7 +270,7 @@ def g1_resume_bounds(slug, resume_path, plan_path):
     """
     warnings = []
     if resume_path.is_file():
-        count = len(body_after_frontmatter(resume_path.read_text()).split())
+        count = len(strip_frontmatter(resume_path.read_text()).split())
         if count > 200:
             warnings.append("%s: resume.md is %d words, over the 200-word bound "
                             "(workflow.md step 4, records.md:13)" % (slug, count))
@@ -339,49 +321,39 @@ def g5_record_index(slug, fields, sessions, nodes):
     return warnings
 
 
-NODE_HEADER = re.compile(r"^### (n\d+)\b.*$", re.M)
-
-
 def g2_session_notes(slug, folder):
     """G2: per session note, every taught node has its Diagram/Check lines, a
     fourth consecutive new node never opens without a logged retrieval check,
-    and frontmatter `nodes:` matches the union of Lesson entries and node ids
+    frontmatter `nodes:` matches the union of Lesson entries and node ids
     named in *Retrieval checks* (`records.md:82`, decided 2026-09-22 after
     cs124-quiz4 s01 and math241-exam1-review s02 both had nodes with evidence
-    that lived only in *Retrieval checks*, not a `### nN` header).
+    that lived only in *Retrieval checks*, not a `### nN` header), and no node
+    entry is filed outside *Lesson* or *Retrieval checks* (records.md:97).
     """
     warnings = []
     if not folder.is_dir():
         return warnings
     for path in sorted(folder.glob("*.md")):
-        label = "%s %s" % (slug, path.stem)
-        text = path.read_text()
-        lesson = section(text, "Lesson")
-        headers = list(NODE_HEADER.finditer(lesson))
-        entries = []
-        for index, match in enumerate(headers):
-            node = match.group(1)
-            entries.append(node)
-            end = headers[index + 1].start() if index + 1 < len(headers) else len(lesson)
-            chunk = lesson[match.end():end]
-            if "**Diagram.**" not in chunk:
-                warnings.append("%s: %s has no Diagram line (tutor.md, CLAUDE.md)" % (label, node))
-            if "**Check.**" not in chunk:
-                warnings.append("%s: %s has no Check line" % (label, node))
-        retrieval = section(text, "Retrieval checks")
-        if len(entries) >= 4 and not retrieval:
+        note = session_note.read(path)
+        label = "%s %s" % (slug, note.name)
+        for entry in note.entries:
+            if not entry.has_diagram:
+                warnings.append("%s: %s has no Diagram line (tutor.md, CLAUDE.md)" % (label, entry.node))
+            if not entry.has_check:
+                warnings.append("%s: %s has no Check line" % (label, entry.node))
+        for entry in note.misplaced:
+            warnings.append("%s: %s is filed under *%s*, not *Lesson* or *Retrieval checks* "
+                            "(records.md:97)" % (label, entry.node, entry.section or "no heading"))
+        if len(note.entries) >= 4 and not note.retrieval:
             warnings.append("%s: %d new nodes opened with *Retrieval checks* left empty "
-                            "(workflow.md, the gate)" % (label, len(entries)))
-        touched = set(entries) | set(NODE_ID.findall(retrieval))
-        declared = set(NODE_ID.findall(frontmatter(path).get("nodes", "")))
+                            "(workflow.md, the gate)" % (label, len(note.entries)))
+        touched = {entry.node for entry in note.entries} | set(note.retrieval_nodes)
+        declared = set(note.declared_nodes)
         if declared != touched:
             warnings.append("%s: frontmatter nodes: %s does not match Lesson + Retrieval-checks nodes %s "
                             "(records.md:82)" % (label, sorted(declared, key=sort_key) or "none",
                                                  sorted(touched, key=sort_key) or "none"))
     return warnings
-
-
-MC_KEY = re.compile(r"\bkey:\s*(\d+)/(\d+)")
 
 
 def g4_mc_slots(slug, folder):
@@ -393,10 +365,8 @@ def g4_mc_slots(slug, folder):
     warnings = []
     if not folder.is_dir():
         return warnings
-    keys = []
-    for path in sorted(folder.glob("*.md")):
-        for match in MC_KEY.finditer(path.read_text()):
-            keys.append((path.stem, int(match.group(1))))
+    keys = [(path.stem, key.slot) for path in sorted(folder.glob("*.md"))
+            for key in session_note.read(path).keys]
     for index in range(1, len(keys)):
         prev_file, prev_slot = keys[index - 1]
         file, slot = keys[index]
@@ -741,8 +711,9 @@ def main():
         plan_text = plan.read_text() if plan.is_file() else ""
         fields = frontmatter(record)
         nodes = read_nodes(record_text, plan_text)
-        sessions = read_sessions(folder / "sessions")
-        openings += open_notes(sessions, slug, stamp)
+        notes = read_notes(folder / "sessions", stamp)
+        sessions = [dict(note.fields, file=note.name) for note in notes]
+        openings += open_notes(notes, slug)
         ranked.append((slug, nodes))
         if args.open_notes or args.due:
             continue  # read-only modes: report, write nothing

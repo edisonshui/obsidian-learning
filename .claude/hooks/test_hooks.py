@@ -75,38 +75,209 @@ eq("an unreadable time is None", vaultlib.note_datetime("2026-09-16", "2350"), N
 eq("missing fields are None", vaultlib.note_datetime(None, None), None)
 
 
+# ------------------------------------------------------------------ session_note: the one parser
+
+import session_note  # noqa: E402
+
+section("strip_frontmatter — the body a reader reads")
+eq("frontmatter goes", vaultlib.strip_frontmatter("---\na: 1\n---\n\nbody here"), "\nbody here")
+eq("a note with no frontmatter is unchanged", vaultlib.strip_frontmatter("body here"), "body here")
+eq("an unclosed block is not guessed at", vaultlib.strip_frontmatter("---\na: 1\nbody"), "---\na: 1\nbody")
+
+SN_NOTE = """---
+subject: "fx"
+session: "02"
+date: "2026-09-16"
+start: "08:00"
+paused:
+end: "09:00"
+nodes: [n1, n2, n3, n4]
+---
+
+# Session 02
+
+## Plan for this session
+
+teach n1 and n2.
+
+## Lesson
+
+### n1 — Addresses
+
+A pointer is like a house number.
+
+**Diagram.** none, a single value.
+
+**Check.** Q: "What do we call the location where a piece of data sits in memory?" (options: a variable / an address / a register) / A: "an address" / Verdict: correct.
+
+### n2 — Reseating
+
+**Check.** Q: "Which line reseats p?" (options, slot order: *p = b / p = &b [correct, slot 2] / &p = b) / A: "p = &b" / Verdict: correct.
+
+### n2 continued — second pass
+
+**Diagram.** none.
+
+**Check.** Q: "Which line creates pointer p storing x's address?" / A: "1" / Verdict: correct. key: 1/3 — options: `int *p = &x;` / `int p = *x;` / `int *p = x;`
+
+## Retrieval checks
+
+Mixed check (n1 + n2): Q: explain in your own words why reseating leaves a untouched / A: "..." / Verdict: correct.
+
+### n3 — Gate: trace a pointer
+
+**Check.** Q: "what prints?" / A: "5" / Verdict: correct. key: 4/3 — options: 5 / 6 / 7
+
+## Misconception candidates
+
+### n4 — filed in the wrong place
+
+Q: "Which is a reference?" (options: a / b / c) / A: "d" / Verdict: wrong.
+"""
+
+section("session_note — node entries by where they are filed (records.md:97)")
+sn = session_note.parse(SN_NOTE, name="2026-09-16-s02", now=datetime(2026, 9, 17, 9, 0))
+eq("kind is session without a `kind: review` field", sn.kind, "session")
+eq("the name travels with the note", sn.name, "2026-09-16-s02")
+eq("frontmatter fields are read", (sn.fields["subject"], sn.fields["end"]), ("fx", "09:00"))
+eq("declared nodes come from `nodes:`", sn.declared_nodes, ("n1", "n2", "n3", "n4"))
+eq("### nN under Lesson are node entries, repeated ids allowed",
+   [entry.node for entry in sn.entries], ["n1", "n2", "n2"])
+eq("### nN under Retrieval checks are gate entries", [entry.node for entry in sn.gate_entries], ["n3"])
+eq("### nN anywhere else is misplaced", [(entry.node, entry.section) for entry in sn.misplaced],
+   [("n4", "Misconception candidates")])
+eq("an entry keeps its title", sn.entries[2].title, "continued — second pass")
+eq("an entry's body stops at the next entry", "Reseating" in sn.entries[0].body
+   or "reseats" in sn.entries[0].body, False)
+eq("the last Lesson entry stops at the next section", "Mixed check" in sn.entries[-1].body, False)
+eq("the canonical Diagram marker is a fact on each entry",
+   [entry.has_diagram for entry in sn.entries], [True, False, True])
+eq("so is the Check marker", [entry.has_check for entry in sn.entries], [True, True, True])
+eq("entry lines are 1-based in the full note, frontmatter included",
+   SN_NOTE.splitlines()[sn.entries[0].line - 1], "### n1 — Addresses")
+eq("node ids named under Retrieval checks, in order", sn.retrieval_nodes, ("n1", "n2", "n3"))
+eq("the Retrieval checks body is exposed for the gate", sn.retrieval.startswith("Mixed check"), True)
+
+section("session_note — logged checks, every format normalised to one shape")
+checks = sn.checks
+eq("one logged check per `Q:`", len(checks), 6)
+eq("format A: options inline, correct found by the logged answer",
+   (checks[0].question, checks[0].options, checks[0].correct),
+   ("What do we call the location where a piece of data sits in memory?",
+    ("a variable", "an address", "a register"), 1))
+eq("format A's probe text keeps the options the learner saw", "a register" in checks[0].text, True)
+eq("the answer and verdict are not part of the probe text",
+   ("A:" in checks[0].text, "Verdict" in checks[0].text), (False, False))
+eq("format B: the inline marker says which is correct, and is removed",
+   (checks[1].options, checks[1].correct), (("*p = b", "p = &b", "&p = b"), 1))
+eq("key field: options in slot order, the slot is the correct one",
+   (checks[2].options, checks[2].correct),
+   (("`int *p = &x;`", "`int p = *x;`", "`int *p = x;`"), 0))
+eq("a free-response check has no options", (checks[3].options, checks[3].correct), ((), None))
+eq("a key whose slot is outside its count is not normalised", checks[4].options, ())
+eq("every key field is read for slot rotation, well-formed or not",
+   [(key.slot, key.count) for key in sn.keys], [(1, 3), (4, 3)])
+eq("a check knows its line", SN_NOTE.splitlines()[checks[2].line - 1].startswith("**Check.**"), True)
+eq("malformed: the bad key and the answer that matches no option, nothing else",
+   [SN_NOTE.splitlines()[bad.line - 1][:12] for bad in sn.malformed],
+   ["**Check.** Q", 'Q: "Which is'])
+
+MISCOUNT = '**Check.** Q: "something?" / A: "x" / Verdict: correct. key: 1/4 — options: a / b / c'
+eq("an option count that disagrees with the key is malformed",
+   (session_note.parse(MISCOUNT).checks[0].options, len(session_note.parse(MISCOUNT).malformed)), ((), 1))
+ORPHAN = "Some prose.\n\nkey: 2/3 — options: a / b / c\n"
+eq("a key with options and no question to belong to is malformed",
+   (session_note.parse(ORPHAN).checks, len(session_note.parse(ORPHAN).malformed)), ((), 1))
+eq("a bare key is still a key, and not malformed",
+   ([(k.slot, k.count) for k in session_note.parse("Q: x / A: y. key: 2/4").keys],
+    session_note.parse("Q: x / A: y. key: 2/4").malformed), ([(2, 4)], ()))
+
+REVIEW = """---
+kind: review
+review: 02
+date: 2026-09-22
+start: "23:27"
+end: "23:55"
+---
+
+## Checks
+
+- **oop n4** — Q: In Java, `class SavingsAccount extends Account {}`. Which relationship is this?
+  - A. Account is a kind of SavingsAccount.
+  - B. SavingsAccount is a kind of Account.
+  - `key: 2/2 — options: Account is a kind of SavingsAccount. / SavingsAccount is a kind of Account.`
+  - A: "B". Verdict: right.
+- **ptr n4** — Q: Given `int value = 11;`, which line stores its address?
+  - ``key: 2/2 — options: `int* ptr = value;` / `int* ptr = &value;` ``
+"""
+
+section("session_note — review notes, and a key field on its own line")
+rv = session_note.parse(REVIEW)
+eq("kind is review", rv.kind, "review")
+eq("a key on its own line belongs to the check above it in the same item",
+   [(check.options, check.correct) for check in rv.checks],
+   [(("Account is a kind of SavingsAccount.", "SavingsAccount is a kind of Account."), 1),
+    (("`int* ptr = value;`", "`int* ptr = &value;`"), 1)])
+eq("the code span around the field is not part of the last option", rv.malformed, ())
+eq("a blank line ends the item: a later key does not reach back",
+   len(session_note.parse('Q: "far away question?" / A: x\n\nkey: 1/2 — options: a / b').malformed), 1)
+
+section("session_note — open status, with `now` passed in (records.md, Closing an open note)")
+def open_note(now, **fields):
+    head = "".join("%s: %s\n" % (key, value) for key, value in fields.items())
+    return session_note.parse("---\n%s---\n" % head, now=now)
+eq("a note with `end:` is closed",
+   open_note(datetime(2026, 9, 17, 9, 0), date="2026-09-16", start="08:00", end="09:00").status,
+   "closed")
+cut = open_note(datetime(2026, 9, 16, 11, 0), date="2026-09-16", start="08:00", paused="", end="")
+eq("no `paused:` is open (cut off), aged from its start", (cut.status, cut.hours), ("open", 3.0))
+midnight = dict(date="2026-09-16", start="23:50", paused="00:10", end="")
+eq("a 20-minute break across midnight is a live break",
+   open_note(datetime(2026, 9, 17, 1, 30), **midnight).status, "live break")
+eq("the same note is a stale pause once the bound has passed",
+   open_note(datetime(2026, 9, 17, 7, 30), **midnight).status, "stale pause")
+bound = dict(date="2026-09-16", start="08:00", paused="08:00", end="")
+eq("one minute under the bound is a live break",
+   open_note(datetime(2026, 9, 16, 13, 59), **bound).status, "live break")
+eq("exactly at the bound is stale",
+   open_note(datetime(2026, 9, 16, 14, 0), **bound).status, "stale pause")
+eq("an unreadable date leaves the age unknown",
+   open_note(datetime(2026, 9, 17), date="??", start="??", end="").hours, None)
+eq("a future timestamp is a negative age, not a huge one",
+   open_note(datetime(2026, 9, 17, 9, 0), date="2027-01-01", start="10:00", paused="10:20",
+             end="").hours < 0, True)
+
+
 # ------------------------------------------------------------------ open_notes
 
-section("open_notes — the staleness bound (records.md, Closing an open note)")
-midnight = {"file": "s07", "date": "2026-09-16", "start": "23:50", "paused": "00:10", "end": ""}
-eq("a 20-minute break across midnight is live, not stale",
-   "live break" in status.open_notes([midnight], "fx", datetime(2026, 9, 17, 1, 30))[0], True)
-eq("the same note is stale once the bound has passed",
-   "stale pause" in status.open_notes([midnight], "fx", datetime(2026, 9, 17, 7, 30))[0], True)
+section("open_notes — words the parser's status; the bounds are pinned under session_note above")
+def opened(now, stem="fx-note", **fields):
+    head = "".join("%s: %s\n" % (key, value) for key, value in fields.items())
+    return session_note.parse("---\n%s---\n" % head, name=stem, now=now)
 
-bound = {"file": "b", "date": "2026-09-16", "start": "08:00", "paused": "08:00", "end": ""}
-eq("one minute under the bound is a live break",
-   "live break" in status.open_notes([bound], "fx", datetime(2026, 9, 16, 13, 59))[0], True)
-eq("exactly at the bound is stale",
-   "stale pause" in status.open_notes([bound], "fx", datetime(2026, 9, 16, 14, 0))[0], True)
+
+eq("a live break says it is one, and how to reopen it",
+   "live break" in status.open_notes([opened(datetime(2026, 9, 17, 1, 30), date="2026-09-16",
+                                             start="23:50", paused="00:10", end="")], "fx")[0], True)
+eq("a stale pause says it must be finalized",
+   "stale pause" in status.open_notes([opened(datetime(2026, 9, 17, 7, 30), date="2026-09-16",
+                                              start="23:50", paused="00:10", end="")], "fx")[0], True)
 eq("no paused time at all reads as cut off",
-   "cut off" in status.open_notes(
-       [{"file": "c", "date": "2026-09-16", "start": "08:00", "paused": "", "end": ""}],
-       "fx", datetime(2026, 9, 16, 11, 0))[0], True)
+   "cut off" in status.open_notes([opened(datetime(2026, 9, 16, 11, 0), date="2026-09-16",
+                                          start="08:00", paused="", end="")], "fx")[0], True)
 eq("a closed note is never reported",
-   status.open_notes([{"file": "d", "date": "2026-09-16", "start": "08:00",
-                       "paused": "", "end": "09:00"}], "fx", datetime(2026, 9, 17, 9, 0)), [])
-eq("a pre-migration note with no clock fields is fine too",
-   status.open_notes([{"file": "s01", "date": "2026-09-15", "start": "17:19",
-                       "end": "18:18", "paused": ""}], "oop", datetime(2026, 9, 17, 1, 30)), [])
+   status.open_notes([opened(datetime(2026, 9, 17, 9, 0), date="2026-09-16", start="08:00",
+                             paused="", end="09:00")], "fx"), [])
 eq("an unreadable date is reported rather than silently skipped",
-   "cannot be read" in status.open_notes(
-       [{"file": "e", "date": "??", "start": "??", "paused": "", "end": ""}],
-       "fx", datetime(2026, 9, 17, 9, 0))[0], True)
+   "cannot be read" in status.open_notes([opened(datetime(2026, 9, 17, 9, 0), date="??",
+                                                 start="??", paused="", end="")], "fx")[0], True)
 eq("a future timestamp is called out, not reported as a huge age",
-   "in the future" in status.open_notes(
-       [{"file": "f", "date": "2027-01-01", "start": "10:00", "paused": "10:20", "end": ""}],
-       "fx", datetime(2026, 9, 17, 9, 0))[0], True)
+   "paused time is" in status.open_notes([opened(datetime(2026, 9, 17, 9, 0), date="2027-01-01",
+                                                 start="10:00", paused="10:20", end="")], "fx")[0],
+   True)
+eq("the report names the note", status.open_notes(
+    [opened(datetime(2026, 9, 16, 11, 0), stem="s07", date="2026-09-16", start="08:00", end="")],
+    "fx")[0].startswith("fx s07: "), True)
 
 
 # ------------------------------------------------------------------ the clock
@@ -416,6 +587,14 @@ warnings = status.g2_session_notes("fx", G2 / "learn/subjects/fx/sessions")
 eq("a node named only in Retrieval checks (decay check, not re-taught) satisfies nodes: (records.md:82)",
    not any("s06" in w and "nodes" in w for w in warnings), True)
 
+misplaced = clean.replace("none needed, fewer than four new nodes.\n",
+                          "none needed.\n\n## Misconception candidates\n\n### n1 — again\n\nx\n")
+sess(G2, "fx", "s07", misplaced)
+warnings = [w for w in status.g2_session_notes("fx", G2 / "learn/subjects/fx/sessions") if "s07" in w]
+eq("a node entry filed outside Lesson and Retrieval checks is flagged, and nothing else is (records.md:97)",
+   warnings, ["fx s07: n1 is filed under *Misconception candidates*, not *Lesson* or "
+              "*Retrieval checks* (records.md:97)"])
+
 
 # ------------------------------------------------------------------ G4: MC slot rotation
 
@@ -496,17 +675,8 @@ HOST_TOKENS = [
 HEADING = re.compile(r"^#+\s+.*$", re.M)
 
 
-def strip_frontmatter(text):
-    lines = text.splitlines()
-    if lines and lines[0].strip() == "---":
-        for index in range(1, len(lines)):
-            if lines[index].strip() == "---":
-                return "\n".join(lines[index + 1:])
-    return text
-
-
 def normalize_skill(text):
-    body = strip_frontmatter(text)
+    body = vaultlib.strip_frontmatter(text)
     for pattern, replacement in HOST_TOKENS:
         body = pattern.sub(replacement, body)
     return body
@@ -584,9 +754,6 @@ section("J1 — pulling the logged checks out of a session note")
 probes = jev.extract_probes_from(PROBE_NOTE, "fx", "s01")
 texts = [probe["text"] for probe in probes]
 eq("one probe per logged `Q:`", len(texts), 3)
-eq("the options travel with the question", "a register" in texts[0], True)
-eq("the logged answer is not part of the probe", "A:" in texts[0], False)
-eq("the verdict is not part of the probe", "Verdict" in texts[0], False)
 eq("a Check line with no `Q:` is not a probe", any("Establish above" in text for text in texts), False)
 eq("a probe knows which note it came from", (probes[0]["subject"], probes[0]["file"]), ("fx", "s01"))
 
@@ -915,9 +1082,7 @@ eq("a missing resume.md is not an error here -- G1 owns that",
    jev.resume_warnings("fx", J4VAULT / "learn/subjects/fx/nope.md",
                        ask_fn=lambda *a, **k: full, vault=J4VAULT), [])
 
-section("J4 — resume_body strips frontmatter, which is not what a reader reads")
-eq("frontmatter goes", jev.resume_body("---\na: 1\n---\n\nbody here"), "body here")
-eq("a note with no frontmatter is unchanged", jev.resume_body("body here"), "body here")
+section("J4 — names_no_node, the deterministic half")
 eq("names_no_node is one-directional: absence is the finding",
    (jev.names_no_node("solid: n1, n2"), jev.names_no_node("everything is fine")), (False, True))
 
@@ -970,6 +1135,8 @@ eq("both entries found, and nothing from outside the Lesson section",
    [entry["node"] for entry in entries], ["n1", "n2"])
 eq("the Retrieval checks section is not swallowed into the last entry",
    "nothing here is a node entry" in entries[-1]["text"], False)
+eq("gate entries are judged too, a misplaced entry is not (records.md:97)",
+   [entry["node"] for entry in jev.extract_node_entries_from(SN_NOTE)], ["n1", "n2", "n2", "n3"])
 
 section("J5 — the deterministic fallback, and the full pass over a folder")
 eq("a comparison with no edge marked is caught",
@@ -1215,26 +1382,14 @@ eq("a resume that does is not",
    jev.resume_warnings("fx", J6 / "learn/subjects/fx/resume.md", ask_fn=resume_ask(0.98)), [])
 
 
-section("J2 — the key: field now carries its options, and G4 still reads the slot")
+section("J2 — the key: field carries its options")
 KEYED = ('**Check.** Q: "Which line creates pointer p storing x\'s address?" / A: "1" / '
          "Verdict: correct. key: 1/3 — options: `int *p = &x;` / `int p = *x;` / `int *p = x;`")
 checks, skipped = jev.extract_mc_checks_from(KEYED, "fx", "s01")
-eq("one check recovered from the extended field", len(checks), 1)
-eq("every option in slot order", checks[0]["options"],
-   ["`int *p = &x;`", "`int p = *x;`", "`int *p = x;`"])
-eq("the slot says which one was correct", checks[0]["correct_index"], 0)
-eq("G4's own pattern is untouched by the suffix",
-   status.MC_KEY.search(KEYED).groups(), ("1", "3"))
-
-BAD = "**Check.** Q: \"something?\" / A: \"x\" / Verdict: correct. key: 4/3 — options: a / b / c"
-eq("a slot outside its own count is reported, not repaired",
-   jev.extract_mc_checks_from(BAD, "fx", "s01"), ([], 1))
-MISCOUNT = "**Check.** Q: \"something?\" / A: \"x\" / Verdict: correct. key: 1/4 — options: a / b / c"
-eq("an option count that disagrees with the field is too",
+eq("one check recovered from the extended field, in J2's shape",
+   (len(checks), checks[0]["correct_index"], skipped), (1, 0, 0))
+eq("a malformed field is counted as skipped, never guessed at",
    jev.extract_mc_checks_from(MISCOUNT, "fx", "s01"), ([], 1))
-eq("the old quoted format still parses, so the historical corpus is not orphaned",
-   [check["options"] for check in jev.extract_mc_checks_from(PROBE_NOTE, "fx", "s01")[0]],
-   [["a variable", "an address", "a register"]])
 
 
 section("J2 — a leak is the blind run beating chance, not the sighted run being right")

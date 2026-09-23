@@ -9,7 +9,7 @@ import re
 import tempfile
 from pathlib import Path
 
-KEY = re.compile(r"\bkey:\s*(\d+)/(\d+)")
+import session_note
 
 
 def logged_slots(vault, scope, subject):
@@ -17,7 +17,7 @@ def logged_slots(vault, scope, subject):
         files = sorted((vault / "learn/reviews").glob("*.md"))
     else:
         files = sorted((vault / "learn/subjects" / subject / "sessions").glob("*.md"))
-    return [int(match.group(1)) for path in files for match in KEY.finditer(path.read_text())]
+    return [key.slot for path in files for key in session_note.read(path).keys]
 
 
 def allowed(slot, history):

@@ -41,7 +41,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import vaultlib  # noqa: E402 -- sibling module, same directory as this file
+import session_note  # noqa: E402 -- sibling modules, same directory as this file
+import vaultlib  # noqa: E402
 
 VAULT = Path(__file__).resolve().parents[2]
 CACHE_DIR = VAULT / ".claude" / "jev"
@@ -272,17 +273,9 @@ def paired_drop(left, right, *, ask_fn=None, vault=VAULT):
 # instrument: "which of the following" points at the options, which the learner
 # can see, while "the code above" points at something they cannot.
 
-# A logged check is one line: `Q: <question> / A: <answer> / Verdict: <verdict>`,
-# with the separators varying by note (`/`, an arrow, or plain whitespace) and
-# the Q sometimes numbered or annotated (`Q1:`, `Q (free response):`). Everything
-# from `Q:` up to the answer or verdict marker is the probe, options included.
-CHECK_Q = re.compile(
-    r"\bQ\s*\d*\s*(?:\([^)]*\))?\s*:\s*"
-    r"(?P<text>.+?)"
-    r"(?=(?:\s*[/→])?\s+A(?:\s*\([^)]*\))?\s*:"
-    r"|(?:\s*[/→])?\s*Verdict\s*:"
-    r"|$)"
-)
+# What counts as a logged check, and what text it showed the learner, is
+# `session_note`'s to say (its `CHECK_Q`): the whole `Q:` up to the answer or
+# verdict marker, options included when they were logged inline.
 
 # Below this a "probe" is a logging fragment, not a question -- asking Jev
 # whether a six-character string stands alone is noise, not a check.
@@ -323,20 +316,9 @@ NOT_DANGLING = re.compile(r"which\s+of\s+the\s+following", re.I)
 
 
 def extract_probes_from(text, subject="", file=""):
-    """Every logged check in one session note, as the learner would have seen it.
-
-    Line-scoped on purpose: a logged check is one line in every note written so
-    far, and a regex allowed to run across lines would swallow the next node's
-    prose into the question text.
-    """
-    probes = []
-    for number, line in enumerate(text.splitlines(), start=1):
-        for match in CHECK_Q.finditer(line):
-            probe = match.group("text").strip().strip("/→ ").strip()
-            if len(probe) < MIN_PROBE_CHARS:
-                continue
-            probes.append({"subject": subject, "file": file, "line": number, "text": probe})
-    return probes
+    """Every logged check in one session note, as the learner would have seen it."""
+    return [{"subject": subject, "file": file, "line": check.line, "text": check.text}
+            for check in session_note.parse(text).checks if len(check.text) >= MIN_PROBE_CHARS]
 
 
 def extract_probes(vault=VAULT):
@@ -815,12 +797,7 @@ def resume_verdict(answers):
 
 def resume_body(text):
     """The note without its frontmatter -- the part a reader actually reads."""
-    lines = text.splitlines()
-    if lines and lines[0].strip() == "---":
-        for index in range(1, len(lines)):
-            if lines[index].strip() == "---":
-                return "\n".join(lines[index + 1:]).strip()
-    return text.strip()
+    return vaultlib.strip_frontmatter(text).strip()
 
 
 def names_no_node(text):
@@ -918,21 +895,23 @@ BOUNDARY_MARKS = re.compile(
     r"|where\s+(?:this|the)\s+analogy|the\s+analogy\s+(?:ends|breaks|stops)"
     r"|only\s+goes\s+so\s+far|does\s+not\s+carry|doesn'?t\s+carry)\b", re.I)
 
-# One node entry in a session note: `### nN ...` under the *Lesson* heading, up to
-# the next entry or the next top-level section.
-NODE_ENTRY = re.compile(r"^###\s+(?P<node>n\d+)\b(?P<rest>.*?)(?=^###\s+n\d+\b|^##\s+|\Z)",
-                        re.M | re.S)
-
 
 def extract_node_entries_from(text, subject="", file=""):
-    """Every `### nN` lesson entry in one session note, with its body."""
-    entries = []
-    for match in NODE_ENTRY.finditer(text or ""):
-        body = match.group("rest").strip()
+    """Every node entry in one session note, with its body.
+
+    Node entries are the `### nN` blocks filed under *Lesson* and, for a gate
+    node, under *Retrieval checks* (records.md:97), in note order. One filed
+    anywhere else is misplaced: G2 reports it, and it is not judged here as if
+    it were the teaching of that node.
+    """
+    note = session_note.parse(text)
+    entries = sorted(note.entries + note.gate_entries, key=lambda entry: entry.line)
+    found = []
+    for entry in entries:
+        body = (entry.title + "\n" + entry.body).strip()
         if body:
-            entries.append({"subject": subject, "file": file, "node": match.group("node"),
-                            "text": body})
-    return entries
+            found.append({"subject": subject, "file": file, "node": entry.node, "text": body})
+    return found
 
 
 def analogy_spec():
@@ -998,88 +977,25 @@ def analogy_warnings(slug, folder, ask_fn=None, vault=VAULT):
 
 # --------------------------------------------------------------------- J2 calibration
 
-# Two formats seen in the live session notes when a check's full option text
-# was preserved (most checks only log the chosen slot and count, e.g. `key:
-# 2/3`, or a prose summary -- neither carries enough to ask Jev the actual
-# question). Format A: "(options: x / y / z)" with the correct one identified
-# by matching the logged answer text. Format B: "(options, slot order: x /
-# y [correct, slot N] / z)" with the correct one marked inline.
-CHECK_RE = re.compile(
-    r'Q:\s*"(?P<q>[^"]+)"\s*'
-    r'\(options(?:,\s*slot order)?\s*:\s*(?P<opts>[^)]+)\)\s*'
-    r'/\s*A:\s*"(?P<a>[^"]+)"'
-)
-SLOT_MARK = re.compile(r"\s*\[correct,\s*slot\s*\d+\]\s*$")
-
-
-def _split_options(raw):
-    parts = [part.strip() for part in raw.split(" / ")]
-    correct_index = None
-    cleaned = []
-    for index, part in enumerate(parts):
-        marked = SLOT_MARK.search(part)
-        if marked:
-            correct_index = index
-            part = part[: marked.start()].strip()
-        cleaned.append(part)
-    return cleaned, correct_index
-
-
-# Format C, and the only one written going forward: the `key:` field G4 already
-# requires, carrying its option text in slot order.
-#
-#   key: 2/3 — options: `*p = b` / `p = &b` / `&p = b`
-#
-# Extending the existing field rather than adding a second one is deliberate.
-# `learn-status.py`'s `MC_KEY` is `\bkey:\s*(\d+)/(\d+)`, so G4 reads this
-# unchanged, there is one field to remember instead of two, and the slot already
-# says which option was correct -- so format B's inline `[correct, slot N]`
-# marker becomes redundant. `encode-lessons` rung 1: the bad state (a check whose
-# options were never recorded) stops being representable in a well-formed log.
-KEYED_OPTIONS = re.compile(
-    r"\bkey:\s*(?P<slot>\d+)\s*/\s*(?P<count>\d+)\s*[—–-]\s*options:\s*(?P<opts>\S.*?)\s*$")
+# A check's option text survives in three formats -- legacy A and B, and the
+# `key:` field written going forward -- and `session_note` normalises all three
+# into one shape (question, options, correct index). Most older checks log only
+# a slot or a prose summary, which carries too little to ask Jev the question.
 
 
 def extract_mc_checks_from(text, subject="", file=""):
     """Every logged MC check in one note whose option text survives, any format.
 
-    Returns `(checks, skipped)`. Line-scoped for the same reason
-    `extract_probes_from` is: a logged check is one line in every note written so
-    far, and a pattern allowed to run across lines swallows the next one.
+    Returns `(checks, skipped)`, where `skipped` counts the lines the parser
+    recognised as a check or key field and could not read. A malformed field is
+    reported, never repaired and never guessed at: G2 and G4 own "is the field
+    well-formed", not this.
     """
-    found, skipped = [], 0
-    for line in text.splitlines():
-        keyed = KEYED_OPTIONS.search(line)
-        if keyed:
-            options = [part.strip() for part in keyed.group("opts").split(" / ")]
-            slot, count = int(keyed.group("slot")), int(keyed.group("count"))
-            question = CHECK_Q.search(line[: keyed.start()])
-            if question and len(options) == count and 1 <= slot <= count:
-                found.append({"subject": subject, "file": file,
-                              "question": question.group("text").strip().strip("/→ ").strip(),
-                              "options": options, "correct_index": slot - 1})
-            else:
-                # A malformed field is reported, never repaired and never guessed
-                # at: G2 and G4 own "is the field well-formed", not this.
-                skipped += 1
-            continue
-        for match in CHECK_RE.finditer(line):
-            options, correct_index = _split_options(match.group("opts"))
-            if correct_index is None:
-                # Format A: no inline marker, so identify the correct option by
-                # matching the logged answer text against the options.
-                answer = match.group("a").strip().strip("`").lower()
-                for index, option in enumerate(options):
-                    if option.strip("`").lower() == answer:
-                        correct_index = index
-                        break
-            if correct_index is None:
-                skipped += 1
-                continue
-            found.append({"subject": subject, "file": file,
-                          "question": match.group("q").strip(),
-                          "options": options, "correct_index": correct_index})
-    return found, skipped
+    note = session_note.parse(text)
+    found = [{"subject": subject, "file": file, "question": check.question,
+              "options": list(check.options), "correct_index": check.correct}
+             for check in note.checks if check.options]
+    return found, len(note.malformed)
 
 
 def find_mc_checks_with_options(vault=VAULT):

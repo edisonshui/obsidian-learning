@@ -19,7 +19,7 @@ The SessionStart hook prints the date, each subject's title, status, last sessio
 - **`learn/me/preferences.md`:** append to *Observed* only, with evidence. Never edit *Stated*.
 - **Reliability rules in `tutor.md` are non-negotiable.** Verify before the learner builds on a claim.
 - **A retrieval check is a gate.** Never open a fourth consecutive new node without a logged mixed retrieval check. If one is skipped, the reason goes under *Retrieval checks* in the session note; that section is never left empty.
-- **Every node logs a `Diagram:` line** — the mermaid block, or one sentence on why the idea has no shape worth drawing. A decision that leaves no trace gets skipped by default.
+- **Every node logs a `**Diagram.**` line** — the mermaid block, or one sentence on why the idea has no shape worth drawing. A decision that leaves no trace gets skipped by default.
 - **Never claim a write you did not make.** `/learn-end` re-reads every file it touched and reports what actually changed. If a write was skipped or a permission prompt was declined, say so.
 - Skills describe the file mechanics: `/learn-start`, `/learn-resume`, `/learn-check`, `/learn-end`, `/learn-review`. A review is the only one that is not a session of a single subject: it writes evidence into several `record.md` files and its narrative into `learn/reviews/`, and it changes no subject's `sessions:` or `last_session`. Record schema is in `learn/system/records.md`; read it before writing any record.
 
