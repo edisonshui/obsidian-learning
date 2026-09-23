@@ -37,3 +37,5 @@ learn/reviews/
 
 # Third-party Obsidian plugins. Reinstallable, and dataview alone is 2.3MB.
 .obsidian/plugins/
+.scratch/
+CONTEXT.md
