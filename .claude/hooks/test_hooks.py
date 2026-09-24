@@ -1233,17 +1233,18 @@ eq("a latest marker date that differs from Last checked is reported",
 eq("a marker naming an unknown node id is reported",
    any(w.startswith("fx n9:") and "not in the node table" in w for w in marker_found), True)
 eq("an agreeing node is not reported", [w for w in marker_found if w.startswith("fx n3:")], [])
-eq("the no-marker check is off until the backfill lands", status.MARKERS_REQUIRED, False)
-eq("so a checked node with no marker is not reported while it is off",
-   [w for w in marker_found if "no transition marker" in w], [])
-status.MARKERS_REQUIRED = True
-try:
-    required = status.marker_warnings("fx", dict(MARKED, n5=marker_node("n5", "checked", "2026-09-21")),
-                                      status.evidence_events(MARKER_LOG, {}))
-finally:
-    status.MARKERS_REQUIRED = False
-eq("flipping the constant reports a checked node with no marker, and not an introduced one",
+eq("the no-marker check is on now the backfill has landed", status.MARKERS_REQUIRED, True)
+UNMARKED = dict(MARKED, n5=marker_node("n5", "checked", "2026-09-21"))
+required = status.marker_warnings("fx", UNMARKED, status.evidence_events(MARKER_LOG, {}))
+eq("a checked node with no marker is reported, and not an introduced one",
    [w.split(":")[0] for w in required if "no transition marker" in w], ["fx n5"])
+status.MARKERS_REQUIRED = False
+try:
+    relaxed = status.marker_warnings("fx", UNMARKED, status.evidence_events(MARKER_LOG, {}))
+finally:
+    status.MARKERS_REQUIRED = True
+eq("switching the constant off silences the no-marker check",
+   [w for w in relaxed if "no transition marker" in w], [])
 
 MARKER_FOLDER = fresh() / "learn/subjects/fx"
 write(MARKER_FOLDER / "record.md", MARKER_LOG)

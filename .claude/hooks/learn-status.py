@@ -142,9 +142,9 @@ MARKER = re.compile(r"(n\d+) (%s)" % "|".join(STATUSES))
 EVIDENCE_LINE = re.compile(r"^- (\d{4}-\d{2}-\d{2})\b\W*([sr]\d+\b)?")
 NOTE_STEM = re.compile(r"^(\d{4}-\d{2}-\d{2})-([sr]\d+)$")
 
-# Off until the marker backfill (ticket 04) gives every existing line its marker:
-# before that, every proven node in the vault would be reported.
-MARKERS_REQUIRED = False
+# On since the marker backfill (ticket 04) gave every existing evidence line its
+# marker. Switching it off hides a proven node whose markers were never written.
+MARKERS_REQUIRED = True
 
 
 def markers(line):
