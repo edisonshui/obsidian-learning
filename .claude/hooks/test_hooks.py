@@ -804,6 +804,16 @@ for host in (".claude", ".agents"):
        "`deadline: YYYY-MM-DD`" in (VAULT_ROOT / host / "skills/learn-start/SKILL.md").read_text(), True)
 
 
+section("skill drift, both learn-end copies set goal_met:, and the done subjects carry it")
+for host in (".claude", ".agents"):
+    eq("%s/learn-end sets goal_met: when the goal is met" % host,
+       "set `status: done` and `goal_met:` to today" in (VAULT_ROOT / host / "skills/learn-end/SKILL.md").read_text(),
+       True)
+for record in sorted((VAULT_ROOT / "learn/subjects").glob("*/record.md")):
+    fields = vaultlib.frontmatter(record)
+    if fields.get("status") == "done":
+        eq("%s is done and has goal_met:" % record.parent.name, bool(fields.get("goal_met")), True)
+
 # ------------------------------------------------------------------ J1 / J3 (PLAN-2026-09-22.md Phase 4)
 
 # Nothing below touches the network. Every Jev-backed function takes an `ask_fn`,
@@ -1492,6 +1502,168 @@ eq("--next prints the ranking from the records",
                           "2. Start · any subject · $learn-start · start something new"])
 eq("--next writes no file", sorted(str(p) for p in NEXT_VAULT.rglob("*")), before)
 
+
+
+section("rewards, badges from transition markers (spec section 2)")
+def reward_texts(found):
+    return [badge["text"] for badge in found["badges"]]
+SOLID_ONCE = rsubject("s", [rnode("n1", "solid", "2026-09-22", name="Aliasing")],
+                      [marker_event("n1", "2026-09-15", "checked"), marker_event("n1", "2026-09-20", "solid"),
+                       marker_event("n1", "2026-09-22", "solid")])
+eq("a Solid badge is dated by the node's first solid marker",
+   reward_texts(status.rewards([SOLID_ONCE], DUE_DAY)), ["Solid: Aliasing, 2026-09-20"])
+
+TWICE = rsubject("t", [rnode("n1", "solid", "2026-09-21", name="Aliasing")],
+                 [marker_event("n1", "2026-09-01", "checked"), marker_event("n1", "2026-09-05", "solid"),
+                  marker_event("n1", "2026-09-10"), marker_event("n1", "2026-09-11"),
+                  marker_event("n1", "2026-09-14", "solid"), marker_event("n1", "2026-09-15", "solid"),
+                  marker_event("n1", "2026-09-17"), marker_event("n1", "2026-09-19", "checked"),
+                  marker_event("n1", "2026-09-21", "solid")])
+eq("each solid marker after a lapse is a Recovered badge; the first Solid badge stays; newest first",
+   reward_texts(status.rewards([TWICE], DUE_DAY)),
+   ["Recovered: Aliasing, 2026-09-21", "Recovered: Aliasing, 2026-09-14", "Solid: Aliasing, 2026-09-05"])
+
+SAME_DATE = [rsubject("b", [rnode("n1", "solid", "2026-09-20", name="Solid one"),
+                            rnode("n2", "solid", "2026-09-20", name="Back again")],
+                      [marker_event("n1", "2026-09-20", "solid"), marker_event("n2", "2026-09-18"),
+                       marker_event("n2", "2026-09-20", "solid")], title="Beta"),
+             rsubject("a", [], goal_met="2026-09-20", title="Alpha", status="done")]
+eq("a Goal met badge is dated by goal_met:; one date orders goal, recovered, solid, then title and plan order",
+   [(b["kind"], b["title"], b["text"]) for b in status.rewards(SAME_DATE, DUE_DAY)["badges"]],
+   [("Goal met", "Alpha", "Goal met: Alpha, 2026-09-20"), ("Recovered", "Beta", "Recovered: Back again, 2026-09-20"),
+    ("Solid", "Beta", "Solid: Solid one, 2026-09-20"), ("Solid", "Beta", "Solid: Back again, 2026-09-20")])
+eq("a subject without goal_met: has no Goal met badge",
+   [b["kind"] for b in status.rewards([rsubject("c", [], status="done")], DUE_DAY)["badges"]], [])
+eq("nothing dated after today counts",
+   reward_texts(status.rewards(SAME_DATE, datetime(2026, 9, 19).date())), [])
+
+
+section("rewards, open recoveries")
+OPEN = rsubject("o", [rnode("n1", "checked", "2026-09-22", name="Re-taught"), rnode("n2", "decayed", "2026-09-21"),
+                      rnode("n3", "solid", "2026-09-22")],
+                [marker_event("n1", "2026-09-10", "solid"), marker_event("n1", "2026-09-20"),
+                 marker_event("n1", "2026-09-22", "checked"), marker_event("n2", "2026-09-19"),
+                 marker_event("n2", "2026-09-21"), marker_event("n3", "2026-09-18"),
+                 marker_event("n3", "2026-09-22", "solid")])
+eq("a lapse stays open through a re-teach until a solid marker; a recovered node is not open",
+   [(r["subject"], r["node"], r["name"], r["date"]) for r in status.rewards([OPEN], DUE_DAY)["open_recoveries"]],
+   [("o", "n1", "Re-taught", "2026-09-20"), ("o", "n2", "N2", "2026-09-19")])
+eq("no lapse, no open recovery", status.rewards([SOLID_ONCE, TWICE], DUE_DAY)["open_recoveries"], [])
+
+RELAPSE = rsubject("r", [rnode("n4", "decayed", "2026-09-20")],
+                   [marker_event("n4", "2026-09-15"), marker_event("n4", "2026-09-17", "checked"),
+                    marker_event("n4", "2026-09-20")])
+eq("an open recovery is dated by the latest lapse, after a re-teach and a second decay",
+   [r["date"] for r in status.rewards([RELAPSE], DUE_DAY)["open_recoveries"]], ["2026-09-20"])
+
+
+section("rewards, counts, which a decay never shrinks")
+def counts_on(subjects, day):
+    return status.rewards(subjects, day)["counts"]
+COUNTED = [rsubject("c", [rnode("n1", "solid", "2026-09-20"), rnode("n2", "checked", "2026-09-18"),
+                          rnode("n3", "skipped"), rnode("n4", "introduced"), rnode("n5", "planned"),
+                          rnode("n6", "introduced")],
+                    [marker_event("n1", "2026-09-15", "checked"), marker_event("n1", "2026-09-20", "solid"),
+                     marker_event("n2", "2026-09-18", "checked"), marker_event("n6", "2026-09-16", "checked"),
+                     marker_event("n6", "2026-09-19"), marker_event("n6", "2026-09-19", "introduced")],
+                    goal_met="2026-09-21", status="done"),
+           rsubject("d", [rnode("n1", "solid", "2026-09-22")],
+                    [marker_event("n1", "2026-09-10", "checked"), marker_event("n1", "2026-09-12", "solid"),
+                     marker_event("n1", "2026-09-17"), marker_event("n1", "2026-09-22", "solid")])]
+eq("proven counts checked, solid, and skipped nodes and any node that ever had a checked or solid marker",
+   {key: counts_on(COUNTED, DUE_DAY)[key] for key in ("nodes_proven", "checks_passed", "goals_met")},
+   {"nodes_proven": 5, "checks_passed": 3, "goals_met": 1})
+DECAYS = [rsubject("d", [rnode("n1", "decayed", "2026-09-17"), rnode("n2", "solid", "2026-09-12")],
+                   [marker_event("n1", "2026-09-10", "checked"), marker_event("n1", "2026-09-12", "solid"),
+                    marker_event("n2", "2026-09-12", "solid"), marker_event("n1", "2026-09-17")])]
+before_decay = counts_on(DECAYS, datetime(2026, 9, 16).date())
+after_decay = counts_on(DECAYS, datetime(2026, 9, 17).date())
+eq("a decay leaves nodes proven, checks passed, goals met, and best streak where they were",
+   [after_decay[key] - before_decay[key] for key in ("nodes_proven", "checks_passed", "goals_met", "best_streak")],
+   [0, 0, 0, 0])
+FIRST_CHECK = [rsubject("f", [rnode("n1", "checked", "2026-09-24"), rnode("n2", "skipped")],
+                        [marker_event("n1", "2026-09-24", "checked")])]
+eq("a node first checked today is not proven the day before; a skipped node needs no marker",
+   (counts_on(FIRST_CHECK, datetime(2026, 9, 23).date())["nodes_proven"], counts_on(FIRST_CHECK, DUE_DAY)["nodes_proven"]),
+   (1, 2))
+eq("and the proven count is the full one on both days", (before_decay["nodes_proven"], after_decay["nodes_proven"]), (2, 2))
+
+
+section("rewards, the weekly review streak (spec section 2)")
+NEUTRAL = rsubject("nt", [rnode("n1", "solid", "2026-09-15")],
+                   [marker_event("n1", "2026-08-31", "checked"), marker_event("n1", "2026-09-02", "solid"),
+                    marker_event("n1", "2026-09-07"), marker_event("n1", "2026-09-15", "solid")])
+neutral = status.rewards([NEUTRAL], DUE_DAY)["streak"]
+eq("a pass adds a week, a week with nothing due is neutral, the current week is pending",
+   ([w["result"] for w in neutral["weeks"]], neutral["current"], neutral["best"], neutral["alive"]),
+   (["pass", "neutral", "pass", "pending"], 2, 2, True))
+eq("weeks run Monday to Sunday, and each lists the nodes due in it",
+   [(w["start"], w["due"]) for w in neutral["weeks"]],
+   [("2026-08-31", []), ("2026-09-07", []), ("2026-09-14", []), ("2026-09-21", [("nt", "n1")])])
+eq("the streak shows in the counts",
+   (counts_on([NEUTRAL], DUE_DAY)["current_streak"], counts_on([NEUTRAL], DUE_DAY)["best_streak"]), (2, 2))
+eq("no markers, no streak",
+   status.rewards([rsubject("e", [])], DUE_DAY)["streak"], {"current": 0, "best": 0, "alive": False, "weeks": []})
+
+STREAK_START = datetime(2026, 8, 3).date()  # a Monday
+def week_day(week, day=0):
+    return (STREAK_START + timedelta(weeks=week, days=day)).isoformat()
+def streak_of(passes, today_week, repairs=()):
+    """n0 is checked in week 0 and stays due. Each passed week passes a node checked
+    that Monday, so it was never due before; a repair passes n0 on a Tuesday."""
+    found = [marker_event("n0", week_day(0), "checked")]
+    for week in passes:
+        found += [marker_event("n%d" % (week + 1), week_day(week), "checked"),
+                  marker_event("n%d" % (week + 1), week_day(week, 1), "solid")]
+    found += [marker_event("n0", week_day(week, 1), "solid") for week in repairs]
+    found.sort(key=lambda event: event["date"])
+    streak = status.rewards([rsubject("st", [], found)], STREAK_START + timedelta(weeks=today_week, days=3))["streak"]
+    return [w["result"] for w in streak["weeks"]], streak["current"], streak["best"]
+eq("an unpaid previous week and the current week are pending, and reset nothing",
+   streak_of({0, 1}, 3), (["pass", "pass", "pending", "pending"], 2, 2))
+eq("the previous week's miss is repaired this week by passing a node that was due in it",
+   streak_of({0, 1}, 3, repairs={3}), (["pass", "pass", "repaired", "pass"], 3, 3))
+eq("a repair in the following week makes the miss neutral once both weeks are past",
+   streak_of({0, 1}, 5, repairs={3}), (["pass", "pass", "repaired", "pass", "pending", "pending"], 3, 3))
+eq("a pass on a node that was not due does not repair; the first miss is forgiven",
+   streak_of({0, 1, 3}, 5), (["pass", "pass", "forgiven", "pass", "pending", "pending"], 3, 3))
+eq("a second miss within 4 weeks of a forgiven one resets the streak; best keeps its high",
+   streak_of({0, 1, 3, 5}, 7), (["pass", "pass", "forgiven", "pass", "miss", "pass", "pending", "pending"], 1, 3))
+eq("a miss 4 weeks after a forgiven one is forgiven again",
+   streak_of({0, 1, 3, 4, 5}, 8),
+   (["pass", "pass", "forgiven", "pass", "pass", "pass", "forgiven", "pending", "pending"], 5, 5))
+eq("a streak reset to 0 is not alive",
+   status.rewards([rsubject("st", [], [marker_event("n0", week_day(0), "checked")])],
+                  STREAK_START + timedelta(weeks=5))["streak"]["alive"], False)
+
+
+section("rewards setting, on, off, missing, and anything else (spec section 4)")
+def setting(frontmatter_line):
+    vault = fresh()
+    write(vault / "learn/me/preferences.md", "---\nlearner: Edison\n%s---\n\n# Learner preferences\n"
+          % (frontmatter_line + "\n" if frontmatter_line else ""))
+    return status.rewards_setting(vault)
+eq("on, true, and yes mean on, in any case",
+   [setting("rewards: %s" % value) for value in ("on", "true", "yes", "On", "YES")], [(True, None)] * 5)
+eq("off, false, and no mean off, with no warning",
+   [setting("rewards: %s" % value) for value in ("off", "false", "no", "Off")], [(False, None)] * 4)
+eq("a trailing comment is not part of the value",
+   (setting("rewards: on  # off hides badges, streak, and reward lines"),
+    setting("rewards: off # hidden")), ((True, None), (False, None)))
+eq("a comment with no value is a missing value, so on", setting("rewards: # later"), (True, None))
+eq("a missing key, or a missing file, means on",
+   (setting(""), status.rewards_setting(fresh())), ((True, None), (True, None)))
+unknown = setting("rewards: quiet")
+eq("any other value means off and is reported as a record inconsistency",
+   (unknown[0], "rewards: quiet" in (unknown[1] or "") and "preferences.md" in (unknown[1] or "")), (False, True))
+eq("the vault's own preferences.md reads as on", status.rewards_setting(HOOKS.parents[1]), (True, None))
+
+SETTING_VAULT = fresh()
+write(SETTING_VAULT / "learn/me/preferences.md", "---\nrewards: loud\n---\n")
+subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(SETTING_VAULT), "--quiet"], check=True)
+eq("the run lists an unknown rewards: value under Record inconsistencies",
+   "rewards: loud" in (SETTING_VAULT / "learn/Dashboard.md").read_text().split("## Record inconsistencies", 1)[-1],
+   True)
 
 # ------------------------------------------------ J4 / J5 (PLAN-2026-09-22.md Phase 5)
 

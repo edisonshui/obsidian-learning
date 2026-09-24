@@ -511,6 +511,172 @@ def next_report(ranked, host="claude"):
                      for number, found in enumerate(ranked, 1))
 
 
+# ------------------------------------------------------------ derived rewards
+
+# Rewards are read from the records every time and never stored (spec section 2,
+# `CONTEXT.md`, *Reward*). Only markers dated on or before `today` count, and a
+# caller can drop marker lines to get the state without them.
+
+BADGE_ORDER = ["Goal met", "Recovered", "Solid"]
+
+REWARDS_ON, REWARDS_OFF = {"on", "true", "yes"}, {"off", "false", "no"}
+
+
+def rewards_setting(vault):
+    """(on, warning) from `rewards:` in `learn/me/preferences.md` (spec section 4).
+
+    Missing means on. An unknown value means off, since showing rewards the
+    learner may have tried to turn off is the worse mistake, and the warning
+    puts it under *Record inconsistencies*. `frontmatter()` keeps a trailing
+    `# comment`, and the file ships with one, so it is cut here.
+    """
+    raw = frontmatter(Path(vault) / "learn" / "me" / "preferences.md").get("rewards", "")
+    value = re.sub(r"(^|\s+)#.*$", "", raw).strip().strip("\"'").lower()
+    if not value or value in REWARDS_ON:
+        return True, None
+    if value in REWARDS_OFF:
+        return False, None
+    return False, ("learn/me/preferences.md: `rewards: %s` is not on or off, so rewards are off "
+                   "(use on, true, yes, off, false, or no)" % value)
+
+
+def badge(kind, slug, title, node, name, date):
+    return {"kind": kind, "subject": slug, "title": title, "node": node, "name": name,
+            "date": date, "text": "%s: %s, %s" % (kind, name, date)}
+
+
+def rewards(subjects, today):
+    """The learner's reward state on `today`.
+
+    `subjects` is a list of (slug, nodes, fields, events), the same shape
+    `rank()` takes. Returns a dict of badges and the rest; writes nothing.
+    """
+    stamp = today.isoformat()
+    badges, recoveries = [], []
+    counts = {"nodes_proven": 0, "checks_passed": 0, "goals_met": 0}
+    for slug, nodes, fields, events in subjects:
+        title = fields.get("title", slug)
+        goal = to_date(fields.get("goal_met"))
+        if goal and goal <= today:
+            counts["goals_met"] += 1
+            badges.append(badge("Goal met", slug, title, None, title, goal.isoformat()))
+        dated = [event for event in events if event["date"] and event["date"] <= stamp]
+        lapse_events = [id(event) for event in lapses(dated)]
+        solid, lapsed, proven = set(), {}, set()  # lapsed: node -> date of its open lapse
+        for event in dated:
+            node, name = event["node"], nodes.get(event["node"], {}).get("name") or event["node"]
+            if event["status"] in ("checked", "solid"):
+                proven.add(node)
+            if id(event) in lapse_events:
+                lapsed[node] = event["date"]
+            elif event["status"] == "solid":
+                counts["checks_passed"] += 1
+                if node not in solid:
+                    solid.add(node)
+                    badges.append(badge("Solid", slug, title, node, name, event["date"]))
+                if lapsed.pop(node, None):
+                    badges.append(badge("Recovered", slug, title, node, name, event["date"]))
+        # A node is proven from its first checked or solid marker, and a decay
+        # after that takes nothing away (spec section 2, *Counts*). A skipped
+        # node has no check to mark, and a status with no marker at all is
+        # counted from the table, which marker_warnings() already reports.
+        marked = {event["node"] for event in events}
+        counts["nodes_proven"] += sum(
+            1 for node, entry in nodes.items()
+            if node in proven or entry.get("status") == "skipped"
+            or (entry.get("status") in DECAYABLE and node not in marked))
+        recoveries += [{"subject": slug, "title": title, "node": node,
+                        "name": nodes.get(node, {}).get("name") or node, "date": date}
+                       for node, date in sorted(lapsed.items(), key=lambda item: sort_key(item[0]))]
+    # Newest first; on one date a goal, then a recovery, then a solid (spec section 8).
+    badges.sort(key=lambda found: (BADGE_ORDER.index(found["kind"]), found["title"],
+                                   sort_key(found["node"]) if found["node"] else 0))
+    badges.sort(key=lambda found: found["date"], reverse=True)
+    streak = review_streak(subjects, today)
+    counts.update(current_streak=streak["current"], best_streak=streak["best"])
+    return {"badges": badges, "open_recoveries": recoveries, "counts": counts, "streak": streak}
+
+
+# A missed week is forgiven unless another forgiven miss fell this many weeks
+# before it, so one miss in any four weeks costs nothing.
+FORGIVE_WEEKS = 3
+
+
+def review_streak(subjects, today):
+    """The weekly review streak on `today` (spec section 2, `CONTEXT.md`,
+    *Review streak*).
+
+    A node is due on a day by `is_due()` applied to its last marker on or
+    before that day, so the streak and the ranking share one due rule. Each
+    week is `pass`, `neutral`, `repaired`, `forgiven`, `miss`, or `pending`;
+    only a miss resets the current streak, and only a pass adds to it.
+    """
+    history, deadlines, solids = {}, {}, {}
+    for slug, _, fields, events in subjects:
+        deadlines[slug] = fields.get("deadline")
+        for event in events:
+            when = to_date(event["date"])
+            if not when or when > today:
+                continue
+            key = (slug, event["node"])
+            history.setdefault(key, []).append((when, event["status"]))
+            if event["status"] == "solid":
+                solids.setdefault(monday(when), set()).add(key)
+    if not history:
+        return {"current": 0, "best": 0, "alive": False, "weeks": []}
+
+    first = min(when for markers in history.values() for when, _ in markers)
+    this_week = monday(today)
+    starts, weeks, start = [], [], monday(first)
+    while start <= this_week:
+        days = [start + timedelta(days=offset) for offset in range(7)]
+        starts.append(start)
+        weeks.append({"start": start.isoformat(), "due": sorted(
+            key for key, markers in history.items()
+            if any(is_due_on(markers, day, deadlines[key[0]]) for day in days if first <= day <= today))})
+        start += timedelta(days=7)
+
+    current = best = 0
+    forgiven = []
+    for index, (start, week) in enumerate(zip(starts, weeks)):
+        if start in solids:
+            result = "pass"
+            current += 1
+        elif start == this_week:
+            result = "pending"  # it can still pass
+        elif not week["due"]:
+            result = "neutral"
+        elif set(week["due"]) & solids.get(start + timedelta(days=7), set()):
+            result = "repaired"
+        elif start == this_week - timedelta(days=7):
+            result = "pending"  # it can still be repaired this week
+        elif any(index - FORGIVE_WEEKS <= earlier < index for earlier in forgiven):
+            result = "miss"
+            current = 0
+        else:
+            result = "forgiven"
+            forgiven.append(index)
+        best = max(best, current)
+        week["result"] = result
+    return {"current": current, "best": best, "alive": current > 0, "weeks": weeks}
+
+
+def monday(day):
+    """The Monday that starts `day`'s week."""
+    return day - timedelta(days=day.weekday())
+
+
+def is_due_on(markers, day, deadline):
+    """Whether a node with these (date, status) markers, in event order, was
+    due on `day`. Its state is its last marker on or before that day."""
+    state = None
+    for when, status in markers:
+        if when > day:
+            break
+        state = {"status": status, "checked": when.isoformat()}
+    return bool(state) and is_due(state, day, deadline)
+
+
 def due_report(rows, undated):
     """`--due` as the tutor and Edison read it. One node per line, stalest first."""
     out = []
@@ -1109,6 +1275,8 @@ def main():
     # the vault where MC slots were ungated, which is precisely the kind of
     # silent gap PLAN-2026-09-22.md exists to close.
     warnings += g4_mc_slots("review", vault / "learn" / "reviews")
+    _, setting_warning = rewards_setting(vault)
+    warnings += [setting_warning] if setting_warning else []
 
     board = vault / "learn" / "Dashboard.md"
     board.write_text(dashboard(subjects, today, warnings, openings))

@@ -21,7 +21,7 @@ Run `date`. Fill `nodes:` in the frontmatter. Fill `active_minutes:` and `idle_m
 - Evidence log: confirm every check from this session is there. Every line from a check ends with its transition marker.
 - *What works for this learner in this subject*: add or refine lines only with evidence, and mark each as *enjoyed* or *demonstrated*.
 - Sessions list: add this session's line and link.
-- Frontmatter: `last_session`, `sessions`, `status`, and `next` (one line: the first thing the next session does).
+- Frontmatter: `last_session`, `sessions`, `status`, and `next` (one line: the first thing the next session does). If this session met the goal, set `status: done` and `goal_met:` to today.
 
 ## 3. `plan.md`
 
