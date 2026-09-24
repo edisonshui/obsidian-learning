@@ -40,7 +40,7 @@ Run `date`. Then look at the most recent session note and take exactly one of th
 
 ## 4. Decay check
 
-One retrieval question on each of the last one or two nodes with status `checked` (or `solid`, if none are `checked`). Grade it. Pass: set the node to `solid`. Fail: set it to `decayed`, re-establish it in a few messages, check again, set it back to `checked`. Log every question and answer in the session note under *Retrieval checks* and append evidence lines to `record.md`. Skip this step only when step 3 took the live-break branch (a `paused:` under 6 hours old).
+One retrieval question on each of the last one or two nodes with status `checked` (or `solid`, if none are `checked`). Grade it. Pass: set the node to `solid`. Fail: set it to `decayed`, re-establish it in a few messages, check again, set it back to `checked`. Log every question and answer in the session note under *Retrieval checks* and append evidence lines to `record.md`, each ending with its transition marker. Skip this step only when step 3 took the live-break branch (a `paused:` under 6 hours old).
 
 ## 5. Continue
 

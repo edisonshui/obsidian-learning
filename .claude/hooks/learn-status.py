@@ -132,6 +132,83 @@ def read_notes(folder, now):
     return [note for note in notes if note.fields]
 
 
+# ------------------------------------------------------ transition markers
+
+# The node table keeps only a node's current status, so its history -- when it
+# reached solid, how often it lapsed -- is read from the `→ nN <status>` endings
+# on evidence lines (spec section 1, `CONTEXT.md`, *Transition marker*).
+
+MARKER = re.compile(r"(n\d+) (%s)" % "|".join(STATUSES))
+EVIDENCE_LINE = re.compile(r"^- (\d{4}-\d{2}-\d{2})\b\W*([sr]\d+\b)?")
+NOTE_STEM = re.compile(r"^(\d{4}-\d{2}-\d{2})-([sr]\d+)$")
+
+# Off until the marker backfill (ticket 04) gives every existing line its marker:
+# before that, every proven node in the vault would be reported.
+MARKERS_REQUIRED = False
+
+
+def markers(line):
+    """The (node, status) pairs in the trailing run of markers, in line order.
+
+    Nothing may follow the last marker, so a line whose final `→` segment is not
+    a marker has none, even if a marker appears earlier in it.
+    """
+    found = []
+    for segment in reversed(line.split("→")[1:]):
+        match = MARKER.fullmatch(segment.strip())
+        if not match:
+            break
+        found.append((match.group(1), match.group(2)))
+    return found[::-1]
+
+
+def note_starts(folder):
+    """{(date, "sNN" or "rNN"): start time} for a subject's session notes and the
+    vault's review notes, the notes an evidence line can name."""
+    starts = {}
+    for notes in (folder / "sessions", folder.parent.parent / "reviews"):
+        for path in sorted(notes.glob("*.md")) if notes.is_dir() else []:
+            stem = NOTE_STEM.match(path.stem)
+            start = frontmatter(path).get("start", "")
+            if stem and start:
+                starts[(stem.group(1), stem.group(2))] = start
+    return starts
+
+
+def evidence_events(record_text, starts):
+    """One event per marker in the *Evidence log*, in the order they happened.
+
+    Order is (date, the `start:` of the note the line names, position in the
+    log): the log is append-only, but a review can be logged above a session
+    from earlier the same day. A line whose note is missing has no start time,
+    so it sorts by date then position, ahead of that day's timed lines.
+    """
+    events = []
+    bullets = [line for line in section(record_text, "Evidence log").splitlines()
+               if line.startswith("- ")]
+    for position, line in enumerate(bullets):
+        head = EVIDENCE_LINE.match(line)
+        date, source = (head.group(1), head.group(2) or "") if head else ("", "")
+        for node, status in markers(line):
+            events.append({"date": date, "source": source, "position": position,
+                           "start": starts.get((date, source), ""),
+                           "node": node, "status": status})
+    events.sort(key=lambda event: (event["date"], event["start"], event["position"]))
+    return events
+
+
+def lapses(events):
+    """Each `decayed` event whose previous marker for that node is not `decayed`
+    (`CONTEXT.md`, *Lapse*). A check that leaves a decayed node decayed is not
+    a new lapse."""
+    found, last = [], {}
+    for event in events:
+        if event["status"] == "decayed" and last.get(event["node"]) != "decayed":
+            found.append(event)
+        last[event["node"]] = event["status"]
+    return found
+
+
 # ------------------------------------------------------ the review picker (Phase 5)
 
 # A node reaches `solid` only by passing a retrieval check in a later session, and
@@ -395,6 +472,38 @@ def g4_mc_slots(slug, folder):
     return warnings
 
 
+def marker_warnings(slug, nodes, events):
+    """Where the transition markers disagree with the node table (spec section 15).
+
+    Rewards are read from markers, so a marker that drifts from the table is a
+    wrong reward. `events` must already be in order, as `evidence_events` returns.
+    """
+    warnings, latest = [], {}
+    for event in events:
+        latest[event["node"]] = event
+    for node in sorted(latest, key=sort_key):
+        event = latest[node]
+        if node not in nodes:
+            warnings.append("%s %s: a transition marker names %s, which is not in the node table"
+                            % (slug, node, node))
+            continue
+        entry = nodes[node]
+        if entry["status"] and event["status"] != entry["status"]:
+            warnings.append("%s %s: last transition marker says '%s' (%s), node table says '%s'"
+                            % (slug, node, event["status"], event["date"], entry["status"]))
+        checked = ISO_DATE.search(entry["checked"] or "")
+        if (entry["status"] in DECAYABLE and checked and event["date"]
+                and checked.group(0) != event["date"]):
+            warnings.append("%s %s: latest transition marker is dated %s, Last checked says %s"
+                            % (slug, node, event["date"], checked.group(0)))
+    if MARKERS_REQUIRED:
+        for node in sorted(nodes, key=sort_key):
+            if nodes[node]["status"] in DECAYABLE and node not in latest:
+                warnings.append("%s %s: status is '%s' but it has no transition marker "
+                                "on any evidence line" % (slug, node, nodes[node]["status"]))
+    return warnings
+
+
 def consistency(nodes, plan_text, subject, fields, sessions, folder):
     """Warn where the records contradict each other. Report; never auto-fix.
 
@@ -410,6 +519,10 @@ def consistency(nodes, plan_text, subject, fields, sessions, folder):
     warnings += g5_record_index(subject, fields, sessions, nodes)
     warnings += g2_session_notes(subject, folder / "sessions")
     warnings += g4_mc_slots(subject, folder / "sessions")
+    record = folder / "record.md"
+    if record.is_file():
+        warnings += marker_warnings(subject, nodes,
+                                    evidence_events(record.read_text(), note_starts(folder)))
     for node in sorted(nodes, key=sort_key):
         entry = nodes[node]
         if entry["plan_status"] and entry["status"] and entry["plan_status"] != entry["status"]:

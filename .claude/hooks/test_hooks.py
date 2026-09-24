@@ -792,6 +792,12 @@ for name in SKILL_NAMES:
     eq("%s: section headings match after normalization" % name, claude_headings, agents_headings)
     eq("%s: step count matches" % name, len(claude_headings), len(agents_headings))
 
+section("skill drift — the skills that write evidence lines ask for transition markers")
+for name in ["learn-check", "learn-resume", "learn-end", "learn-review"]:
+    for host in (".claude", ".agents"):
+        eq("%s/%s names the transition marker" % (host, name),
+           "transition marker" in (VAULT_ROOT / host / "skills" / name / "SKILL.md").read_text(), True)
+
 
 # ------------------------------------------------------------------ J1 / J3 (PLAN-2026-09-22.md Phase 4)
 
@@ -1153,6 +1159,101 @@ eq("dropped prereqs do not also trip the prereqs-vs-edges check",
    [w for w in prereq_warnings if "graph edges" in w], [])
 eq("a clean plan with no Can do column reports nothing about prereqs",
    [w for w in status.consistency(OLD, "", "fx", {}, [], LOOP_FOLDER) if "prereq" in w], [])
+
+section("markers — the trailing run of `→ nN <status>` on an evidence line")
+eq("one marker", status.markers("- 2026-09-30 s05: q → a → correct → n9 solid"), [("n9", "solid")])
+eq("several markers, in line order",
+   status.markers("- 2026-09-30 s05: q → a → correct → n1 solid → n3 checked"),
+   [("n1", "solid"), ("n3", "checked")])
+eq("no marker", status.markers("- 2026-09-30 s05: q → a → correct"), [])
+eq("text after a marker is not a marker run",
+   status.markers("- 2026-09-30 s05: q → a → correct → n4 solid (second try)"), [])
+eq("only the trailing run counts",
+   status.markers("- 2026-09-30 s05: q → n2 planned → correct → n4 solid"), [("n4", "solid")])
+eq("an unknown status word is not a marker", status.markers("- 2026-09-30 s05: q → a → n4 great"), [])
+
+
+def evidence(*lines):
+    return "## Nodes\n\n## Evidence log\n\n" + "\n".join("- " + line for line in lines) + "\n\n## Strands\n\n- 2026-09-22 s01: x → n1 decayed\n"
+
+
+section("evidence_events — ordered by date, the named note's start time, then position")
+SAME_DAY = evidence("2026-09-22 r02: q → a → wrong → n1 decayed",
+                    "2026-09-22 s01: q → a → correct → n1 checked",
+                    "2026-09-21 s00: q → a → correct → n2 checked",
+                    "2026-09-22 (diagnosis): q → a → correct",
+                    "2026-09-22 s05: q → a → correct → n2 solid")
+STARTS = {("2026-09-22", "r02"): "14:15", ("2026-09-22", "s01"): "10:00", ("2026-09-21", "s00"): "09:00"}
+ORDERED = status.evidence_events(SAME_DAY, STARTS)
+eq("a session at 10:00 comes before a review at 14:15 on the same day, whatever the log order",
+   [(e["source"], e["node"], e["status"]) for e in ORDERED if e["date"] == "2026-09-22" and e["source"] != "s05"],
+   [("s01", "n1", "checked"), ("r02", "n1", "decayed")])
+eq("an earlier date comes first", ORDERED[0]["date"], "2026-09-21")
+eq("a line whose note is missing sorts by date then position, ahead of that day's timed notes",
+   [(e["source"], e["node"]) for e in ORDERED],
+   [("s00", "n2"), ("s05", "n2"), ("s01", "n1"), ("r02", "n1")])
+eq("only the Evidence log is read", len(ORDERED), 4)
+NO_NOTES = status.evidence_events(SAME_DAY, {})
+eq("with no notes at all, lines order by date then position",
+   [(e["source"], e["node"]) for e in NO_NOTES],
+   [("s00", "n2"), ("r02", "n1"), ("s01", "n1"), ("s05", "n2")])
+
+
+section("lapses — a drop to decayed, not every decayed marker")
+def events_of(*pairs):
+    return [{"date": "2026-09-%02d" % (10 + i), "source": "s01", "position": i, "node": node, "status": st}
+            for i, (node, st) in enumerate(pairs)]
+LAPSED = status.lapses(events_of(("n1", "checked"), ("n1", "decayed"), ("n1", "decayed"),
+                                 ("n2", "solid"), ("n1", "checked"), ("n1", "decayed")))
+eq("repeated decayed is one lapse; a recovery then a decay is a second",
+   [(e["node"], e["date"]) for e in LAPSED], [("n1", "2026-09-11"), ("n1", "2026-09-15")])
+eq("a node's first marker being decayed is a lapse",
+   [e["node"] for e in status.lapses(events_of(("n3", "decayed")))], ["n3"])
+eq("another node's marker between two decays does not break the run",
+   len(status.lapses(events_of(("n1", "decayed"), ("n2", "decayed"), ("n1", "decayed")))), 2)
+
+
+section("consistency — transition markers against the node table")
+def marker_node(node, st, checked):
+    return {"id": node, "name": node, "status": st, "checked": checked, "evidence": "",
+            "prereqs": [], "plan_status": ""}
+MARKED = {"n1": marker_node("n1", "solid", "2026-09-22"),
+          "n2": marker_node("n2", "checked", "2026-09-20 s02"),
+          "n3": marker_node("n3", "checked", "2026-09-21"),
+          "n4": marker_node("n4", "introduced", "")}
+MARKER_LOG = evidence("2026-09-20 s02: q → a → correct → n1 checked → n2 checked",
+                      "2026-09-22 s03: q → a → correct → n1 decayed",
+                      "2026-09-21 s03: q → a → correct → n2 checked → n9 solid",
+                      "2026-09-21 s03: q → a → correct → n3 checked")
+marker_found = status.marker_warnings("fx", MARKED, status.evidence_events(MARKER_LOG, {}))
+eq("a last marker that disagrees with the table status is reported",
+   any(w.startswith("fx n1:") and "'decayed'" in w and "'solid'" in w for w in marker_found), True)
+eq("a latest marker date that differs from Last checked is reported",
+   any(w.startswith("fx n2:") and "2026-09-21" in w and "Last checked" in w for w in marker_found), True)
+eq("a marker naming an unknown node id is reported",
+   any(w.startswith("fx n9:") and "not in the node table" in w for w in marker_found), True)
+eq("an agreeing node is not reported", [w for w in marker_found if w.startswith("fx n3:")], [])
+eq("the no-marker check is off until the backfill lands", status.MARKERS_REQUIRED, False)
+eq("so a checked node with no marker is not reported while it is off",
+   [w for w in marker_found if "no transition marker" in w], [])
+status.MARKERS_REQUIRED = True
+try:
+    required = status.marker_warnings("fx", dict(MARKED, n5=marker_node("n5", "checked", "2026-09-21")),
+                                      status.evidence_events(MARKER_LOG, {}))
+finally:
+    status.MARKERS_REQUIRED = False
+eq("flipping the constant reports a checked node with no marker, and not an introduced one",
+   [w.split(":")[0] for w in required if "no transition marker" in w], ["fx n5"])
+
+MARKER_FOLDER = fresh() / "learn/subjects/fx"
+write(MARKER_FOLDER / "record.md", MARKER_LOG)
+write(MARKER_FOLDER / "sessions/2026-09-21-s03.md", '---\nsubject: "fx"\nsession: "03"\ndate: "2026-09-21"\nstart: "10:00"\nend: "11:00"\nnodes: []\n---\n')
+write(MARKER_FOLDER.parents[1] / "reviews/2026-09-22-r01.md", '---\nkind: review\nreview: 01\ndate: 2026-09-22\nstart: "09:00"\n---\n')
+eq("the notes' start times are read from sessions/ and learn/reviews/",
+   status.note_starts(MARKER_FOLDER), {("2026-09-21", "s03"): "10:00", ("2026-09-22", "r01"): "09:00"})
+eq("consistency() reads record.md from the subject folder and reports marker drift",
+   any(w.startswith("fx n9:") for w in status.consistency(MARKED, "", "fx", {}, [], MARKER_FOLDER)), True)
+
 
 section("due — ties break on a name, so two runs on one day agree")
 TIE = [("beta", {"n2": {"id": "n2", "status": "checked", "checked": "2026-09-01", "evidence": "", "name": "B"}}),

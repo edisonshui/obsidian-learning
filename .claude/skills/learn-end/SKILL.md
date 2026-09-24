@@ -18,7 +18,7 @@ Run `date`. Fill `nodes:` in the frontmatter. Fill `active_minutes:` and `idle_m
 - Nodes table: statuses and *Last checked* dates as they stand now. A node with no logged check this session stays `introduced`.
 - Strands: move a floor or ceiling only on evidence from this session.
 - Misconceptions: promote candidates that appeared twice or were confirmed; mark resolved only if a targeted check was passed. Keep the evidence.
-- Evidence log: confirm every check from this session is there.
+- Evidence log: confirm every check from this session is there. Every line from a check ends with its transition marker.
 - *What works for this learner in this subject*: add or refine lines only with evidence, and mark each as *enjoyed* or *demonstrated*.
 - Sessions list: add this session's line and link.
 - Frontmatter: `last_session`, `sessions`, `status`, and `next` (one line: the first thing the next session does).

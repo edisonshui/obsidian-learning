@@ -43,7 +43,7 @@ A review touches several subjects, so the writing splits in two. Both halves hap
 **The evidence goes to each subject's `record.md`**, which is the only file in that subject a review may edit:
 
 - Nodes table: a pass moves the node to `solid`; a fail moves it to `decayed`. *Last checked* becomes today's date.
-- Evidence log: one line per question, `YYYY-MM-DD rNN: <what was asked> → <what they answered> → <verdict>`. The `rNN` prefix in place of `sNN` is what marks it as a review.
+- Evidence log: one line per question, `YYYY-MM-DD rNN: <what was asked> → <what they answered> → <verdict>`. The `rNN` prefix in place of `sNN` is what marks it as a review. Each line ends with its transition marker, `→ nN solid` or `→ nN decayed`.
 
 **Do not touch** `sessions:`, `last_session`, the *Sessions* list, `plan.md`, or `resume.md` of any subject. A review is not a session of any one subject, and recording it as one puts `g5_record_index` permanently at odds with what is on disk, for no gain. A `done` subject stays `done`; a node dropping to `decayed` is what says otherwise, in the place the next `$learn-resume` will read it.
 
