@@ -1100,6 +1100,60 @@ eq("ascii hyphen", node_name("n1 - Memory address"), "Memory address")
 eq("bare space", node_name("n1 encapsulation"), "encapsulation")
 eq("full stop", node_name("n1. static vs. instance"), "static vs. instance")
 
+section("read_nodes — the plan table is read by header name, not position")
+def plan_table(header, *rows):
+    def line(cells):
+        return "| " + " | ".join(cells) + " |"
+    return "\n".join(["## Nodes", "", line(header), line(["---"] * len(header))]
+                     + [line(row) for row in rows]) + "\n"
+TEMPLATE = ["Id", "Node", "Rests on (unconditional truth)", "Discovery question", "Check type",
+            "Can do", "Est. min", "Prereqs", "Status"]
+WIDE = status.read_nodes("", plan_table(TEMPLATE,
+    ["n1", "Memory", "t", "q", "c", "say what an address is", "10", "none", "checked"],
+    ["n2", "Pointers", "t", "q", "c", "", "15", "n1", "planned"]))
+eq("the can-do statement is read from its column", WIDE["n1"]["can_do"], "say what an address is")
+eq("an empty Can do cell falls back to the node name", WIDE["n2"]["can_do"], "Pointers")
+eq("Prereqs and Status come from their headers, with Can do in the middle",
+   (WIDE["n2"]["prereqs"], WIDE["n2"]["plan_status"]), (["n1"], "planned"))
+SHUFFLED = status.read_nodes("", plan_table(["Status", "Prereqs", "Node", "Id"],
+                                      ["planned", "none", "Memory", "n1"],
+                                      ["checked", "n1", "Pointers", "n2"]))
+eq("column order does not matter",
+   (SHUFFLED["n2"]["name"], SHUFFLED["n2"]["prereqs"], SHUFFLED["n2"]["plan_status"]),
+   ("Pointers", ["n1"], "checked"))
+OLD = status.read_nodes("", plan_table([cell for cell in TEMPLATE if cell != "Can do"],
+                                 ["n1", "Memory", "t", "q", "c", "10", "none", "checked"]))
+eq("a plan without a Can do column still loads, falling back to the name",
+   (OLD["n1"]["can_do"], OLD["n1"]["plan_status"]), ("Memory", "checked"))
+SHORT = status.read_nodes("", plan_table(["Id", "Node", "Prereqs", "Status"], ["n1", "Memory", "none", "planned"]))
+eq("a four-column table still yields its status",
+   SHORT["n1"]["plan_status"], "planned")
+ESCAPED = status.read_nodes("", plan_table(["Id", "Node", "Discovery question", "Prereqs", "Status"],
+                                     ["n2", "Projection", r"why \|a\|² and not \|a\|?", "none", "checked"]))
+eq("an escaped pipe inside a cell does not shift the columns after it",
+   ESCAPED["n2"]["plan_status"], "checked")
+
+section("consistency — a prereq naming the node itself or an unknown id is dropped and reported")
+LOOP_FOLDER = fresh() / "learn/subjects/fx"
+LOOP_FOLDER.mkdir(parents=True)
+LOOPED = status.read_nodes("", plan_table(TEMPLATE,
+    ["n1", "Memory", "t", "q", "c", "", "10", "none", "planned"],
+    ["n4", "Inheritance", "t", "q", "c", "", "15", "n4: none", "planned"],
+    ["n5", "Override", "t", "q", "c", "", "15", "n4, n99", "planned"]))
+eq("a self-reference is dropped from the graph", LOOPED["n4"]["prereqs"], [])
+eq("an unknown id is dropped, a known one kept", LOOPED["n5"]["prereqs"], ["n4"])
+edges = "```mermaid\nflowchart TD\n    n4 --> n5\n```\n"
+prereq_warnings = [w for w in status.consistency(LOOPED, edges, "fx", {}, [], LOOP_FOLDER)
+                   if "prereq" in w]
+eq("the self-loop is a record inconsistency",
+   any(w.startswith("fx n4:") and "itself" in w for w in prereq_warnings), True)
+eq("the unknown id is a record inconsistency",
+   any(w.startswith("fx n5:") and "n99" in w for w in prereq_warnings), True)
+eq("dropped prereqs do not also trip the prereqs-vs-edges check",
+   [w for w in prereq_warnings if "graph edges" in w], [])
+eq("a clean plan with no Can do column reports nothing about prereqs",
+   [w for w in status.consistency(OLD, "", "fx", {}, [], LOOP_FOLDER) if "prereq" in w], [])
+
 section("due — ties break on a name, so two runs on one day agree")
 TIE = [("beta", {"n2": {"id": "n2", "status": "checked", "checked": "2026-09-01", "evidence": "", "name": "B"}}),
        ("alpha", {"n1": {"id": "n1", "status": "checked", "checked": "2026-09-01", "evidence": "", "name": "A"}})]

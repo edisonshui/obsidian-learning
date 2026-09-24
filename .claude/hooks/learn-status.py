@@ -47,6 +47,7 @@ COLOURS = {
 
 NODE_ID = re.compile(r"\bn\d+\b")
 MERMAID = re.compile(r"```mermaid\n(.*?)```", re.S)
+CELL_BREAK = re.compile(r"(?<!\\)\|")
 EDGE = re.compile(r"\b(n\d+)\b[^\n]*?-->[^\n]*?\b(n\d+)\b")
 
 
@@ -54,16 +55,29 @@ EDGE = re.compile(r"\b(n\d+)\b[^\n]*?-->[^\n]*?\b(n\d+)\b")
 
 def table_rows(text):
     """Pipe-table body rows as lists of stripped cells, skipping header and rule."""
+    return pipe_rows(text)[1:]
+
+
+def table_by_header(text):
+    """Pipe-table body rows as dicts keyed by the header cells, so a column can
+    be added or moved without shifting what every other lookup reads."""
+    rows = pipe_rows(text)
+    return [dict(zip(rows[0], cells)) for cells in rows[1:]] if rows else []
+
+
+def pipe_rows(text):
+    """Every pipe-table row, header included, as lists of stripped cells."""
     rows = []
     for line in text.splitlines():
         line = line.strip()
         if not line.startswith("|"):
             continue
-        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        # "\|" is a literal pipe inside a cell, as in |a|² in a math plan.
+        cells = [cell.strip() for cell in CELL_BREAK.split(line.strip("|"))]
         if all(set(cell) <= set("-: ") for cell in cells):
             continue  # the |---|---| separator
         rows.append(cells)
-    return rows[1:] if rows else []
+    return rows
 
 
 def read_nodes(record_text, plan_text):
@@ -90,18 +104,24 @@ def read_nodes(record_text, plan_text):
             "prereqs": [],
             "plan_status": "",
         }
-    for cells in table_rows(section(plan_text, "Nodes")):
-        if not cells or not NODE_ID.fullmatch(cells[0].strip()):
+    for row in table_by_header(section(plan_text, "Nodes")):
+        node = row.get("Id", "")
+        if not NODE_ID.fullmatch(node):
             continue
-        node = cells[0].strip()
-        entry = nodes.setdefault(node, {"id": node, "name": cells[1] if len(cells) > 1 else "",
+        entry = nodes.setdefault(node, {"id": node, "name": row.get("Node", ""),
                                         "status": "", "checked": "", "evidence": "",
                                         "prereqs": [], "plan_status": ""})
-        if not entry["name"] and len(cells) > 1:
-            entry["name"] = cells[1]
-        if len(cells) >= 8:
-            entry["prereqs"] = NODE_ID.findall(cells[-2])
-            entry["plan_status"] = cells[-1].strip().lower()
+        if not entry["name"]:
+            entry["name"] = row.get("Node", "")
+        entry["can_do"] = row.get("Can do", "")
+        entry["prereqs"] = NODE_ID.findall(row.get("Prereqs", ""))
+        entry["plan_status"] = row.get("Status", "").lower()
+    # A prereq naming the node itself or an id not in the table is no edge.
+    # It is dropped here and kept aside for consistency() to report.
+    for node, entry in nodes.items():
+        entry["can_do"] = entry.get("can_do") or entry["name"]
+        entry["bad_prereqs"] = [p for p in entry["prereqs"] if p == node or p not in nodes]
+        entry["prereqs"] = [p for p in entry["prereqs"] if p not in entry["bad_prereqs"]]
     return nodes
 
 
@@ -397,6 +417,11 @@ def consistency(nodes, plan_text, subject, fields, sessions, folder):
                             % (subject, node, entry["status"], entry["plan_status"]))
         if not entry["status"]:
             warnings.append("%s %s: in plan.md but missing from the record.md node table" % (subject, node))
+    for node in sorted(nodes, key=sort_key):
+        for prereq in nodes[node].get("bad_prereqs", []):
+            reason = "names the node itself" if prereq == node else "is not in the node table"
+            warnings.append("%s %s: prereq %s %s, so it is left out of the graph"
+                            % (subject, node, prereq, reason))
     edges = set()
     for block in MERMAID.findall(plan_text):
         for line in block.splitlines():
@@ -404,7 +429,7 @@ def consistency(nodes, plan_text, subject, fields, sessions, folder):
             if found:
                 edges.add((found.group(1), found.group(2)))
     for node in sorted(nodes, key=sort_key):
-        declared = set(nodes[node]["prereqs"]) - {node}
+        declared = set(nodes[node]["prereqs"])
         drawn = {parent for parent, child in edges if child == node}
         if not declared and not drawn:
             continue
