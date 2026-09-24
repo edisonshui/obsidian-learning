@@ -17,7 +17,7 @@ Follow Phase 1 of `learn/system/workflow.md`. Read `learn/system/records.md` bef
 
 ## 2. Capture the goal
 
-Ask at most three questions in one round (use AskUserQuestion if available). Cover: what *done* looks like as something observable; why this, why now; deadline or context. If the goal hint already answers some, skip those. Write the goal in the learner's words and 3–6 success criteria to `record.md`. Confirm the criteria in one message; do not proceed until confirmed or edited.
+Ask at most three questions in one round (use AskUserQuestion if available). Cover: what *done* looks like as something observable; why this, why now; deadline or context. If the goal hint already answers some, skip those. Write the goal in the learner's words and 3–6 success criteria to `record.md`. Confirm the criteria in one message; do not proceed until confirmed or edited. If there is a deadline, write it as `deadline: YYYY-MM-DD` in `record.md` frontmatter.
 
 ## 3. Diagnose
 

@@ -17,7 +17,7 @@ Once the slug is known, run `python3 .codex/hooks/learning.py select --subject <
 
 ## 2. Capture the goal
 
-Ask at most three questions in one round (use a question picker if available). Cover: what *done* looks like as something observable; why this, why now; deadline or context. If the goal hint already answers some, skip those. Write the goal in the learner's words and 3–6 success criteria to `record.md`. Confirm the criteria in one message; do not proceed until confirmed or edited.
+Ask at most three questions in one round (use a question picker if available). Cover: what *done* looks like as something observable; why this, why now; deadline or context. If the goal hint already answers some, skip those. Write the goal in the learner's words and 3–6 success criteria to `record.md`. Confirm the criteria in one message; do not proceed until confirmed or edited. If there is a deadline, write it as `deadline: YYYY-MM-DD` in `record.md` frontmatter.
 
 ## 3. Diagnose
 

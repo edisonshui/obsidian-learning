@@ -798,6 +798,11 @@ for name in ["learn-check", "learn-resume", "learn-end", "learn-review"]:
         eq("%s/%s names the transition marker" % (host, name),
            "transition marker" in (VAULT_ROOT / host / "skills" / name / "SKILL.md").read_text(), True)
 
+section("skill drift — both learn-start copies write the deadline")
+for host in (".claude", ".agents"):
+    eq("%s/learn-start writes deadline:" % host,
+       "`deadline: YYYY-MM-DD`" in (VAULT_ROOT / host / "skills/learn-start/SKILL.md").read_text(), True)
+
 
 # ------------------------------------------------------------------ J1 / J3 (PLAN-2026-09-22.md Phase 4)
 
@@ -1262,6 +1267,230 @@ TIE = [("beta", {"n2": {"id": "n2", "status": "checked", "checked": "2026-09-01"
 eq("same staleness sorts by subject then node",
    [(row["subject"], row["id"]) for row in status.due(TIE, TODAY, per_subject=None)[0]],
    [("alpha", "n1"), ("beta", "n2")])
+
+
+section("is_due — checked after 3 days, solid after 7, decayed never (spec section 3)")
+DUE_DAY = datetime(2026, 9, 24).date()
+def due_node(st, checked):
+    return {"id": "n1", "name": "n1", "status": st, "checked": checked}
+eq("checked 3 days ago is due, 2 days ago is not",
+   (status.is_due(due_node("checked", "2026-09-21"), DUE_DAY),
+    status.is_due(due_node("checked", "2026-09-22 s02"), DUE_DAY)), (True, False))
+eq("solid 7 days ago is due, 6 days ago is not",
+   (status.is_due(due_node("solid", "2026-09-17"), DUE_DAY),
+    status.is_due(due_node("solid", "2026-09-18"), DUE_DAY)), (True, False))
+eq("a decayed node is never due, however old",
+   status.is_due(due_node("decayed", "2026-01-01"), DUE_DAY), False)
+eq("planned, introduced, and undated nodes are never due",
+   [status.is_due(due_node(st, checked), DUE_DAY)
+    for st, checked in (("planned", ""), ("introduced", "2026-09-01"), ("checked", "—"))],
+   [False, False, False])
+eq("inside the deadline window, a node checked before the window opened is due",
+   status.is_due(due_node("solid", "2026-09-19"), DUE_DAY, deadline="2026-09-27"), True)
+eq("inside the window, a node checked since it opened keeps the normal rule",
+   status.is_due(due_node("solid", "2026-09-21"), DUE_DAY, deadline="2026-09-27"), False)
+eq("the window opens 7 days before the deadline, the span the Deadline candidate uses",
+   [status.is_due(due_node("solid", "2026-09-18"), DUE_DAY, deadline=d)
+    for d in ("2026-10-01", "2026-10-02")], [True, False])
+eq("after the deadline the window is closed",
+   status.is_due(due_node("solid", "2026-09-19"), DUE_DAY, deadline="2026-09-23"), False)
+eq("the window never makes a decayed node due",
+   status.is_due(due_node("decayed", "2026-09-01"), DUE_DAY, deadline="2026-09-25"), False)
+
+
+section("rank — the recommended action, every kind in order (spec section 3)")
+def rnode(node, st, checked="", name=None, prereqs=()):
+    return {"id": node, "name": name or node.upper(), "status": st, "checked": checked,
+            "prereqs": list(prereqs)}
+def rsubject(slug, nodes, events=(), **fields):
+    fields.setdefault("title", slug.title())
+    fields.setdefault("status", "active")
+    return (slug, {node["id"]: node for node in nodes}, fields, list(events))
+def marker_event(node, date, st="decayed"):
+    return {"date": date, "source": "s01", "position": 0, "start": "", "node": node, "status": st}
+RANK_NOW = datetime(2026, 9, 24, 15, 0)
+def rnote(slug, stem, paused=None, end=None, date="2026-09-24"):
+    text = ('---\nsubject: "%s"\nsession: "%s"\ndate: "%s"\nstart: "10:00"\npaused: %s\nend: %s\n---\n'
+            % (slug, stem[-2:], date, paused or "", end or ""))
+    return (slug, session_note.parse(text, name="%s-%s" % (date, stem), now=RANK_NOW))
+def kinds(found):
+    return [(c["kind"], c["subject"]) for c in found]
+
+eq("with nothing pending, Start is the only candidate",
+   status.rank([rsubject("fin", [rnode("n1", "checked", "2026-09-23")], status="done")], [], DUE_DAY),
+   [{"kind": "Start", "subject": None, "title": None, "command": "learn-start",
+     "reason": "start something new", "welcome": ""}])
+
+EVERY_KIND = [
+    rsubject("act", [rnode("n1", "checked", "2026-09-23"), rnode("n2", "planned", prereqs=["n1"])],
+             last_session="2026-09-20"),
+    rsubject("brk", [rnode("n1", "introduced")], last_session="2026-09-24"),
+    rsubject("exam", [rnode("n1", "solid", "2026-09-10", name="Chain rule")], deadline="2026-09-27",
+             title="Calc"),
+    rsubject("old", [rnode("n1", "checked", "2026-09-01", name="Leaves")], status="done"),
+    rsubject("rep", [rnode("n1", "decayed", "2026-09-22", name="Aliasing")], status="done"),
+]
+EVERY_NOTES = [rnote("brk", "s02", paused="14:05")]
+ranked = status.rank(EVERY_KIND, EVERY_NOTES, DUE_DAY)
+eq("break, deadline, repair, review, resume, start",
+   kinds(ranked), [("Continue a break", "brk"), ("Deadline", "exam"), ("Repair", "rep"),
+                   ("Review", None), ("Resume", "act"), ("Start", None)])
+eq("each kind's command",
+   [c["command"] for c in ranked],
+   ["learn-resume brk", "learn-review exam", "learn-resume rep", "learn-review",
+    "learn-resume act", "learn-start"])
+eq("a break's reason and welcome name the pause time",
+   (ranked[0]["reason"], ranked[0]["welcome"]),
+   ("your session paused at 14:05", "pick your Brk session back up; the break started at 14:05"))
+eq("a deadline subject's Review names its own due nodes after the prefix",
+   (ranked[1]["reason"], ranked[1]["welcome"]),
+   ("deadline in 3 days: 1 node is due in Calc, oldest *Chain rule* (last checked 10 Sep)",
+    "Calc's deadline is in 3 days, so review the 1 node that is due, oldest *Chain rule* from Calc"))
+eq("a Repair names the node and when it slipped",
+   (ranked[2]["reason"], ranked[2]["welcome"]),
+   ("*Aliasing* slipped on 22 Sep",
+    "bring back *Aliasing* in Rep. It slipped on 22 Sep, and one short session puts it back"))
+eq("the one Review counts every due node across subjects, deadline subjects included",
+   (ranked[3]["reason"], ranked[3]["welcome"], ranked[3]["title"]),
+   ("2 nodes are due across 2 subjects, oldest *Leaves* (last checked 1 Sep)",
+    "review the 2 nodes that are due, oldest *Leaves* from Old", None))
+eq("a Resume names the next node",
+   (ranked[4]["reason"], ranked[4]["welcome"]), ("*N2* is next", "continue Act, where *N2* is next"))
+eq("reward-blind and read-only: the same inputs give the same ranking",
+   status.rank(EVERY_KIND, EVERY_NOTES, DUE_DAY), ranked)
+
+section("rank — Continue a break")
+BREAKS = [rsubject("a", [], last_session="2026-09-24"), rsubject("b", [], last_session="2026-09-24")]
+eq("most recent pause first; a stale pause or a cut-off is no break",
+   kinds(status.rank(BREAKS, [rnote("a", "s01", paused="12:00"), rnote("b", "s03", paused="14:30"),
+                              rnote("a", "s00", paused="09:00", date="2026-09-23")], DUE_DAY)),
+   [("Continue a break", "b"), ("Continue a break", "a"), ("Start", None)])
+
+eq("a subject on a break still gets its Repair line; only Resume skips it",
+   kinds(status.rank([rsubject("a", [rnode("n1", "decayed", "2026-09-20")], last_session="2026-09-24")],
+                     [rnote("a", "s01", paused="14:30")], DUE_DAY)),
+   [("Continue a break", "a"), ("Repair", "a"), ("Start", None)])
+
+section("rank — Deadline")
+DEADLINES = [
+    rsubject("far", [rnode("n1", "planned")], deadline="2026-10-02"),
+    rsubject("later", [rnode("n1", "planned")], deadline="2026-09-30"),
+    rsubject("gone", [rnode("n1", "planned")], deadline="2026-09-23", last_session="2026-09-23"),
+    rsubject("idle", [rnode("n1", "checked", "2026-09-23")], deadline="2026-09-25", status="done"),
+    rsubject("soon", [rnode("n1", "decayed", "2026-09-20", name="Limits"), rnode("n2", "solid", "2026-09-01")],
+             deadline="2026-09-24", status="done"),
+    rsubject("zeta", [rnode("n1", "planned")], deadline="2026-09-30"),
+]
+found = status.rank(DEADLINES, [], DUE_DAY)
+eq("sooner deadline first, then slug; one outside 7 days or already passed is not a deadline",
+   [c["subject"] for c in found if c["kind"] == "Deadline"], ["soon", "later", "zeta"])
+eq("a subject's Repair comes before its Review, and its deadline prefix says today",
+   (found[0]["command"], found[0]["reason"]),
+   ("learn-resume soon", "deadline today: *Limits* slipped on 20 Sep"))
+eq("with nothing to repair or review, an active subject resumes",
+   (found[1]["command"], found[1]["reason"], found[1]["welcome"]),
+   ("learn-resume later", "deadline in 6 days: *N1* is next",
+    "Later's deadline is in 6 days, so continue Later, where *N1* is next"))
+eq("a done subject with nothing pending yields no deadline candidate",
+   "idle" in [c["subject"] for c in found], False)
+eq("a deadline subject is not listed again under Repair or Resume",
+   [c["kind"] for c in found if c["subject"] in ("soon", "later")], ["Deadline", "Deadline"])
+eq("the one Review still counts the deadline subject's due node",
+   [c["reason"] for c in found if c["kind"] == "Review"],
+   ["1 node is due in Soon, oldest *N2* (last checked 1 Sep)"])
+eq("one day out reads in 1 day",
+   status.rank([rsubject("x", [rnode("n1", "planned")], deadline="2026-09-25")], [], DUE_DAY)[0]["reason"],
+   "deadline in 1 day: *N1* is next")
+
+section("rank — Repair order: count, oldest decay, lapses, slug")
+def repair_order(*subjects):
+    return [c["subject"] for c in status.rank(list(subjects), [], DUE_DAY) if c["kind"] == "Repair"]
+eq("most decayed nodes first",
+   repair_order(rsubject("a", [rnode("n1", "decayed", "2026-09-01")], status="done"),
+                rsubject("b", [rnode("n1", "decayed", "2026-09-20"), rnode("n2", "decayed", "2026-09-20")],
+                         status="done")), ["b", "a"])
+eq("then the oldest decay date, read from the latest lapse marker before Last checked",
+   repair_order(rsubject("a", [rnode("n1", "decayed", "2026-09-10")], status="done"),
+                rsubject("b", [rnode("n1", "decayed", "2026-09-22")],
+                         [marker_event("n1", "2026-09-05")], status="done")), ["b", "a"])
+eq("without a lapse marker the decay date is Last checked",
+   repair_order(rsubject("a", [rnode("n1", "decayed", "2026-09-12")], status="done"),
+                rsubject("b", [rnode("n1", "decayed", "2026-09-11")], status="done")), ["b", "a"])
+eq("then the most lapses on one decayed node, ahead of slug",
+   repair_order(rsubject("a", [rnode("n1", "decayed", "2026-09-22")], [marker_event("n1", "2026-09-22")], status="done"),
+                rsubject("b", [rnode("n1", "decayed", "2026-09-22")],
+                         [marker_event("n1", "2026-09-10"), marker_event("n1", "2026-09-12", "checked"),
+                          marker_event("n1", "2026-09-22")], status="done")), ["b", "a"])
+eq("then slug",
+   repair_order(rsubject("b", [rnode("n1", "decayed", "2026-09-22")], status="done"),
+                rsubject("a", [rnode("n1", "decayed", "2026-09-22")], status="done")), ["a", "b"])
+POINTERS = rsubject("pointers-and-references", [rnode("n2", "decayed", "2026-09-22")],
+                    [marker_event("n2", "2026-09-17"), marker_event("n2", "2026-09-17", "checked"),
+                     marker_event("n2", "2026-09-22")], status="done")
+EALC = rsubject("quiz2-analects-baijuyi-hakurakuten", [rnode("n3", "decayed", "2026-09-22")],
+                [marker_event("n3", "2026-09-22")], status="done")
+eq("Pointers (2 lapses on n2) ranks above EALC (1 lapse on n3)",
+   repair_order(EALC, POINTERS), ["pointers-and-references", "quiz2-analects-baijuyi-hakurakuten"])
+eq("several decayed nodes: the first to slip is named, with a count of the rest",
+   status.rank([rsubject("m", [rnode("n1", "decayed", "2026-09-22", name="Late"),
+                               rnode("n2", "decayed", "2026-09-20", name="Early"),
+                               rnode("n3", "decayed", "2026-09-21")], status="done")],
+               [], DUE_DAY)[0]["reason"],
+   "*Early* and 2 more slipped, the first on 20 Sep")
+eq("a paused subject with a decayed node repairs rather than resumes",
+   kinds(status.rank([rsubject("p", [rnode("n1", "decayed", "2026-09-20")], status="paused")], [], DUE_DAY)),
+   [("Repair", "p"), ("Start", None)])
+
+section("rank — Resume order, the passed-deadline demotion, and its reasons")
+RESUMES = [
+    rsubject("b", [rnode("n1", "planned")], last_session="2026-09-20"),
+    rsubject("a", [rnode("n1", "planned")], last_session="2026-09-20"),
+    rsubject("new", [rnode("n1", "checked", "2026-09-23")], last_session="2026-09-22", status="paused"),
+    rsubject("past", [rnode("n1", "planned")], last_session="2026-09-23", deadline="2026-09-22"),
+    rsubject("done", [rnode("n1", "planned")], last_session="2026-09-24", status="done"),
+]
+found = status.rank(RESUMES, [rnote("a", "s03", date="2026-09-20")], DUE_DAY)
+eq("most recent last_session first, then slug; a passed deadline sinks below every other Resume",
+   kinds(found), [("Resume", "new"), ("Resume", "a"), ("Resume", "b"), ("Resume", "past"), ("Start", None)])
+eq("no planned node reads continue the plan",
+   (found[0]["reason"], found[0]["welcome"]), ("continue the plan", "continue New"))
+eq("an open note is named as closed out first",
+   found[1]["reason"], "*N1* is next. Its open s03 note is closed out first.")
+eq("a passed deadline is named",
+   found[3]["reason"], "*N1* is next. The deadline (22 Sep) has passed.")
+
+section("rank — the next node follows the plan's prereqs")
+def next_reason(*nodes):
+    return status.rank([rsubject("x", list(nodes))], [], DUE_DAY)[0]["reason"]
+eq("the first planned node whose prereqs are all proven",
+   next_reason(rnode("n1", "introduced"), rnode("n2", "planned", prereqs=["n1"]),
+               rnode("n3", "planned", prereqs=["n4"]), rnode("n4", "skipped")), "*N3* is next")
+eq("else the first planned node",
+   next_reason(rnode("n1", "introduced"), rnode("n2", "planned", prereqs=["n1"])), "*N2* is next")
+eq("nodes are read in plan order, n2 before n10",
+   next_reason(rnode("n10", "planned"), rnode("n2", "planned")), "*N2* is next")
+
+section("--next — one line per candidate, in the host's command form, writing nothing")
+eq("claude commands use /",
+   status.next_report(ranked[2:4]).splitlines(),
+   ["1. Repair · Rep · /learn-resume rep · *Aliasing* slipped on 22 Sep",
+    "2. Review · any subject · /learn-review · 2 nodes are due across 2 subjects, "
+    "oldest *Leaves* (last checked 1 Sep)"])
+eq("codex commands use $",
+   status.next_report(ranked[-1:], host="codex"), "1. Start · any subject · $learn-start · start something new")
+import subprocess  # noqa: E402
+NEXT_VAULT = fresh()
+write(NEXT_VAULT / "learn/subjects/fx/record.md",
+      '---\nsubject: "fx"\ntitle: "Fx"\nstatus: active\nlast_session: "2026-09-20"\n---\n\n'
+      "## Nodes\n\n| Node | Status | Last checked | Evidence |\n| --- | --- | --- | --- |\n"
+      "| n1 Loops | planned | — | — |\n")
+before = sorted(str(p) for p in NEXT_VAULT.rglob("*"))
+printed = subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(NEXT_VAULT),
+                          "--next", "--host", "codex"], capture_output=True, text=True).stdout
+eq("--next prints the ranking from the records",
+   printed.splitlines(), ["1. Resume · Fx · $learn-resume fx · *Loops* is next",
+                          "2. Start · any subject · $learn-start · start something new"])
+eq("--next writes no file", sorted(str(p) for p in NEXT_VAULT.rglob("*")), before)
 
 
 # ------------------------------------------------ J4 / J5 (PLAN-2026-09-22.md Phase 5)

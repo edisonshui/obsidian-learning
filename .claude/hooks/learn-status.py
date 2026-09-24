@@ -13,12 +13,13 @@ open on a phone. Where Dataview does fit -- subject and session frontmatter -- s
 `learn/Queries.md`.
 
 Run: python3 .claude/hooks/learn-status.py [--vault PATH]
+     python3 .claude/hooks/learn-status.py --next [--host claude|codex]  (read-only)
 """
 
 import argparse
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -242,14 +243,8 @@ def days_since(checked, today):
     report it -- treating it as zero days would quietly rank an unchecked node as
     the freshest thing in the vault.
     """
-    match = ISO_DATE.search(checked or "")
-    if not match:
-        return None
-    try:
-        when = datetime.strptime(match.group(0), "%Y-%m-%d").date()
-    except ValueError:
-        return None  # well-shaped but impossible, e.g. 2026-13-45
-    return (today - when).days
+    when = to_date(checked)
+    return (today - when).days if when else None
 
 
 def due(subjects, today, subject=None, per_subject=2, limit=None):
@@ -294,6 +289,226 @@ def due(subjects, today, subject=None, per_subject=2, limit=None):
 
     rows.sort(key=lambda row: (-row["days"], row["subject"], sort_key(row["id"])))
     return (rows[:limit] if limit else rows), undated
+
+
+# --------------------------------------------- the due rule and the ranking
+
+# `due()` above ranks staleness for picking questions; `is_due()` answers the
+# yes-or-no question the ranking and the streak ask (spec section 3, `CONTEXT.md`,
+# *Due*). A decayed node is never due: it needs repair, not review.
+DUE_DAYS = {"checked": 3, "solid": 7}
+
+# A deadline counts from 7 days ahead through the deadline day. The same span
+# opens the due window and lists the subject under Deadline, so a subject is
+# never in one and not the other.
+DEADLINE_DAYS = 7
+
+
+def to_date(text):
+    """The first ISO date in `text` as a date, or None."""
+    match = ISO_DATE.search(text or "")
+    if not match:
+        return None
+    try:
+        return datetime.strptime(match.group(0), "%Y-%m-%d").date()
+    except ValueError:
+        return None  # well-shaped but impossible, e.g. 2026-13-45
+
+
+def days_to_deadline(deadline, today):
+    """Days from `today` to a `deadline:` value, or None if it holds no date."""
+    when = to_date(deadline)
+    return (when - today).days if when else None
+
+
+def in_deadline_window(deadline, today):
+    """Whether `today` falls from 7 days before `deadline` through the deadline."""
+    left = days_to_deadline(deadline, today)
+    return left is not None and 0 <= left <= DEADLINE_DAYS
+
+
+def is_due(node, today, deadline=None):
+    """Whether a node should be checked again on `today`."""
+    if node.get("status") not in DUE_DAYS:
+        return False
+    checked = to_date(node.get("checked"))
+    if checked is None:
+        return False
+    if (today - checked).days >= DUE_DAYS[node["status"]]:
+        return True
+    if in_deadline_window(deadline, today):
+        return checked < to_date(deadline) - timedelta(days=DEADLINE_DAYS)
+    return False
+
+
+def short_date(when):
+    """`22 Sep`, the form every reason and welcome phrase uses."""
+    return "%d %s" % (when.day, when.strftime("%b"))
+
+
+def next_node(nodes):
+    """The first `planned` node in plan order whose prereqs are all proven,
+    else the first `planned` node, else None."""
+    planned = [nodes[node] for node in sorted(nodes, key=sort_key) if nodes[node]["status"] == "planned"]
+    ready = [entry for entry in planned
+             if all(nodes.get(p, {}).get("status") in COVERED for p in entry.get("prereqs", []))]
+    return (ready or planned or [None])[0]
+
+
+def plural(count, word):
+    return "%d %s%s" % (count, word, "" if count == 1 else "s")
+
+
+def candidate(kind, slug, title, command, reason, welcome):
+    return {"kind": kind, "subject": slug, "title": title, "command": command,
+            "reason": reason, "welcome": welcome}
+
+
+def repair(slug, title, nodes, events):
+    """The Repair candidate for a subject, with its sort key, or None."""
+    decayed = [entry for entry in nodes.values() if entry["status"] == "decayed"]
+    if not decayed:
+        return None
+    lapsed = lapses(events)
+    slipped = []
+    for entry in decayed:
+        own = [event for event in lapsed if event["node"] == entry["id"]]
+        when = to_date(own[-1]["date"]) if own else to_date(entry["checked"])
+        slipped.append((when or datetime.max.date(), sort_key(entry["id"]), entry, len(own)))
+    slipped.sort(key=lambda item: item[:2])
+    first, entry = slipped[0][0], slipped[0][2]
+    name, date = "*%s*" % entry["name"], short_date(first)
+    reason = ("%s slipped on %s" % (name, date) if len(slipped) == 1 else
+              "%s and %d more slipped, the first on %s" % (name, len(slipped) - 1, date))
+    welcome = ("bring back %s in %s. It slipped on %s, and one short session puts it back"
+               % (name, title, date))
+    key = (-len(slipped), first, -max(item[3] for item in slipped), slug)
+    return candidate("Repair", slug, title, "learn-resume " + slug, reason, welcome), key
+
+
+def review(due_nodes, titles, slug=None):
+    """The Review candidate over `due_nodes`, a list of (slug, node), or None."""
+    if not due_nodes:
+        return None
+    oldest_slug, oldest = min(due_nodes, key=lambda item: (to_date(item[1]["checked"]), item[0],
+                                                           sort_key(item[1]["id"])))
+    count = len(due_nodes)
+    spread = sorted({item[0] for item in due_nodes})
+    where = ("in %s" % titles[spread[0]] if len(spread) == 1
+             else "across %d subjects" % len(spread))
+    reason = ("%s %s due %s, oldest *%s* (last checked %s)"
+              % (plural(count, "node"), "is" if count == 1 else "are", where, oldest["name"],
+                 short_date(to_date(oldest["checked"]))))
+    welcome = ("review the %s that %s due, oldest *%s* from %s"
+               % (plural(count, "node"), "is" if count == 1 else "are", oldest["name"],
+                  titles[oldest_slug]))
+    command = "learn-review" + (" " + slug if slug else "")
+    return candidate("Review", slug, titles[slug] if slug else None, command, reason, welcome)
+
+
+def resume(slug, title, nodes, fields, open_stem, today):
+    """The Resume candidate, naming a passed deadline or an open note if any."""
+    upcoming = next_node(nodes)
+    reason = "*%s* is next" % upcoming["name"] if upcoming else "continue the plan"
+    welcome = ("continue %s, where *%s* is next" % (title, upcoming["name"]) if upcoming
+               else "continue %s" % title)
+    extra = []
+    left = days_to_deadline(fields.get("deadline"), today)
+    if left is not None and left < 0:
+        extra.append("The deadline (%s) has passed." % short_date(to_date(fields["deadline"])))
+    if open_stem:
+        extra.append("Its open %s note is closed out first." % open_stem)
+    if extra:
+        reason = " ".join([reason + "."] + extra)
+    return candidate("Resume", slug, title, "learn-resume " + slug, reason, welcome)
+
+
+def rank(subjects, notes, today):
+    """The recommended actions, best first (spec section 3, `CONTEXT.md`,
+    *Recommended action*).
+
+    `subjects` is a list of (slug, nodes, fields, events): `read_nodes`, the
+    record's frontmatter, and `evidence_events`. `notes` is a list of (slug,
+    session note) as `session_note.read` returns them. Reads nothing else, so
+    rewards cannot move it and running it changes nothing.
+    """
+    titles = {slug: fields.get("title", slug) for slug, _, fields, _ in subjects}
+    listed, ranked = set(), []
+
+    breaks = sorted(((note.hours, slug, note) for slug, note in notes if note.status == "live break"),
+                    key=lambda item: item[:2])
+    for _, slug, note in breaks:
+        paused = note.fields.get("paused", "")
+        ranked.append(candidate("Continue a break", slug, titles.get(slug, slug), "learn-resume " + slug,
+                                "your session paused at %s" % paused,
+                                "pick your %s session back up; the break started at %s"
+                                % (titles.get(slug, slug), paused)))
+        listed.add(slug)
+
+    open_stems = {}
+    for slug, note in notes:
+        if note.status in ("open", "stale pause"):
+            open_stems[slug] = note.name.rsplit("-", 1)[-1]
+
+    deadlines = []
+    for slug, nodes, fields, events in subjects:
+        if not in_deadline_window(fields.get("deadline"), today):
+            continue
+        left = days_to_deadline(fields.get("deadline"), today)
+        title = titles[slug]
+        repaired = repair(slug, title, nodes, events)
+        found = repaired[0] if repaired else review(
+            [(slug, entry) for entry in nodes.values() if is_due(entry, today, fields.get("deadline"))],
+            titles, slug)
+        if not found and fields.get("status") in ("active", "paused"):
+            found = resume(slug, title, nodes, fields, open_stems.get(slug), today)
+        if not found:
+            continue
+        when = "today" if left == 0 else "in " + plural(left, "day")
+        found = dict(found, kind="Deadline",
+                     reason="deadline %s: %s" % (when, found["reason"]),
+                     welcome="%s's deadline is %s, so %s" % (title, when, found["welcome"]))
+        deadlines.append(((left, slug), found))
+    for _, found in sorted(deadlines, key=lambda item: item[0]):
+        ranked.append(found)
+        listed.add(found["subject"])
+
+    # Only a Deadline listing takes a subject out of Repair: a break and a
+    # decayed node are two different things to do.
+    on_deadline = {found["subject"] for _, found in deadlines}
+    repairs = [repair(slug, titles[slug], nodes, events)
+               for slug, nodes, fields, events in subjects if slug not in on_deadline]
+    for found, _ in sorted((item for item in repairs if item), key=lambda item: item[1]):
+        ranked.append(found)
+        listed.add(found["subject"])
+
+    across_subjects = review([(slug, entry) for slug, nodes, fields, _ in subjects
+                         for entry in nodes.values() if is_due(entry, today, fields.get("deadline"))],
+                        titles)
+    if across_subjects:
+        ranked.append(across_subjects)
+
+    resumes = []
+    for slug, nodes, fields, _ in subjects:
+        if slug in listed or fields.get("status") not in ("active", "paused"):
+            continue
+        left = days_to_deadline(fields.get("deadline"), today)
+        last = to_date(fields.get("last_session"))
+        key = (left is not None and left < 0, -(last.toordinal() if last else 0), slug)
+        resumes.append((key, resume(slug, titles[slug], nodes, fields, open_stems.get(slug), today)))
+    ranked += [found for _, found in sorted(resumes, key=lambda item: item[0])]
+
+    ranked.append(candidate("Start", None, None, "learn-start", "start something new", ""))
+    return ranked
+
+
+def next_report(ranked, host="claude"):
+    """`--next`: one candidate per line, commands in the host's form."""
+    sigil = "$" if host == "codex" else "/"
+    return "\n".join("%d. %s · %s · %s%s · %s"
+                     % (number, found["kind"], found["title"] or "any subject", sigil,
+                        found["command"], found["reason"])
+                     for number, found in enumerate(ranked, 1))
 
 
 def due_report(rows, undated):
@@ -802,6 +1017,11 @@ def main():
                         help="print nodes ranked by time since their last check and "
                              "write nothing (read-only). The pick for /learn-review, "
                              "and for /learn-check's older spacing node with --subject")
+    parser.add_argument("--next", action="store_true", dest="next_action",
+                        help="print the recommended actions, best first, and write "
+                             "nothing (read-only)")
+    parser.add_argument("--host", choices=("claude", "codex"), default="claude",
+                        help="with --next, print /learn-... (claude) or $learn-... (codex)")
     parser.add_argument("--subject", help="with --due, restrict to one subject slug")
     parser.add_argument("--limit", type=int, default=None,
                         help="with --due, keep only the N stalest nodes")
@@ -821,6 +1041,7 @@ def main():
     today = stamp.strftime("%Y-%m-%d")
     subjects, warnings, openings, written = [], [], [], []
     ranked = []  # (slug, nodes) for --due, collected before the write half of the loop
+    rank_inputs, notes_by_subject = [], []  # rank()'s inputs for --next
 
     if args.semantic:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -844,7 +1065,9 @@ def main():
         sessions = [dict(note.fields, file=note.name) for note in notes]
         openings += open_notes(notes, slug)
         ranked.append((slug, nodes))
-        if args.open_notes or args.due:
+        rank_inputs.append((slug, nodes, fields, evidence_events(record_text, note_starts(folder))))
+        notes_by_subject += [(slug, note) for note in notes]
+        if args.open_notes or args.due or args.next_action:
             continue  # read-only modes: report, write nothing
         warnings += consistency(nodes, plan_text, slug, fields, sessions, folder)
         if args.semantic:
@@ -873,6 +1096,10 @@ def main():
         rows, undated = due(ranked, stamp.date(), subject=args.subject,
                             per_subject=args.per_subject or None, limit=args.limit)
         print(due_report(rows, undated))
+        return 0
+
+    if args.next_action:
+        print(next_report(rank(rank_inputs, notes_by_subject, stamp.date()), host=args.host))
         return 0
 
     # A review note is not a session note and deliberately lives outside
