@@ -26,10 +26,10 @@ flowchart TD
 
 *(In teaching order. Each node is one concept, teachable in one sitting of 10–20 minutes. Prereqs reference node ids.)*
 
-| Id | Node | Rests on (unconditional truth) | Discovery question | Check type | Est. min | Prereqs | Status |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| n1 |  |  |  |  |  |  | planned |
-| n2 |  |  |  |  |  |  | planned |
+| Id | Node | Rests on (unconditional truth) | Discovery question | Check type | Can do | Est. min | Prereqs | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| n1 |  |  |  |  |  |  |  | planned |
+| n2 |  |  |  |  |  |  |  | planned |
 
 ## Session groups
 

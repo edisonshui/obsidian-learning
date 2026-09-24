@@ -17,13 +17,13 @@ flowchart TD
 
 ## Phase 0 — Boot (every session)
 
-Claude Code reads `CLAUDE.md`; Codex reads `AGENTS.md`. SessionStart prints a subject index, operational preferences, open-note warnings, and the full resume for this conversation's selected subject when known. Before teaching, read this file and `tutor.md`; after selection, load the selected subject's full state as Phase 5 specifies. Read `learn/me/preferences.md` in full for planning, preference updates, or conflicting guidance. If the hook summary is missing, read its `Operational summary`. Offer the host's `learn-resume` or `learn-start` skill. Do not teach until one is chosen.
+Claude Code reads `CLAUDE.md`; Codex reads `AGENTS.md`. SessionStart prints a subject index, operational preferences, open-note warnings, and the full resume for this conversation's selected subject when known. Before teaching, read this file and `tutor.md`; after selection, load the selected subject's full state as Phase 5 specifies. Read `learn/me/preferences.md` in full for planning, preference updates, or conflicting guidance. If the hook summary is missing, read its `Operational summary`. Show the learner the hook's *Show the learner* block verbatim, then offer its recommended command first, then the host's `learn-resume` and `learn-start` skills and something else. Do not teach until one is chosen.
 
 ## Phase 1 — Start a project (`/learn-start`)
 
-1. **Goal capture.** Ask at most three questions, together, not in rounds: what does *done* look like as something observable; why this, why now; any deadline or context (a course, an interview, curiosity). Turn the answer into 3–6 **success criteria** the learner could be tested on. Write them to `record.md`.
+1. **Goal capture.** Ask at most three questions, together, not in rounds: what does *done* look like as something observable; why this, why now; any deadline or context (a course, an interview, curiosity). Turn the answer into 3–6 **success criteria** the learner could be tested on. Write them to `record.md`. Record a deadline as `deadline:` in `record.md`.
 2. **Diagnose.** Identify the 3–6 **strands** the goal depends on (prerequisite threads, e.g. for a math topic: notation, the previous concept, the computational skill; for a programming topic: the language feature, the mental model, the design judgment). For each strand, probe by binary search as `tutor.md` describes. Budget: 10–15 minutes, roughly 12–20 questions total. Every probe result goes into `record.md` as evidence. If the learner's stated prerequisites are already in another subject's record, read that record instead of re-probing.
-3. **Plan.** Write `plan.md`: an ordered list of concept **nodes** from each strand's floor to the goal. Each node: what unconditional truth it rests on, its discovery question, the check type, estimated minutes, and its prerequisite nodes. Mark nodes the diagnosis already demonstrated as `skipped`. Draw the dependency graph as a mermaid DAG. Group nodes into sessions of 45–60 minutes.
+3. **Plan.** Write `plan.md`: an ordered list of concept **nodes** from each strand's floor to the goal. Each node: what unconditional truth it rests on, its discovery question, the check type, a can-do statement, estimated minutes, and its prerequisite nodes. Mark nodes the diagnosis already demonstrated as `skipped`. Draw the dependency graph as a mermaid DAG. Group nodes into sessions of 45–60 minutes.
 4. **Review.** Run the `fact-checker` subagent on every factual claim the plan rests on, and the `plan-reviewer` subagent against `record.md` and `preferences.md`. Fix what they flag; record unresolved uncertainty in the plan.
 5. **Present and approve.** Show the learner the graph and a five-line summary: what they already have, what the first session covers, what the last node is, how many sessions, what they will be able to do at the end. Wait for approval or edits. The plan is a contract the learner can inspect, not a hidden agenda.
 6. Open a session note and enter the teach loop.
@@ -35,7 +35,7 @@ For the current node, in order:
 1. **Motivate** with the discovery question. One message.
 2. **Establish** the concept one reasoning step per message, check question after each non-trivial step. Use a diagram when structure is the point.
 3. **Connect** it to earlier nodes and, if it clarifies, to the learner's interests.
-4. **Check** with a retrieval or application question. Grade it. Log the question, the answer, and the verdict.
+4. **Check** with a retrieval or application question. Grade it. Log the question, the answer, and the verdict. Every evidence line ends with its transition marker (`records.md`, *Evidence rule*).
 5. **Log** the node to the session note *now*: the explanation as taught, the diagram, the check and result, any misconception candidates. Update the node's status in `record.md` (`planned → introduced → checked`).
 6. Every 2–3 nodes, run a mixed retrieval check (`/learn-check`) covering the current node and one earlier one. **This is a gate:** a fourth consecutive new node does not open until a check is logged. If you skip one deliberately, write the reason under *Retrieval checks*. An empty *Retrieval checks* section at `/learn-end` means the rule was broken, and `/learn-end` records that in the note rather than leaving it blank.
 
@@ -54,13 +54,13 @@ Adaptation rules are in `tutor.md` under *Pacing*. If a check reveals a missing 
 In this order:
 
 1. Finalize the **session note**: what was covered, checks and results, misconception candidates, corrections, what worked and what did not, the next step.
-2. Update **`record.md`**: node statuses, strand floors and ceilings if they moved, misconceptions (new, or resolved with the evidence), the *what works for this learner in this subject* section.
+2. Update **`record.md`**: node statuses, strand floors and ceilings if they moved, misconceptions (new, or resolved with the evidence), the *what works for this learner in this subject* section. When the goal is met, set `status: done` and `goal_met:` to today.
 3. Update **`plan.md`**: node statuses, re-sequencing if the diagnosis changed, next session's node group.
 4. Rewrite **`resume.md`** from scratch. Under 200 words. It is the first thing the next session reads.
 5. **`preferences.md` — only at the stated bar.** An observation joins *Observed* only once it has appeared in at least two checks or the learner has confirmed it directly. One sighting is not enough, however clear it looked, and the two sightings need not fall in the same session: a first sighting is written to *Preference candidates* in the session note and carried into the *Candidates* tally in `preferences.md`, where a later session can count it. If nothing met the bar this session, say so in one line in chat — "no preference observation met the two-sighting bar" — and write nothing to *Observed*. Never edit *Stated*; contradictions go under *Proposed changes to Stated*.
-6. Regenerate the status views: `python3 .claude/hooks/learn-status.py`. Both hosts use this generator. It rewrites `learn/Dashboard.md` and each subject's `progress.md` from the records, so they cannot drift from `record.md`.
+6. Regenerate the status views: `python3 .claude/hooks/learn-status.py`. Both hosts use this generator. It rewrites `learn/Home.md`, `learn/Dashboard.md`, and each subject's `progress.md` from the records, so they cannot drift from `record.md`. Then run `learn-status.py --rewards --subject <slug> --session <NN>`.
 7. **Verify, do not assume.** Re-read every file steps 1–6 were supposed to touch and prepare a checklist: file, changed or unchanged, and one phrase on what changed. A step that was skipped, blocked by a permission prompt, or not applicable is reported as such. Never narrate a write that did not happen. A record the learner believes exists and does not is worse than no record.
-8. **Close once.** After all writes and verification are finished, send one closing block containing the checklist, the preference-bar result, the resume summary exactly once, and one next-step line. For a break, that line says how to resume. Host-required progress updates may appear before this block, but they must not contain a provisional checklist, session summary, or handoff. After sending the closing block, stop; do not restate or paraphrase it.
+8. **Close once.** After all writes and verification are finished, send one closing block containing the checklist, the preference-bar result, the reward lines exactly as the script printed them (none if it printed none), the resume summary exactly once, and one next-step line. For a break, that line says how to resume. Host-required progress updates may appear before this block, but they must not contain a provisional checklist, session summary, or handoff. After sending the closing block, stop; do not restate or paraphrase it.
 
 ## Phase 5 — Resume (`/learn-resume`)
 
@@ -77,7 +77,7 @@ A review is not one of the phases. It opens no session note, teaches nothing, an
 
 1. **Pick in code.** `python3 .claude/hooks/learn-status.py --due` ranks every node in the vault by time since its last check, capped per subject. Read-only, offline, and the same picker `/learn-check` uses for its older spacing node.
 2. **Ask and grade** by `tutor.md`, *Checks and quizzes*. Every question is retrieval, and every question names its subject first — the learner has had no recap.
-3. **Log the split**, per `records.md`, *Reviews*: the narrative to `learn/reviews/YYYY-MM-DD-rNN.md`, the evidence and status moves to each subject's `record.md`, and nothing else in any subject.
+3. **Log the split**, per `records.md`, *Reviews*: the narrative to `learn/reviews/YYYY-MM-DD-rNN.md`, the evidence and status moves to each subject's `record.md`, and nothing else in any subject. Close with `learn-status.py --rewards --review <NN>` and paste its lines verbatim.
 
 A node that fails a review is `decayed`, which is the signal to run `/learn-resume` on that subject. A review never re-teaches it.
 

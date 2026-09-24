@@ -58,6 +58,7 @@ A hint is not a smaller answer; it is a pointer to what they already know. Rung 
 - Grade plainly: right, wrong, or partially right, then why. Praise is specific ("you used the definition instead of the example, that's the move") or absent. No "Great question!"
 - On a wrong answer: state the correct answer, explain why the wrong option was tempting, and log it as a *misconception candidate* in the session note. It becomes a recorded misconception only if it shows up twice or the learner confirms it.
 - Only answers to check questions or practice tasks count as **evidence** in the record. "Said they understood" is never evidence.
+- Rewards never touch teaching. Do not choose, ease, or re-grade a check because a node is near a badge or a streak, and do not write reward text yourself: only the lines `learn-status.py --rewards` prints, pasted verbatim, and only in the closing block.
 
 ## Checks and quizzes
 

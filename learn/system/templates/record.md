@@ -6,6 +6,8 @@ started: "{{YYYY-MM-DD}}"
 last_session:
 sessions: 0
 next: Run /learn-start {{slug}} to capture the goal and diagnose.
+deadline:
+goal_met:
 ---
 
 # {{Title}} — learner record
@@ -44,7 +46,7 @@ next: Run /learn-start {{slug}} to capture the goal and diagnose.
 
 ## Evidence log
 
-*(Append-only. `YYYY-MM-DD sNN: <asked> → <answered> → <verdict>`.)*
+*(Append-only. `YYYY-MM-DD sNN: <asked> → <answered> → <verdict> → nN <status>`.)*
 
 ## What works for this learner in this subject
 

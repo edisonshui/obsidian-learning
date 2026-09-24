@@ -32,9 +32,13 @@ Session numbers `sNN` are per subject and never reused. Two sessions on one day 
 
 **Misconception status:** `open` or `resolved YYYY-MM-DD`, with the evidence for each.
 
+**Plan table** (in `plan.md`): the plan's node table has a `Can do` column right after `Check type`: one can-do statement per node, a bare verb phrase that reads after "You can now", with no node id, testable by the node's check. `/learn-start` writes it; it changes only when the node's scope changes. A missing one falls back to the node name.
+
 ## Evidence rule
 
 An evidence line is `YYYY-MM-DD sNN: <what was asked> → <what they answered> → <verdict>`, or `YYYY-MM-DD rNN: …` when the check came from a cross-subject review (see *Reviews* below). Only answers to diagnostic probes, check questions, practice tasks, decay checks, and review checks produce evidence lines. Statements like "makes sense" or "I already know this" are recorded, if at all, as claims, never as evidence.
+
+Every evidence line from a check that concerns a node ends with a transition marker per node, `→ nN <status>`, giving the node's status after that line even when it did not change: `2026-09-30 s05: … → correct → n9 solid`. A line that concerns several nodes ends with one marker each. Nothing follows the last marker. A line that concerns no node, such as a diagnostic probe before the plan exists, has none. Rewards are derived from these markers (`CONTEXT.md`, *Transition marker*), so a missing or wrong marker is a wrong reward.
 
 ## Update rules
 
@@ -42,10 +46,12 @@ An evidence line is `YYYY-MM-DD sNN: <what was asked> → <what they answered> �
 - **Statuses only move on evidence.** No node reaches `checked` without a logged check; no node reaches `solid` without a later-session retrieval.
 - **Misconception candidates** live in the session note. They are promoted to `record.md` when they appear twice or the learner confirms them; they are marked `resolved` only after a check that specifically targets them is passed.
 - **`resume.md` is disposable.** It is regenerated from `record.md` and `plan.md` every session end, so it can never drift into being the only copy of anything.
-- **Frontmatter is the index.** `record.md` frontmatter (`status`, `sessions`, `last_session`, `next`) is what `Dashboard.md` and the SessionStart hook read. Keep it accurate.
+- **Frontmatter is the index.** `record.md` frontmatter (`status`, `sessions`, `last_session`, `next`, `deadline`, `goal_met`) is what `Home.md`, `Dashboard.md`, and the SessionStart hook read. Keep it accurate.
 - **Never edit `learn/system/` or the *Stated* section of `learn/me/preferences.md` from inside a lesson.** Propose in chat; the learner edits.
 - **Preference observations** go to the *Observed* section of `preferences.md` only when confirmed by evidence, and always distinguish *enjoyed* from *demonstrated understanding*. A learner can enjoy a format that does not produce evidence, and the record must say which is which.
 - **Preference candidates** follow the same promotion pattern as misconceptions, one level up. A single sighting is written to *Preference candidates* in the session note, then carried into the *Candidates* tally in `preferences.md`; a second sighting, in that session or any later one, promotes it to *Observed*. Nothing reaches *Observed* on one sighting, and no sighting is discarded for being old.
+- **Rewards are derived, never written.** No file stores a badge, count, or streak. `learn-status.py` reads them from transition markers and frontmatter, and `--rewards` prints the only reward lines the tutor may show, verbatim. Rewards never change how a check is chosen, asked, or graded.
+- **`rewards:` in `learn/me/preferences.md` frontmatter belongs to the learner.** The tutor and scripts read it and never write it.
 
 ## Reviews
 
@@ -56,7 +62,7 @@ Because it touches several subjects, its writing splits, and the split is what k
 | Goes to | What |
 | --- | --- |
 | `learn/reviews/YYYY-MM-DD-rNN.md` | The narrative: the picked set, every question, answer and verdict, each MC question's `key: <slot>/<count> — options: <opt1> / <opt2> / <opt3>`, misconception candidates, corrections. `rNN` is per-vault and never reused |
-| each subject's `record.md` | Node status (`→ solid` on a pass, `→ decayed` on a fail), *Last checked*, and one `rNN`-prefixed evidence line per question |
+| each subject's `record.md` | Node status (`→ solid` on a pass, `→ decayed` on a fail), *Last checked*, and one `rNN`-prefixed evidence line per question. Every evidence line ends with its transition marker. |
 
 A review changes **nothing else** in a subject: not `sessions:`, not `last_session`, not the *Sessions* list, not `plan.md`, not `resume.md`. It is not a session of any one subject, and recording it as one would put `sessions:` and `last_session` permanently at odds with the notes on disk — which is exactly what G5 exists to catch. A `done` subject stays `done`; a node dropping to `decayed` is what says otherwise, written where the next `/learn-resume` reads it.
 
@@ -75,6 +81,8 @@ started: YYYY-MM-DD
 last_session: YYYY-MM-DD
 sessions: <count>
 next: <one line: the first thing the next session does>
+deadline: YYYY-MM-DD   # optional: the exam or quiz this subject prepares for
+goal_met: YYYY-MM-DD   # set by /learn-end when status becomes done; never cleared
 ---
 ```
 
