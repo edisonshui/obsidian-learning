@@ -34,9 +34,10 @@ learn/subjects/    one folder per subject:
                      resume.md    the 200-word hand-off                  (authored)
                      sessions/    one notebook per session               (authored)
                      log.md       the live conversation                  (generated: hook)
-                     progress.md  status view + coloured DAG             (generated: script)
+                     progress.md  skill tree, counts, can-do statements  (generated: script)
 learn/reviews/     cross-subject spaced repetition, one note per pass  (authored)
-learn/Dashboard.md index of all subjects                                 (generated: script)
+learn/Home.md      what to do now: the recommended action              (generated: script)
+learn/Dashboard.md index of all subjects, badges, warnings              (generated: script)
 learn/Queries.md   Dataview views over frontmatter                       (authored)
 .claude/skills/    the /learn-* commands
 .claude/agents/    fact-checker, plan-reviewer
@@ -44,12 +45,12 @@ learn/Queries.md   Dataview views over frontmatter                       (author
                                        reports any session note left open
                    obsidian-live.py    mirrors the conversation to log.md; times the session
                                        (`clock --subject <slug>` reads the totals back)
-                   learn-status.py     writes Dashboard.md and each progress.md
+                   learn-status.py     writes Home.md, Dashboard.md and each progress.md
                    vaultlib.py         frontmatter + open-note reading, shared by the two above
                    test_hooks.py       run it after changing any of them
 ```
 
-**Generated files are never hand-edited.** `Dashboard.md`, every `progress.md`, and every `log.md` are rewritten from the records; a correction belongs in `record.md` or `plan.md`. `learn-status.py` also reports where `record.md` and `plan.md` contradict each other, on the dashboard under *Record inconsistencies* — it reports and never repairs, because a generator that silently fixed its source would hide the drift it exists to surface.
+**Generated files are never hand-edited.** `Home.md`, `Dashboard.md`, every `progress.md`, and every `log.md` are rewritten from the records; a correction belongs in `record.md` or `plan.md`. `learn-status.py` also reports where `record.md` and `plan.md` contradict each other, on the dashboard under *Record inconsistencies* — it reports and never repairs, because a generator that silently fixed its source would hide the drift it exists to surface.
 
 Obsidian renders mermaid and LaTeX; write diagrams and math per `learn/system/diagrams.md`. Use `[[wikilinks]]` with full paths from the vault root, e.g. `[[learn/subjects/oop/record|OOP record]]`.
 

@@ -33,7 +33,7 @@ Do not teach, quiz, or plan until a subject is chosen.
 
 ## Files and generated views
 
-`learn/system/` holds the teaching rules, `learn/me/` holds learner preferences, and `learn/subjects/<slug>/` holds each subject's `record.md`, `plan.md`, `resume.md`, and `sessions/`. `learn/reviews/` holds cross-subject spaced-repetition notes, which belong to no single subject. `python3 .claude/hooks/learn-status.py` generates `learn/Dashboard.md` and each `progress.md` for both tutors. Do not hand-edit those views.
+`learn/system/` holds the teaching rules, `learn/me/` holds learner preferences, and `learn/subjects/<slug>/` holds each subject's `record.md`, `plan.md`, `resume.md`, and `sessions/`. `learn/reviews/` holds cross-subject spaced-repetition notes, which belong to no single subject. `python3 .claude/hooks/learn-status.py` generates the views for both tutors: `learn/Home.md` is the "what to do now" view, led by the recommended action, `learn/Dashboard.md` is the detail view indexing every subject, its badges, and record warnings, and each `progress.md` holds a subject's skill tree and can-do statements. Do not hand-edit those views.
 
 Claude Code writes each subject's `log.md`. Codex writes `codex-log.md` through `.codex/hooks/learning.py`. The separate logs prevent one tool's hook from overwriting the other's conversation. They are generated views, not learning state. Codex updates its log after submitted prompts and completed turns; it does not stream partial answers into Obsidian.
 
