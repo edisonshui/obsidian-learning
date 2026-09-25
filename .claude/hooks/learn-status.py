@@ -14,6 +14,8 @@ open on a phone. Where Dataview does fit -- subject and session frontmatter -- s
 
 Run: python3 .claude/hooks/learn-status.py [--vault PATH]
      python3 .claude/hooks/learn-status.py --next [--host claude|codex]  (read-only)
+     python3 .claude/hooks/learn-status.py --rewards --subject SLUG --session NN  (read-only)
+     python3 .claude/hooks/learn-status.py --rewards --review NN  (read-only)
 """
 
 import argparse
@@ -131,6 +133,42 @@ def read_notes(folder, now):
     notes = [session_note.read(path, now=now)
              for path in (sorted(folder.glob("*.md")) if folder.is_dir() else [])]
     return [note for note in notes if note.fields]
+
+
+def load_subjects(vault, now):
+    """Every subject folder with a record.md, read once.
+
+    Returns (subjects, missing): one dict per subject holding what the ranking,
+    the rewards, and every view read, and the names of folders with no
+    record.md, which are not subjects.
+    """
+    root = Path(vault) / "learn" / "subjects"
+    subjects, missing = [], []
+    for folder in sorted(path for path in root.glob("*") if path.is_dir()) if root.is_dir() else []:
+        record, plan = folder / "record.md", folder / "plan.md"
+        if not record.is_file():
+            missing.append(folder.name)
+            continue
+        record_text = record.read_text()
+        plan_text = plan.read_text() if plan.is_file() else ""
+        subjects.append({
+            "slug": folder.name, "folder": folder, "fields": frontmatter(record),
+            "record_text": record_text, "plan_text": plan_text,
+            "nodes": read_nodes(record_text, plan_text),
+            "notes": read_notes(folder / "sessions", now),
+            "events": evidence_events(record_text, note_starts(folder)),
+        })
+    return subjects, missing
+
+
+def rank_inputs(subjects):
+    """The (slug, nodes, fields, events) tuples `rank()` and `rewards()` take."""
+    return [(s["slug"], s["nodes"], s["fields"], s["events"]) for s in subjects]
+
+
+def note_inputs(subjects):
+    """The (slug, session note) pairs `rank()` takes."""
+    return [(s["slug"], note) for s in subjects for note in s["notes"]]
 
 
 # ------------------------------------------------------ transition markers
@@ -677,6 +715,103 @@ def is_due_on(markers, day, deadline):
     return bool(state) and is_due(state, day, deadline)
 
 
+# ------------------------------------------------------------ reward lines
+
+# `--rewards` prints the only reward text the tutor may show, pasted verbatim
+# into the `/learn-end` or `/learn-review` closing block (spec section 11,
+# `CONTEXT.md`, *Reward line*). It compares the reward state with and without
+# the scope's marker lines, so it can only name what that session or review
+# added. Record voice: dated facts, no praise, no exclamation marks, no emoji.
+
+MAX_REWARD_LINES = 4
+COUNT_LABELS = [("nodes_proven", "Nodes proven"), ("checks_passed", "Retrieval checks passed"),
+                ("goals_met", "Goals met")]
+
+
+def same_source(source, letter, number):
+    """Whether an evidence line's `sNN` or `rNN` names this session or review.
+    `number` may be written `3`, `03`, or `s03`."""
+    digits = re.sub(r"\D", "", str(number))
+    return bool(digits) and bool(re.fullmatch(r"%s0*%d" % (letter, int(digits)), source or ""))
+
+
+def weeks_word(count):
+    return plural(count, "week")
+
+
+def reward_lines(subjects, today, subject=None, session=None, review=None, session_date=None):
+    """The closing block's reward lines, at most four, or [] (spec section 11).
+
+    `subjects` is the (slug, nodes, fields, events) list `rewards()` takes. With
+    `review`, the scope is that review's lines in every subject; otherwise it
+    is session `session` of `subject`, and a Goal met badge is in scope when
+    `goal_met:` equals `session_date`. The rewards setting is the caller's to
+    check: this always answers as if rewards were on.
+    """
+    if review is not None:
+        in_scope = lambda slug, event: same_source(event["source"], "r", review)  # noqa: E731
+    else:
+        in_scope = lambda slug, event: slug == subject and same_source(event["source"], "s", session)  # noqa: E731
+    before_inputs = []
+    for slug, nodes, fields, events in subjects:
+        kept = dict(fields)
+        if (review is None and slug == subject and session_date
+                and to_date(fields.get("goal_met")) == to_date(session_date)):
+            kept.pop("goal_met", None)
+        outside = [e for e in events if not in_scope(slug, e)]
+        # A node the scope moved stands, before it, where its last marker
+        # outside the scope left it. Its table status is the after state.
+        moved = {e["node"] for e in events if in_scope(slug, e)}
+        last = {e["node"]: e["status"] for e in outside}
+        before_nodes = {node: (dict(entry, status=last.get(node, "planned")) if node in moved else entry)
+                        for node, entry in nodes.items()}
+        before_inputs.append((slug, before_nodes, kept, outside))
+    before, after = rewards(before_inputs, today), rewards(subjects, today)
+
+    def key(found):
+        return (found["kind"], found["subject"], found["node"], found["date"])
+    had = {key(found) for found in before["badges"]}
+    earned = sorted((found for found in after["badges"] if key(found) not in had),
+                    key=lambda found: (found["date"], BADGE_ORDER.index(found["kind"])))
+    was_open = {(r["subject"], r["node"], r["date"]) for r in before["open_recoveries"]}
+    opened = [r for r in after["open_recoveries"] if (r["subject"], r["node"], r["date"]) not in was_open]
+
+    badge_lines = [found["text"] for found in earned]
+    recovery = (["Recovery open: %s. Passing it in a later session earns Recovered."
+                 % ", ".join(r["name"] for r in opened)] if opened else [])
+    changed = ["%s: %d → %d" % (label, before["counts"][name], after["counts"][name])
+               for name, label in COUNT_LABELS if before["counts"][name] != after["counts"][name]]
+    counts = [" · ".join(changed)] if changed and review is None else []
+
+    weeks_before, weeks_after = before["streak"]["weeks"], after["streak"]["weeks"]
+    streak_now = after["streak"]["current"]
+    if review is not None:
+        turned = bool(weeks_after) and weeks_after[-1]["result"] == "pass" and (
+            not weeks_before or weeks_before[-1]["result"] != "pass")
+        repaired = (len(weeks_after) > 1 and weeks_after[-2]["result"] == "repaired"
+                    and (len(weeks_before) < 2 or weeks_before[-2]["result"] != "repaired"))
+        streak = ["Review streak: %s" % weeks_word(streak_now)] if (turned or repaired) and streak_now else []
+    else:
+        due_now = sum(1 for _, nodes, fields, _ in subjects for entry in nodes.values()
+                      if is_due(entry, today, fields.get("deadline")))
+        this_week_passed = bool(weeks_after) and weeks_after[-1]["result"] == "pass"
+        if due_now and not this_week_passed:
+            streak = ["This week isn't counted yet: %s %s due"
+                      % (plural(due_now, "check"), "is" if due_now == 1 else "are")]
+        elif after["streak"]["alive"]:
+            streak = ["Review streak: %s" % weeks_word(streak_now)]
+        else:
+            streak = []
+        if not badge_lines and not counts:
+            return recovery  # nothing earned: only an opened recovery is ever named
+
+    if len(earned) > 2 or len(badge_lines + recovery + counts + streak) > MAX_REWARD_LINES:
+        if len(earned) > 1:
+            badge_lines = ["%d badges: %s" % (len(earned), " · ".join(
+                "%s: %s" % (found["kind"], found["name"]) for found in earned))]
+    return (badge_lines + recovery + counts + streak)[:MAX_REWARD_LINES]
+
+
 def due_report(rows, undated):
     """`--due` as the tutor and Edison read it. One node per line, stalest first."""
     out = []
@@ -696,7 +831,14 @@ def due_report(rows, undated):
 
 # --------------------------------------------------------------------- checking
 
-def open_notes(notes, subject):
+def command_form(command, host):
+    """A skill command as a host types it: `/learn-...` for Claude, `$learn-...`
+    for Codex, and bare for `host=None`, the form Home and the Dashboard print
+    because both hosts read them."""
+    return {"claude": "/", "codex": "$"}.get(host, "") + command
+
+
+def open_notes(notes, subject, host="claude"):
     """Report every session note whose `end:` is still empty.
 
     `/learn-resume` is required to finalize a stale or cut-off note before opening
@@ -725,16 +867,17 @@ def open_notes(notes, subject):
                            "check the note's `date:` field" % (label, note.anchor, -note.hours))
         elif note.status == "open":
             reports.append("%s: `end:` is empty with no `paused:` -- cut off %.1f h ago without "
-                           "`/learn-end`. `/learn-resume` must finalize it before opening the next note."
-                           % (label, note.hours))
+                           "`%s`. `%s` must finalize it before opening the next note."
+                           % (label, note.hours, command_form("learn-end", host),
+                              command_form("learn-resume", host)))
         elif note.status == "stale pause":
             reports.append("%s: paused %.1f h ago, past the %d h bound -- a stale pause, not a break. "
-                           "`/learn-resume` must finalize it before opening the next note."
-                           % (label, note.hours, STALE_HOURS))
+                           "`%s` must finalize it before opening the next note."
+                           % (label, note.hours, STALE_HOURS, command_form("learn-resume", host)))
         else:
             reports.append("%s: paused %.1f h ago, inside the %d h bound -- a live break. "
-                           "`/learn-resume %s` reopens this note and skips the decay check."
-                           % (label, note.hours, STALE_HOURS, subject))
+                           "`%s` reopens this note and skips the decay check."
+                           % (label, note.hours, STALE_HOURS, command_form("learn-resume " + subject, host)))
     return reports
 
 
@@ -1187,8 +1330,16 @@ def main():
                         help="print the recommended actions, best first, and write "
                              "nothing (read-only)")
     parser.add_argument("--host", choices=("claude", "codex"), default="claude",
-                        help="with --next, print /learn-... (claude) or $learn-... (codex)")
-    parser.add_argument("--subject", help="with --due, restrict to one subject slug")
+                        help="with --next or --open-notes, print /learn-... (claude) or "
+                             "$learn-... (codex)")
+    parser.add_argument("--rewards", action="store_true",
+                        help="print the reward lines for one session (--subject and "
+                             "--session) or one review (--review), and write nothing "
+                             "(read-only). Prints nothing when rewards are off")
+    parser.add_argument("--session", help="with --rewards and --subject, the session number")
+    parser.add_argument("--review", help="with --rewards, the review number")
+    parser.add_argument("--subject", help="with --due, restrict to one subject slug; "
+                                          "with --rewards, the session's subject")
     parser.add_argument("--limit", type=int, default=None,
                         help="with --due, keep only the N stalest nodes")
     parser.add_argument("--per-subject", type=int, default=2, dest="per_subject",
@@ -1200,53 +1351,17 @@ def main():
                              "default: session start must stay offline, fast, and "
                              "deterministic (PLAN-2026-09-22.md, Engineering constraints)")
     args = parser.parse_args()
+    if args.rewards and not (args.review or (args.subject and args.session)):
+        parser.error("--rewards needs --subject and --session, or --review")
 
     vault = args.vault.resolve()
-    root = vault / "learn" / "subjects"
     stamp = datetime.now()
     today = stamp.strftime("%Y-%m-%d")
-    subjects, warnings, openings, written = [], [], [], []
-    ranked = []  # (slug, nodes) for --due, collected before the write half of the loop
-    rank_inputs, notes_by_subject = [], []  # rank()'s inputs for --next
-
-    if args.semantic:
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        import jev  # noqa: E402 -- only imported when explicitly asked for
-        if not jev.available(vault) and not args.quiet:
-            print("learn-status: --semantic requested but jev is not available "
-                  "(no TYPESAFE_API_KEY or typesafe-sdk not installed) -- running the "
-                  "deterministic fallback half of each semantic check instead")
-
-    for folder in sorted(path for path in root.glob("*") if path.is_dir()) if root.is_dir() else []:
-        slug = folder.name
-        record, plan = folder / "record.md", folder / "plan.md"
-        if not record.is_file():
-            warnings.append("%s: no record.md" % slug)
-            continue
-        record_text = record.read_text()
-        plan_text = plan.read_text() if plan.is_file() else ""
-        fields = frontmatter(record)
-        nodes = read_nodes(record_text, plan_text)
-        notes = read_notes(folder / "sessions", stamp)
-        sessions = [dict(note.fields, file=note.name) for note in notes]
-        openings += open_notes(notes, slug)
-        ranked.append((slug, nodes))
-        rank_inputs.append((slug, nodes, fields, evidence_events(record_text, note_starts(folder))))
-        notes_by_subject += [(slug, note) for note in notes]
-        if args.open_notes or args.due or args.next_action:
-            continue  # read-only modes: report, write nothing
-        warnings += consistency(nodes, plan_text, slug, fields, sessions, folder)
-        if args.semantic:
-            # Not gated on `jev.available()`: with no key each semantic check
-            # falls back to its deterministic half rather than vanishing, which
-            # is the rule for every Jev check in PLAN-2026-09-22.md Phase 4.
-            warnings += semantic_warnings(nodes, plan_text, slug, fields, sessions, folder,
-                                          vault=vault)
-        note = folder / "progress.md"
-        note.write_text(progress_note(slug, folder, fields, nodes, plan_text,
-                                      record_text, sessions, today))
-        written.append(str(note.relative_to(vault)))
-        subjects.append((slug, {"fields": fields, "nodes": nodes, "folder": folder}))
+    loaded, missing = load_subjects(vault, stamp)
+    warnings = ["%s: no record.md" % slug for slug in missing]
+    openings, written = [], []
+    for subject in loaded:
+        openings += open_notes(subject["notes"], subject["slug"], host=args.host)
 
     if args.open_notes:
         # Printed into the tutor's context by session-start.sh. Silence means every
@@ -1259,14 +1374,57 @@ def main():
         # Read-only like --open-notes: a review picks from the records without
         # touching them, so running this to decide what to ask never itself
         # changes what the dashboard says.
-        rows, undated = due(ranked, stamp.date(), subject=args.subject,
-                            per_subject=args.per_subject or None, limit=args.limit)
+        rows, undated = due([(s["slug"], s["nodes"]) for s in loaded], stamp.date(),
+                            subject=args.subject, per_subject=args.per_subject or None,
+                            limit=args.limit)
         print(due_report(rows, undated))
         return 0
 
     if args.next_action:
-        print(next_report(rank(rank_inputs, notes_by_subject, stamp.date()), host=args.host))
+        print(next_report(rank(rank_inputs(loaded), note_inputs(loaded), stamp.date()), host=args.host))
         return 0
+
+    if args.rewards:
+        # Read-only, and silent when rewards are off or nothing qualifies: the
+        # closing skills paste whatever this prints, so no output is no lines.
+        if rewards_setting(vault)[0]:
+            session_date = None
+            if not args.review:
+                chosen = next((s for s in loaded if s["slug"] == args.subject), None)
+                for note in chosen["notes"] if chosen else []:
+                    if same_source(note.name.rsplit("-", 1)[-1], "s", args.session):
+                        session_date = note.fields.get("date")
+            for line in reward_lines(rank_inputs(loaded), stamp.date(), subject=args.subject,
+                                     session=args.session, review=args.review,
+                                     session_date=session_date):
+                print(line)
+        return 0
+
+    if args.semantic:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import jev  # noqa: E402 -- only imported when explicitly asked for
+        if not jev.available(vault) and not args.quiet:
+            print("learn-status: --semantic requested but jev is not available "
+                  "(no TYPESAFE_API_KEY or typesafe-sdk not installed) -- running the "
+                  "deterministic fallback half of each semantic check instead")
+
+    subjects = []
+    for subject in loaded:
+        slug, folder, fields, nodes = subject["slug"], subject["folder"], subject["fields"], subject["nodes"]
+        plan_text, record_text = subject["plan_text"], subject["record_text"]
+        sessions = [dict(note.fields, file=note.name) for note in subject["notes"]]
+        warnings += consistency(nodes, plan_text, slug, fields, sessions, folder)
+        if args.semantic:
+            # Not gated on `jev.available()`: with no key each semantic check
+            # falls back to its deterministic half rather than vanishing, which
+            # is the rule for every Jev check in PLAN-2026-09-22.md Phase 4.
+            warnings += semantic_warnings(nodes, plan_text, slug, fields, sessions, folder,
+                                          vault=vault)
+        note = folder / "progress.md"
+        note.write_text(progress_note(slug, folder, fields, nodes, plan_text,
+                                      record_text, sessions, today))
+        written.append(str(note.relative_to(vault)))
+        subjects.append((slug, {"fields": fields, "nodes": nodes, "folder": folder}))
 
     # A review note is not a session note and deliberately lives outside
     # learn/subjects/, so the per-subject loop above never sees it -- but its

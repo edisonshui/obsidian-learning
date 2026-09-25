@@ -804,6 +804,13 @@ for host in (".claude", ".agents"):
        "`deadline: YYYY-MM-DD`" in (VAULT_ROOT / host / "skills/learn-start/SKILL.md").read_text(), True)
 
 
+section("skill drift — both closing skills, in both hosts, paste the --rewards lines")
+for name in ("learn-end", "learn-review"):
+    for host in (".claude", ".agents"):
+        eq("%s/%s runs learn-status.py --rewards" % (host, name),
+           "learn-status.py --rewards" in (VAULT_ROOT / host / "skills" / name / "SKILL.md").read_text(), True)
+
+
 section("skill drift, both learn-end copies set goal_met:, and the done subjects carry it")
 for host in (".claude", ".agents"):
     eq("%s/learn-end sets goal_met: when the goal is met" % host,
@@ -1664,6 +1671,97 @@ subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(S
 eq("the run lists an unknown rewards: value under Record inconsistencies",
    "rewards: loud" in (SETTING_VAULT / "learn/Dashboard.md").read_text().split("## Record inconsistencies", 1)[-1],
    True)
+
+
+section("--rewards, the reward lines for one session or one review (spec section 11)")
+def sourced(node, date, st, source):
+    return dict(marker_event(node, date, st), source=source)
+SESSION = rsubject("e", [rnode("n1", "solid", "2026-09-24", name="Alpha"), rnode("n2", "solid", "2026-09-24", name="Beta"),
+                         rnode("n3", "checked", "2026-09-24", name="Gamma"), rnode("n4", "decayed", "2026-09-24", name="Delta")],
+                   [sourced("n1", "2026-09-10", "checked", "s01"), sourced("n2", "2026-09-10", "checked", "s01"),
+                    sourced("n4", "2026-09-10", "checked", "s01"), sourced("n2", "2026-09-15", "solid", "s02"),
+                    sourced("n2", "2026-09-20", "decayed", "s03"), sourced("n1", "2026-09-24", "solid", "s05"),
+                    sourced("n2", "2026-09-24", "solid", "s05"), sourced("n3", "2026-09-24", "checked", "s05"),
+                    sourced("n4", "2026-09-24", "decayed", "s05")], title="Echo")
+end_lines = status.reward_lines([SESSION], DUE_DAY, subject="e", session="05")
+eq("badges, recovery open, changed counts, then the streak, capped at 4 by collapsing the badges",
+   end_lines,
+   ["2 badges: Recovered: Beta · Solid: Alpha",
+    "Recovery open: Delta. Passing it in a later session earns Recovered.",
+    "Nodes proven: 3 → 4 · Retrieval checks passed: 1 → 3",
+    "Review streak: 2 weeks"])
+eq("the session number may be written 5, 05, or s05",
+   [status.reward_lines([SESSION], DUE_DAY, subject="e", session=n) for n in ("5", "s05")], [end_lines, end_lines])
+TWO_BADGES = rsubject("t", [rnode("n1", "solid", "2026-09-24", name="Alpha"), rnode("n2", "solid", "2026-09-24", name="Beta")],
+                      [sourced("n1", "2026-09-10", "checked", "s01"), sourced("n2", "2026-09-10", "checked", "s01"),
+                       sourced("n1", "2026-09-24", "solid", "s02"), sourced("n2", "2026-09-24", "solid", "s02")])
+eq("with at most two badges and room for them, each badge is its own dated line",
+   status.reward_lines([TWO_BADGES], DUE_DAY, subject="t", session="02")[:2],
+   ["Solid: Alpha, 2026-09-24", "Solid: Beta, 2026-09-24"])
+THREE = rsubject("h", [rnode(n, "solid", "2026-09-24", name=n.upper()) for n in ("n1", "n2", "n3")],
+                 [sourced(n, "2026-09-10", "checked", "s01") for n in ("n1", "n2", "n3")]
+                 + [sourced(n, "2026-09-24", "solid", "s02") for n in ("n1", "n2", "n3")],
+                 goal_met="2026-09-24", status="done")
+eq("more than two badges share one line, and goal_met: on the session's date is in scope",
+   status.reward_lines([THREE], DUE_DAY, subject="h", session="02", session_date="2026-09-24")[:2],
+   ["4 badges: Goal met: H · Solid: N1 · Solid: N2 · Solid: N3", "Retrieval checks passed: 0 → 3 · Goals met: 0 → 1"])
+LAPSE_ONLY = rsubject("l", [rnode("n1", "decayed", "2026-09-24", name="Lambda")],
+                      [sourced("n1", "2026-09-10", "checked", "s01"), sourced("n1", "2026-09-17", "solid", "s02"),
+                       sourced("n1", "2026-09-24", "decayed", "s03")])
+eq("an opened recovery prints alone when nothing was earned",
+   status.reward_lines([LAPSE_ONLY], DUE_DAY, subject="l", session="03"),
+   ["Recovery open: Lambda. Passing it in a later session earns Recovered."])
+eq("a session that earned nothing and opened nothing prints nothing",
+   status.reward_lines([LAPSE_ONLY], DUE_DAY, subject="l", session="09"), [])
+DUE_WEEK = rsubject("w", [rnode("n1", "checked", "2026-09-22", name="Omega"), rnode("n2", "checked", "2026-09-15")],
+                    [sourced("n2", "2026-09-15", "checked", "s01"), sourced("n1", "2026-09-22", "checked", "s02")])
+eq("with checks due and no pass this week, the streak line says the week is not counted yet",
+   status.reward_lines([DUE_WEEK], DUE_DAY, subject="w", session="02"),
+   ["Nodes proven: 1 → 2", "This week isn't counted yet: 1 check is due"])
+
+REVIEWED = rsubject("rv", [rnode("n1", "solid", "2026-09-24", name="Rho"), rnode("n2", "solid", "2026-09-23", name="Sigma")],
+                    [sourced("n1", "2026-09-19", "checked", "s01"), sourced("n2", "2026-09-19", "checked", "s02"),
+                     sourced("n1", "2026-09-24", "solid", "r03")])
+eq("a review that makes the week a pass prints the streak line",
+   status.reward_lines([REVIEWED], DUE_DAY, review="3"), ["Solid: Rho, 2026-09-24", "Review streak: 1 week"])
+ALREADY = rsubject("rv", REVIEWED[1].values(), REVIEWED[3] + [sourced("n2", "2026-09-23", "solid", "s03")])
+eq("a review in a week that had already passed prints no streak line, and no counts line",
+   status.reward_lines([ALREADY], DUE_DAY, review="03"), ["Solid: Rho, 2026-09-24"])
+REPAIR = rsubject("rp", [rnode("n1", "solid", "2026-09-22", name="Pi"), rnode("n2", "solid", "2026-09-21")],
+                  [sourced("n1", "2026-09-10", "checked", "s01"), sourced("n2", "2026-09-19", "checked", "s02"),
+                   sourced("n2", "2026-09-21", "solid", "s03"), sourced("n1", "2026-09-22", "solid", "r04")])
+eq("a review that repairs last week's miss prints the streak line even when the week had passed",
+   status.reward_lines([REPAIR], DUE_DAY, review="04"), ["Solid: Pi, 2026-09-22", "Review streak: 1 week"])
+eq("a review's scope is its rNN lines in every subject, and never a session's; the streak is vault-wide",
+   (status.reward_lines([REVIEWED, LAPSE_ONLY], DUE_DAY, review="03"),
+    status.reward_lines([REVIEWED], DUE_DAY, subject="rv", session="03")),
+   (["Solid: Rho, 2026-09-24", "Review streak: 2 weeks"], []))
+every_line = [line for lines in (end_lines, status.reward_lines([THREE], DUE_DAY, subject="h", session="02",
+                                                                 session_date="2026-09-24"),
+                                 status.reward_lines([LAPSE_ONLY], DUE_DAY, subject="l", session="03"),
+                                 status.reward_lines([DUE_WEEK], DUE_DAY, subject="w", session="02"),
+                                 status.reward_lines([REPAIR], DUE_DAY, review="04")) for line in lines]
+eq("record voice: no exclamation marks, praise words, or emoji",
+   [line for line in every_line if "!" in line or any(ord(ch) > 0x2FFF for ch in line)
+    or re.search(r"(?i)\b(great|well done|nice|congrat|awesome|excellent|amazing|keep it up)", line)], [])
+
+REWARDS_VAULT = fresh()
+write(REWARDS_VAULT / "learn/subjects/fx/record.md",
+      '---\nsubject: "fx"\ntitle: "Fx"\nstatus: active\n---\n\n'
+      "## Nodes\n\n| Node | Status | Last checked | Evidence |\n| --- | --- | --- | --- |\n"
+      "| n1 Loops | checked | %s | — |\n\n## Evidence log\n\n"
+      "- %s s01: q → a → correct → n1 checked\n" % ((datetime.now().date().isoformat(),) * 2))
+write(REWARDS_VAULT / "learn/me/preferences.md", "---\nrewards: on\n---\n")
+def rewards_run(*extra):
+    return subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(REWARDS_VAULT),
+                           "--rewards"] + list(extra), capture_output=True, text=True)
+before = sorted(str(p) for p in REWARDS_VAULT.rglob("*"))
+on_run = rewards_run("--subject", "fx", "--session", "01")
+eq("--rewards prints the session's lines and exits 0", (on_run.stdout, on_run.returncode), ("Nodes proven: 0 → 1\n", 0))
+write(REWARDS_VAULT / "learn/me/preferences.md", "---\nrewards: off\n---\n")
+off_run = rewards_run("--subject", "fx", "--session", "01")
+eq("with rewards off it prints nothing and exits 0", (off_run.stdout, off_run.returncode), ("", 0))
+eq("--rewards writes no file", sorted(str(p) for p in REWARDS_VAULT.rglob("*")), before)
 
 # ------------------------------------------------ J4 / J5 (PLAN-2026-09-22.md Phase 5)
 

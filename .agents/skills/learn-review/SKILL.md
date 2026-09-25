@@ -49,6 +49,6 @@ A review touches several subjects, so the writing splits in two. Both halves hap
 
 ## 4. Close
 
-Run `python3 .claude/hooks/learn-status.py` to regenerate the views. Re-read every file you just wrote and build a checklist: file, **changed** or **unchanged**, one phrase on what changed. Then run `git status --porcelain` and reconcile the two, by the same rule as `$learn-end` step 7 — a file the checklist calls changed that git does not list was not written, and saying so is the point of the step.
+Run `python3 .claude/hooks/learn-status.py` to regenerate the views. Run `python3 .claude/hooks/learn-status.py --rewards --review <NN>` and keep its output exactly. Re-read every file you just wrote and build a checklist: file, **changed** or **unchanged**, one phrase on what changed. Then run `git status --porcelain` and reconcile the two, by the same rule as `$learn-end` step 7 — a file the checklist calls changed that git does not list was not written, and saying so is the point of the step.
 
-Send one closing block: the checklist, one line per node saying where it landed (`solid`, `decayed`, or not reached), and the next step. Then stop.
+Send one closing block: the checklist, one line per node saying where it landed (`solid`, `decayed`, or not reached), the reward lines verbatim (if any), and the next step. Write no reward text of your own. Then stop.
