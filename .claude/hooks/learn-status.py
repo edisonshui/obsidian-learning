@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the learning dashboard and per-subject progress notes from the records.
+"""Generate Home, the learning dashboard, and per-subject progress notes from the records.
 
 Everything here is derived, never authored. `record.md` and `plan.md` are the
 source of truth; this script only re-presents them, so the dashboard cannot drift
@@ -19,6 +19,7 @@ Run: python3 .claude/hooks/learn-status.py [--vault PATH]
 """
 
 import argparse
+import math
 import re
 import sys
 from datetime import datetime, timedelta
@@ -29,7 +30,7 @@ import session_note  # noqa: E402
 import slot_rotation  # noqa: E402
 from vaultlib import STALE_HOURS, frontmatter, section, strip_frontmatter  # noqa: E402
 
-# Teaching order, worst to best. The order drives the summary table and the legend.
+# Teaching order, worst to best.
 STATUSES = ["decayed", "planned", "introduced", "checked", "solid", "skipped"]
 
 # A node counts toward progress once it has passed a check, or was skipped because
@@ -37,16 +38,6 @@ STATUSES = ["decayed", "planned", "introduced", "checked", "solid", "skipped"]
 # so it is shown as partial: claiming it as progress would overstate the evidence.
 COVERED = {"checked", "solid", "skipped"}
 PARTIAL = {"introduced"}
-
-# Light fills with dark text stay legible in both Obsidian themes.
-COLOURS = {
-    "solid":      "fill:#c6f6d5,stroke:#2f855a,color:#1a202c",
-    "checked":    "fill:#bee3f8,stroke:#2b6cb0,color:#1a202c",
-    "introduced": "fill:#feebc8,stroke:#b7791f,color:#1a202c",
-    "planned":    "fill:#edf2f7,stroke:#a0aec0,color:#4a5568",
-    "decayed":    "fill:#fed7d7,stroke:#c53030,color:#1a202c",
-    "skipped":    "fill:#e9d8fd,stroke:#6b46c1,color:#1a202c",
-}
 
 NODE_ID = re.compile(r"\bn\d+\b")
 MERMAID = re.compile(r"```mermaid\n(.*?)```", re.S)
@@ -1092,39 +1083,6 @@ def bar(done, partial, total, width=16):
     return "`" + cells + "░" * max(width - len(cells), 0) + "` " + str(int(round(100.0 * done / total))) + "%"
 
 
-def by_status(nodes):
-    groups = {}
-    for node in sorted(nodes, key=sort_key):
-        groups.setdefault(nodes[node]["status"] or "unknown", []).append(node)
-    return groups
-
-
-def colour_graphs(plan_text, nodes):
-    """Re-emit the plan's mermaid graphs with each node filled by its status.
-
-    classDef is plain mermaid, so this stays inside the rules in diagrams.md: no
-    init directives, no HTML in labels, and it degrades to a normal graph if a
-    renderer ignores the class lines.
-    """
-    blocks = []
-    for block in MERMAID.findall(plan_text):
-        body = block.rstrip()
-        if not body.lstrip().startswith(("flowchart", "graph")):
-            continue
-        present = [node for node in sorted(set(NODE_ID.findall(body)), key=sort_key) if node in nodes]
-        if not present:
-            continue
-        lines = [body]
-        used = [status for status in STATUSES
-                if any(nodes[node]["status"] == status for node in present)]
-        for status in used:
-            lines.append("    classDef %s %s" % (status, COLOURS[status]))
-            members = [node for node in present if nodes[node]["status"] == status]
-            lines.append("    class %s %s" % (",".join(members), status))
-        blocks.append("```mermaid\n" + "\n".join(lines) + "\n```")
-    return blocks
-
-
 def log_links(slug, folder):
     # log.md and codex-log.md are gitignored, hook-written mirrors of the live
     # conversation, not records -- link only the ones that actually exist so the
@@ -1134,64 +1092,603 @@ def log_links(slug, folder):
                        for name, label in names if (folder / (name + ".md")).is_file())
 
 
-def status_label(status, styled=False):
-    # Literal text survives with the prototype snippet disabled. Only known
-    # statuses enter the HTML attribute; other values keep the existing format.
-    if styled and status in STATUSES:
-        return '<code data-learning-status="%s">%s</code>' % (status, status)
-    return "`%s`" % status
+GENERATED = "*Generated from the records; edits are overwritten.*"
 
 
-def progress_note(slug, folder, fields, nodes, plan_text, record_text, sessions, today):
-    prototype = slug == "oop"  # First visual milestone, expand after learner use.
-    total = len(nodes)
-    done = sum(1 for node in nodes.values() if node["status"] in COVERED)
+def proven_count(nodes):
+    return sum(1 for entry in nodes.values() if entry["status"] in COVERED)
+
+
+def up_next(nodes):
+    """`planned` nodes whose every prereq is proven, in plan order."""
+    return [node for node in sorted(nodes, key=sort_key) if nodes[node]["status"] == "planned"
+            and all(nodes.get(p, {}).get("status") in COVERED for p in nodes[node].get("prereqs", []))]
+
+
+def pending_tag(nodes, fields, today):
+    """`N to repair` when a node is decayed, else `N due for review` when a node
+    is due, else "". The Dashboard and the startup index both read it."""
+    decayed = sum(1 for entry in nodes.values() if entry["status"] == "decayed")
+    if decayed:
+        return "%d to repair" % decayed
+    waiting = sum(1 for entry in nodes.values() if is_due(entry, today, fields.get("deadline")))
+    return "%d due for review" % waiting if waiting else ""
+
+
+def deadline_words(deadline, today, passed=False):
+    """`deadline in 4 days` or `deadline today` while the deadline is ahead,
+    `deadline passed` after it when `passed` asks for that, else ""."""
+    left = days_to_deadline(deadline, today)
+    if left is None or (left < 0 and not passed):
+        return ""
+    if left < 0:
+        return "deadline passed"
+    return "deadline today" if left == 0 else "deadline in " + plural(left, "day")
+
+
+def next_review(subjects):
+    """(node name, date) of the earliest day a proven node becomes due, or None."""
+    upcoming = []
+    for slug, nodes, _, _ in subjects:
+        for entry in nodes.values():
+            checked = to_date(entry.get("checked"))
+            if entry.get("status") in DUE_DAYS and checked:
+                upcoming.append((checked + timedelta(days=DUE_DAYS[entry["status"]]), slug,
+                                 sort_key(entry["id"]), entry["name"]))
+    if not upcoming:
+        return None
+    when, _, _, name = min(upcoming)
+    return name, when
+
+
+def joined(names):
+    """`*a*`, `*a* and *b*`, or `*a*, *b*, and *c*`."""
+    names = ["*%s*" % name for name in names]
+    if len(names) < 3:
+        return " and ".join(names)
+    return ", ".join(names[:-1]) + ", and " + names[-1]
+
+
+def milestone(subjects):
+    """The next-milestone line: up to 3 `checked` nodes with the soonest due
+    date, then subject, then id. None when no node is `checked`."""
+    waiting = sorted((to_date(entry["checked"]) + timedelta(days=DUE_DAYS["checked"]), slug,
+                      sort_key(entry["id"]), entry["name"])
+                     for slug, nodes, _, _ in subjects for entry in nodes.values()
+                     if entry["status"] == "checked" and to_date(entry.get("checked")))
+    names = [item[3] for item in waiting[:3]]
+    if not names:
+        return None
+    if len(names) == 1:
+        return "Next up: %s is one passed check from solid." % joined(names)
+    return "Next up: %s are each one passed check from solid." % joined(names)
+
+
+def option_line(found):
+    """One ranked candidate as a line of Home's *Other options*."""
+    reason = found["reason"]
+    if not found["title"] and reason.startswith(found["kind"].lower() + " "):
+        reason = reason[len(found["kind"]) + 1:]  # "**Start** something new", not "Start start"
+    head = "**%s** %s: " % (found["kind"], found["title"]) if found["title"] else "**%s** " % found["kind"]
+    return "- %s%s%s `%s`" % (head, reason, "" if reason.endswith(".") else ".", found["command"])
+
+
+CARD_CALLOUT = {"Solid": "success", "Recovered": "tip", "Goal met": "abstract"}
+
+
+def earned_cards(badges, limit=3):
+    """The latest `limit` cards, one per (subject, date, kind), as callouts."""
+    cards = {}
+    for found in badges:
+        cards.setdefault((found["subject"], found["date"], found["kind"]), []).append(found)
+    order = sorted(cards, key=lambda key: (BADGE_ORDER.index(key[2]), cards[key][0]["title"]))
+    order.sort(key=lambda key: key[1], reverse=True)
+    out = []
+    for subject, date, kind in order[:limit]:
+        group = cards[(subject, date, kind)]
+        out.append("> [!%s] %s, %s · %s" % (CARD_CALLOUT[kind], kind, short_date(to_date(date)),
+                                           group[0]["title"]))
+        if kind != "Goal met":
+            out.append("> " + " · ".join(found["name"] for found in group))
+        out.append("")
+    return out
+
+
+def long_date(when):
+    """`Thursday, 24 September`, the Home card's title."""
+    return "%s, %d %s" % (when.strftime("%A"), when.day, when.strftime("%B"))
+
+
+def home(ranked, subjects, state, rewards_on, today):
+    """`learn/Home.md`: what to do now (spec section 8).
+
+    `ranked` is `rank()`'s output, `subjects` the (slug, nodes, fields, events)
+    list, `state` the vault's `rewards()`. Commands print bare, since both
+    hosts read this note.
+    """
+    out = ["---", "type: learning-home", 'updated: "%s"' % today.isoformat(), "generated: true",
+           "cssclasses: [learning-note]", "---", "",
+           "> [!question] %s" % long_date(today)]
+    top, others = ranked[0], ranked[1:]
+    if top["kind"] == "Start":
+        out.append("> Everything you've proven is up to date.")
+        upcoming = next_review(subjects)
+        if upcoming:
+            out.append("> The next review is *%s* on %s." % (upcoming[0], short_date(upcoming[1])))
+        out += [">", "> Curious about something new? `learn-start`"]
+    else:
+        out += ["> Ready when you are. A good next step is to %s." % top["welcome"], ">",
+                "> `%s`" % top["command"]]
+    out.append("")
+    if others:
+        out += ["> [!note]- Other options (%d)" % len(others)] + ["> " + option_line(found) for found in others]
+        out.append("")
+    if rewards_on:
+        cards = earned_cards(state["badges"])
+        if cards:
+            out += ["## Recently earned", ""] + cards
+        line = milestone(subjects)
+        if line:
+            out += [line, ""]
+    counts = state["counts"]
+    parts = []
+    if rewards_on:
+        parts = ["%d node%s proven" % (counts["nodes_proven"], "" if counts["nodes_proven"] == 1 else "s"),
+                 "%d goal%s met" % (counts["goals_met"], "" if counts["goals_met"] == 1 else "s")]
+        if state["streak"]["alive"]:
+            parts.append("review streak " + weeks_word(counts["current_streak"]))
+    parts.append("[[learn/Dashboard|all subjects and badges]]")
+    out += [" · ".join(parts), "", "---", ""]
+    out.append("*Rewards are %s. Turn them %s with `rewards: %s` in [[learn/me/preferences|preferences]].*"
+               % (("on", "off", "off") if rewards_on else ("off", "on", "on")))
+    out += ["", GENERATED, ""]
+    return "\n".join(out)
+
+
+# ------------------------------------------------------------ the skill tree
+
+# An inline SVG, because the CSS snippet cannot colour mermaid and a real tree
+# needs its own layout (spec section 7). Ported from the skill-tree-layout
+# prototype, method A: rank by longest path with roots at the bottom, a dummy
+# point per rank on long edges, barycenter sweeps to cut crossings, and
+# Brandes-Köpf coordinates so long edges run straight. No layout dependency.
+
+TREE_GAP = 22      # between two labels in a row
+TREE_DUMMY_W = 14  # width an edge passing through a row reserves
+TREE_CHAR_W = 6.6  # average glyph width at 12px
+TREE_WRAP = 22     # label characters per line
+TREE_MIN_W = 800   # viewBox floor, so a thin tree is not blown up to the note width
+TREE_SWEEPS = 24
+
+
+def wrap(name):
+    """A node name in lines of at most 22 characters, split on words. Full
+    names, never cut: a single longer word keeps its own line."""
+    words, lines, current = name.replace("`", "").split(), [], ""
+    for word in words:
+        if current and len(current) + 1 + len(word) > TREE_WRAP:
+            lines.append(current)
+            current = word
+        else:
+            current = (current + " " + word).strip()
+    lines.append(current)
+    return lines
+
+
+def layered(nodes):
+    """Ranks, dummy points, and a crossing-reduced order per rank."""
+    rank, visiting = {}, set()
+
+    def depth(node):
+        if node not in rank:
+            visiting.add(node)  # a cycle is a plan error; its closing edge is ignored
+            rank[node] = 1 + max((depth(p) for p in nodes[node]["prereqs"] if p not in visiting), default=-1)
+            visiting.discard(node)
+        return rank[node]
+    for node in sorted(nodes, key=sort_key):
+        depth(node)
+    up, down, chains, width = {}, {}, [], {}
+    for node in nodes:
+        up.setdefault(node, [])
+        down.setdefault(node, [])
+        width[node] = max(44, TREE_CHAR_W * max(len(line) for line in wrap(nodes[node]["name"])))
+    for node in sorted(nodes, key=sort_key):
+        for prereq in nodes[node]["prereqs"]:
+            if rank[prereq] >= rank[node]:
+                continue  # the ignored edge of a cycle
+            chain = [prereq]
+            for level in range(rank[prereq] + 1, rank[node]):
+                dummy = "%s>%s@%d" % (prereq, node, level)
+                rank[dummy], width[dummy], up[dummy], down[dummy] = level, TREE_DUMMY_W, [], []
+                chain.append(dummy)
+            chain.append(node)
+            for lower, upper in zip(chain, chain[1:]):
+                up[lower].append(upper)
+                down[upper].append(lower)
+            chains.append((prereq, node, chain))
+    layers = [[] for _ in range(max(rank.values()) + 1)]
+    for vertex in sorted(rank, key=lambda v: (v not in nodes, sort_key(v) if v in nodes else 0, v)):
+        layers[rank[vertex]].append(vertex)
+    # Start from a depth-first order from the roots, so connected nodes start together.
+    seen, first_order = set(), []
+
+    def visit(vertex):
+        if vertex in seen:
+            return
+        seen.add(vertex)
+        first_order.append(vertex)
+        for above in up[vertex]:
+            visit(above)
+    for vertex in layers[0] + sorted(rank):
+        visit(vertex)
+    index = {vertex: position for position, vertex in enumerate(first_order)}
+    layers = reduce_crossings([sorted(layer, key=index.get) for layer in layers], up, down)
+    return rank, layers, up, down, chains, width
+
+
+def crossings(layers, down):
+    total = 0
+    for level in range(1, len(layers)):
+        below = {vertex: position for position, vertex in enumerate(layers[level - 1])}
+        segments = [(position, below[lower]) for position, vertex in enumerate(layers[level])
+                    for lower in down[vertex]]
+        for a in range(len(segments)):
+            for b in range(a + 1, len(segments)):
+                if (segments[a][0] - segments[b][0]) * (segments[a][1] - segments[b][1]) < 0:
+                    total += 1
+    return total
+
+
+def reduce_crossings(layers, up, down):
+    """Alternating barycenter sweeps, each followed by adjacent swaps while they
+    help. Keeps the best order seen."""
+    best, best_count = [layer[:] for layer in layers], crossings(layers, down)
+    current = [layer[:] for layer in layers]
+    for sweep in range(TREE_SWEEPS):
+        upward = sweep % 2 == 0
+        levels = range(1, len(current)) if upward else range(len(current) - 2, -1, -1)
+        neighbours = down if upward else up
+        for level in levels:
+            reference = current[level - 1] if upward else current[level + 1]
+            where = {vertex: position for position, vertex in enumerate(reference)}
+            keyed = []
+            for position, vertex in enumerate(current[level]):
+                near = [where[other] for other in neighbours[vertex]]
+                keyed.append((sum(near) / len(near) if near else position, position, vertex))
+            current[level] = [vertex for _, _, vertex in sorted(keyed)]
+        improved = True
+        while improved:
+            improved = False
+            for layer in current:
+                for position in range(len(layer) - 1):
+                    count = crossings(current, down)
+                    layer[position], layer[position + 1] = layer[position + 1], layer[position]
+                    if crossings(current, down) < count:
+                        improved = True
+                    else:
+                        layer[position], layer[position + 1] = layer[position + 1], layer[position]
+        count = crossings(current, down)
+        if count < best_count:
+            best, best_count = [layer[:] for layer in current], count
+    return best
+
+
+def sep(width, a, b):
+    """Half of each label's width plus 22px, or 8px next to a dummy point."""
+    return width[a] / 2 + width[b] / 2 + (TREE_GAP if ">" not in a and ">" not in b else 8)
+
+
+def bk(layers, up, down, width):
+    """Brandes-Köpf x coordinates: four vertical alignments, compacted, aligned
+    to the narrowest, then the median of the four per node. Follows dagre's
+    position/bk.js."""
+    dummy = lambda vertex: ">" in vertex  # noqa: E731
+    conflicts = set()
+    for level in range(1, len(layers)):
+        below, layer = layers[level - 1], layers[level]
+        where = {vertex: position for position, vertex in enumerate(below)}
+        start, scan = 0, 0
+        for position, vertex in enumerate(layer):
+            inner = next((lower for lower in down[vertex] if dummy(lower) and dummy(vertex)), None)
+            end = where[inner] if inner else len(below)
+            if inner or position == len(layer) - 1:
+                for other in layer[scan:position + 1]:
+                    for lower in down[other]:
+                        if (where[lower] < start or end < where[lower]) and not (dummy(lower) and dummy(other)):
+                            conflicts.add(frozenset((lower, other)))
+                scan, start = position + 1, end
+    placements = {}
+    for vertical in "ud":
+        ordered = layers if vertical == "u" else layers[::-1]
+        neighbours = down if vertical == "u" else up
+        for horizontal in "lr":
+            rows = [layer[:] if horizontal == "l" else layer[::-1] for layer in ordered]
+            where = {vertex: position for row in rows for position, vertex in enumerate(row)}
+            root = {vertex: vertex for row in rows for vertex in row}
+            align = dict(root)
+            for row in rows:
+                previous = -1
+                for vertex in row:
+                    near = sorted(neighbours[vertex], key=where.get)
+                    if not near:
+                        continue
+                    middle = (len(near) - 1) / 2
+                    for index in range(int(math.floor(middle)), int(math.ceil(middle)) + 1):
+                        other = near[index]
+                        if (align[vertex] == vertex and previous < where[other]
+                                and frozenset((vertex, other)) not in conflicts):
+                            align[other] = vertex
+                            align[vertex] = root[vertex] = root[other]
+                            previous = where[other]
+            edges = {}
+            for row in rows:
+                for a, b in zip(row, row[1:]):
+                    pair = (root[a], root[b])
+                    edges[pair] = max(edges.get(pair, 0), sep(width, a, b))
+            blocks = set(root.values())
+            into, out_of = {block: [] for block in blocks}, {block: [] for block in blocks}
+            for (a, b), weight in edges.items():
+                out_of[a].append((b, weight))
+                into[b].append((a, weight))
+            order, indegree = [], {block: len(into[block]) for block in blocks}
+            queue = sorted(block for block in blocks if indegree[block] == 0)
+            while queue:
+                block = queue.pop(0)
+                order.append(block)
+                for after, _ in out_of[block]:
+                    indegree[after] -= 1
+                    if indegree[after] == 0:
+                        queue.append(after)
+            xs = {}
+            for block in order:
+                xs[block] = max((xs[a] + weight for a, weight in into[block]), default=0)
+            for block in reversed(order):
+                least = min((xs[after] - weight for after, weight in out_of[block]), default=math.inf)
+                if least != math.inf:
+                    xs[block] = max(xs[block], least)
+            x = {vertex: xs[root[vertex]] for vertex in root}
+            if horizontal == "r":
+                x = {vertex: -value for vertex, value in x.items()}
+            placements[vertical + horizontal] = x
+    spans = {key: max(x.values()) - min(x.values()) for key, x in placements.items()}
+    narrowest = placements[min(spans, key=spans.get)]
+    low, high = min(narrowest.values()), max(narrowest.values())
+    for key, x in placements.items():
+        shift = low - min(x.values()) if key[1] == "l" else high - max(x.values())
+        placements[key] = {vertex: value + shift for vertex, value in x.items()}
+    return {vertex: sum(sorted(placements[key][vertex] for key in placements)[1:3]) / 2
+            for vertex in narrowest}
+
+
+def svg_text(text):
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+def svg_prefix(kind, slug):
+    """Gradient and filter ids are global to the page, so each SVG names its own."""
+    return "%s-%s" % (kind, re.sub(r"[^a-z0-9]", "", slug.lower())[:24] or "x")
+
+
+def gradients(prefix, gold=False):
+    stops = [("solid", "--color-green", "--color-cyan"), ("checked", "--color-blue", "--color-purple")]
+    if gold:
+        stops.append(("gold", "--color-yellow", "--color-orange"))
+    return ("<defs>" + "".join(
+        '<linearGradient id="%s-%s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color: var(%s)"/>'
+        '<stop offset="1" style="stop-color: var(%s)"/></linearGradient>' % (prefix, name, start, end)
+        for name, start, end in stops)
+        + '<filter id="%s-glow" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="5"/></filter>'
+          "</defs>" % prefix)
+
+
+def circle(cx, cy, r, style, extra=""):
+    return '<circle cx="%.0f" cy="%.0f" r="%d"%s style="%s"/>' % (cx, cy, r, extra, style)
+
+
+def glyph(cx, cy, text, style):
+    return '<text x="%.0f" y="%.0f" text-anchor="middle" style="%s">%s</text>' % (cx, cy, style, text)
+
+
+ON_DISC = "fill: var(--text-on-accent); font-size: 15px; font-weight: 700"
+
+
+def disc(status, cx, cy, prefix, next_up, rewards_on):
+    """The SVG elements for one node's disc (spec section 7, *Discs*)."""
+    if status == "solid":
+        ring = circle(cx, cy, 21, "fill: var(--background-primary); stroke: var(--color-green); stroke-width: 2")
+        body = circle(cx, cy, 17, "fill: url(#%s-solid)" % prefix)
+        if not rewards_on:
+            return [ring, body, glyph(cx, cy + 5, "✓", ON_DISC)]
+        return [circle(cx, cy, 22, "fill: var(--color-green); fill-opacity: 0.55",
+                       ' filter="url(#%s-glow)"' % prefix), ring, body,
+                glyph(cx, cy + 6, "★", "fill: var(--color-yellow); stroke: var(--color-orange); "
+                                       "stroke-width: 0.8px; font-size: 17px; font-weight: 700")]
+    if status in ("checked", "skipped"):
+        return [circle(cx, cy, 17, "fill: url(#%s-checked)" % prefix), glyph(cx, cy + 5, "✓", ON_DISC)]
+    if status == "introduced":  # I2: a hollow ring in the checked gradient
+        return [circle(cx, cy, 16, "fill: url(#%s-checked); fill-opacity: 0.18; stroke: url(#%s-checked); "
+                                   "stroke-width: 4" % (prefix, prefix))]
+    if status == "decayed":  # D2: the full disc kept, with a small refresh badge
+        return [circle(cx, cy, 17, "fill: url(#%s-solid)" % prefix), glyph(cx, cy + 5, "✓", ON_DISC),
+                circle(cx + 14, cy - 13, 8, "fill: var(--color-cyan); stroke: var(--background-primary); "
+                                            "stroke-width: 2"),
+                glyph(cx + 14, cy - 9, "↻", "fill: var(--text-on-accent); font-size: 11px; font-weight: 800")]
+    if next_up:
+        return [circle(cx, cy, 21, "fill: var(--background-primary); stroke: var(--color-orange); "
+                                   "stroke-width: 2; stroke-dasharray: 4 3"),
+                circle(cx, cy, 15, "fill: var(--color-orange)"),
+                glyph(cx, cy + 5, "→", "fill: var(--text-on-accent); font-size: 15px; font-weight: 800")]
+    return [circle(cx, cy, 12, "fill: var(--background-secondary); stroke: var(--text-faint); stroke-width: 1")]
+
+
+def skill_tree(slug, title, nodes, rewards_on=True):
+    """The progress page's skill tree as one inline SVG, or "" with no nodes."""
+    if not nodes:
+        return ""
+    rank, layers, up, down, chains, width = layered(nodes)
+    X = bk(layers, up, down, width)
+    low = min(X[v] - width[v] / 2 for v in X)
+    high = max(X[v] + width[v] / 2 for v in X)
+    W = max(TREE_MIN_W, high - low + 40)
+    shift = W / 2 - (low + high) / 2
+    # Each row is as tall as its longest label: the disc, 14px a line, and a gap for edges.
+    lines = [max((len(wrap(nodes[v]["name"])) for v in layer if v in nodes), default=0) for layer in layers]
+    ys, y = [], 0.0
+    for level, count in enumerate(lines):
+        if level:
+            y -= 22 + 30 + 14 * count + 44
+        ys.append(y)
+    H = 30 + (-ys[-1]) + 22 + 30 + 14 * lines[0]
+    Y = {v: 30 + 22 - ys[-1] + ys[rank[v]] for v in rank}
+    X = {v: x + shift for v, x in X.items()}
+    prefix = svg_prefix("st", slug)
+    ready = set(up_next(nodes))
+    label = svg_text("%s skill tree" % title)
+    out = ['<svg viewBox="0 0 %.0f %.0f" width="100%%" role="img" aria-label="%s">' % (W, H, label),
+           "<title>%s</title>" % label, gradients(prefix)]
+    edges = []
+    for a, b, chain in chains:
+        lower, upper = nodes[a]["status"], nodes[b]["status"]
+        if lower in COVERED and upper in COVERED:
+            style, layer = "stroke: var(--color-green); stroke-width: 3.5; stroke-linecap: round", 2
+        elif lower in COVERED and b in ready:
+            style, layer = "stroke: var(--color-orange); stroke-width: 2; stroke-dasharray: 6 4", 1
+        else:
+            style, layer = "stroke: var(--text-faint); stroke-width: 1.2; stroke-dasharray: 2 4", 0
+        # Leave from the top of the lower disc and arrive under the upper
+        # node's label, so no edge crosses text.
+        points = [(X[v], Y[v]) for v in chain]
+        points[0] = (points[0][0], points[0][1] - 23)
+        points[-1] = (points[-1][0], points[-1][1] + 30 + 14 * len(wrap(nodes[b]["name"])))
+        path = "M %.0f %.0f" % points[0]
+        for (x1, y1), (x2, y2) in zip(points, points[1:]):
+            middle = (y1 + y2) / 2
+            path += " C %.0f %.0f %.0f %.0f %.0f %.0f" % (x1, middle, x2, middle, x2, y2)
+        edges.append((layer, '<path d="%s" style="fill: none; %s"/>' % (path, style)))
+    out += [edge for _, edge in sorted(edges, key=lambda item: item[0])]
+    halo = "paint-order: stroke; stroke: var(--background-primary); stroke-width: 4px; stroke-linejoin: round"
+    for node in sorted(nodes, key=sort_key):
+        entry, cx, cy = nodes[node], X[node], Y[node]
+        out += disc(entry["status"], cx, cy, prefix, node in ready, rewards_on)
+        faint = entry["status"] not in COVERED | PARTIAL | {"decayed"} and node not in ready
+        for index, text in enumerate(wrap(entry["name"])):
+            out.append('<text x="%.0f" y="%.0f" text-anchor="middle" style="fill: var(%s); font-size: 12px; %s">%s</text>'
+                       % (cx, cy + 36 + 14 * index, "--text-faint" if faint else "--text-normal", halo,
+                          svg_text(text)))
+    out.append("</svg>")
+    return "\n".join(out)
+
+
+def count_tiles(slug, counts, streak):
+    """Four tiles in the tree's colours: skills proven, checks passed later,
+    the review streak while it is alive, and the best streak."""
+    rows = [("✓", str(counts["nodes_proven"]), "skills proven", "checked", "--color-blue"),
+            ("★", str(counts["checks_passed"]), "checks passed later", "solid", "--color-green")]
+    if streak["alive"]:
+        rows.append(("↻", "%d wk" % streak["current"], "review streak", "gold", "--color-yellow"))
+    rows.append(("▲", "%d wk" % streak["best"], "best streak", "gold", "--color-yellow"))
+    prefix = svg_prefix("tl", slug)
+    out = ['<svg viewBox="0 0 800 96" width="100%" role="img" aria-label="Counts">', "<title>Counts</title>",
+           gradients(prefix, gold=True)]
+    for index, (icon, number, text, fill, colour) in enumerate(rows):
+        x = index * 200 + 10
+        out.append('<rect x="%d" y="6" width="180" height="84" rx="14" style="fill: url(#%s-%s); '
+                   'fill-opacity: 0.16; stroke: url(#%s-%s); stroke-width: 2"/>' % (x, prefix, fill, prefix, fill))
+        out.append(circle(x + 26, 30, 13, "fill: url(#%s-%s)" % (prefix, fill)))
+        out.append(glyph(x + 26, 35, icon, "fill: var(--text-on-accent); font-size: 14px; font-weight: 800"))
+        out.append(glyph(x + 100, 50, number, "fill: var(%s); font-size: 30px; font-weight: 800" % colour))
+        out.append(glyph(x + 90, 76, text, "fill: var(--text-muted); font-size: 13px"))
+    out.append("</svg>")
+    return "\n".join(out)
+
+
+# ------------------------------------------------------------ the progress page
+
+def shown_before_lapse(node, events):
+    """The date of a node's latest `checked` or `solid` marker before its
+    current lapse, or None."""
+    own = [event for event in events if event["node"] == node]
+    lapsed = lapses(own)
+    if not lapsed:
+        return None
+    cut = next(index for index, event in enumerate(own) if event is lapsed[-1])
+    earlier = [event for event in own[:cut] if event["status"] in ("checked", "solid")]
+    return to_date(earlier[-1]["date"]) if earlier else None
+
+
+def callout(kind, title, bullets, fold=""):
+    return ["> [!%s]%s %s" % (kind, fold, title)] + ["> - " + bullet for bullet in bullets] + [""]
+
+
+def progress_note(slug, folder, fields, nodes, record_text, sessions, today, events=(),
+                  rewards_on=True, state=None, streak=None):
+    """A subject's progress page (spec section 6). `state` is `rewards()` over
+    this subject alone and `streak` the vault's review streak."""
+    total, done = len(nodes), proven_count(nodes)
     partial = sum(1 for node in nodes.values() if node["status"] in PARTIAL)
-    groups = by_status(nodes)
     title = fields.get("title", slug)
-
+    ordered = [nodes[node] for node in sorted(nodes, key=sort_key)]
     out = ["---", "type: learning-progress", 'subject: "%s"' % slug,
-           'updated: "%s"' % today, "generated: true",
-           *(["cssclasses: [learning-note]"] if prototype else []), "---", "",
-           "# %s — progress" % title, "",
-           "> [!warning] Generated file",
-           "> Written by `.claude/hooks/learn-status.py` from `record.md` and `plan.md`.",
-           "> Anything edited here is overwritten on the next run.", "",
+           'updated: "%s"' % today.isoformat(), "generated: true", "cssclasses: [learning-note]", "---", "",
+           "# %s — progress" % title, "", GENERATED, "",
            "**%d of %d nodes proven** %s · %s session%s · status **%s**"
            % (done, total, bar(done, partial, total), fields.get("sessions", "0"),
               "" if fields.get("sessions") == "1" else "s", fields.get("status", "unknown")), "",
-           (("> [!todo] Next action\n> " if prototype else "Next: ")
-            + fields.get("next", "—")), "",
+           "> [!todo] Next action", "> " + fields.get("next", "—"), "",
            " · ".join(part for part in [
+               "[[learn/subjects/%s/resume|Resume]]" % slug,
                "[[learn/subjects/%s/record|Record]]" % slug,
                "[[learn/subjects/%s/plan|Plan]]" % slug,
                log_links(slug, folder),
-               "[[learn/Dashboard|Dashboard]]",
-           ] if part), "",
-           "## Where each node stands", "", "| Status | Meaning | Nodes |", "| --- | --- | --- |"]
-    meanings = {"solid": "passed a retrieval check in a later session",
-                "checked": "passed a check when taught", "introduced": "taught, not yet proven",
-                "planned": "not yet taught", "decayed": "failed a later retrieval check",
-                "skipped": "diagnosis showed it was already there", "unknown": "no status recorded"}
-    for status in STATUSES + ["unknown"]:
-        if status in groups or (prototype and status not in ("skipped", "unknown")):
-            out.append("| %s | %s | %s |" % (status_label(status, prototype), meanings[status],
-                                             ", ".join(groups.get(status, [])) or "None"))
-    out += ["", "## Dependency graph", "",
-            "Filled by status, so the plan doubles as the progress view.", ""]
-    graphs = colour_graphs(plan_text, nodes)
-    out += (["\n\n".join(graphs), ""] if graphs
-            else ["*No flowchart found in `plan.md`.*", ""])
-    out += ["## Nodes", "", "| Id | Node | Status | Last checked |", "| --- | --- | --- | --- |"]
-    for node in sorted(nodes, key=sort_key):
-        entry = nodes[node]
-        out.append("| %s | %s | %s | %s |" % (entry["id"], entry["name"],
-                    status_label(entry["status"] or "unknown", prototype), entry["checked"] or "—"))
+               "[[learn/Home|Home]]",
+           ] if part), ""]
+    tree = skill_tree(slug, title, nodes, rewards_on)
+    if tree:
+        out += [tree, ""]
+    if rewards_on and state and streak:
+        out += [count_tiles(slug, state["counts"], streak), ""]
+
+    can_do = [entry["can_do"] for entry in ordered if entry["status"] in COVERED]
+    if can_do:
+        out += callout("success", "You can now (%d)" % len(can_do), can_do)
+    refresh = []
+    for entry in ordered:
+        if entry["status"] == "decayed":
+            shown = shown_before_lapse(entry["id"], list(events))
+            refresh.append(entry["can_do"] + (" (you showed this on %s; one check brings it back)"
+                                              % short_date(shown) if shown else ""))
+    if refresh:
+        out += callout("tip", "Worth a refresh (%d)" % len(refresh), refresh)
+    learning = [entry["can_do"] for entry in ordered if entry["status"] == "introduced"]
+    if learning:
+        out += callout("info", "You're learning (%d)" % len(learning), learning)
+    ready = up_next(nodes)
+    planned = [entry for entry in ordered if entry["status"] == "planned"]
+    if planned:
+        out += ["> [!todo] Up next"]
+        out += ["> - " + (nodes[node]["name"] if nodes[node]["can_do"] == nodes[node]["name"]
+                          else "You'll be able to " + nodes[node]["can_do"]) for node in ready]
+        rest = len(planned) - len(ready)
+        if rest and ready:
+            out += [">", "> %d more after that." % rest]
+        elif rest:
+            out += ["> %d more planned." % rest]
+        out.append("")
+    if rewards_on and state and state["badges"]:
+        out += callout("abstract", plural(len(state["badges"]), "badge"),
+                       [found["text"] for found in state["badges"]], fold="-")
+
+    out += ["## Details", "", "> [!note]- Nodes", "> | Id | Node | Status | Last checked |",
+            "> | --- | --- | --- | --- |"]
+    for entry in ordered:
+        out.append("> | %s | %s | `%s` | %s |" % (entry["id"], entry["name"], entry["status"] or "unknown",
+                                                entry["checked"] or "—"))
+    out.append("")
     strands = section(record_text, "Strands")
     if strands:
-        out += ["", "## Strands — floor and ceiling", "", strands]
+        out += ["### Strands — floor and ceiling", "", strands, ""]
     if sessions:
-        out += ["", "## Sessions", "", "| # | Date | Active | Ended | Nodes | Note |",
+        out += ["### Sessions", "", "| # | Date | Active | Ended | Nodes | Note |",
                 "| --- | --- | --- | --- | --- | --- |"]
         for entry in sessions:
             # An open note is called open here rather than shown as a blank cell: a
@@ -1202,73 +1699,64 @@ def progress_note(slug, folder, fields, nodes, plan_text, record_text, sessions,
                        % (entry.get("session", "?"), entry.get("date", "?"),
                           (entry.get("active_minutes") or "—") + (" min" if entry.get("active_minutes") else ""),
                           ended, entry.get("nodes", "—"), slug, entry["file"]))
-    if prototype:
-        out += ["", "## Callout key", "",
-                "Visual examples only. These are not questions or evidence from a lesson.", "",
-                "> [!question] Question", "> A prompt to answer in the agent chat.", "",
-                "> [!hint] Hint", "> A known fact to use for the next reasoning step.", "",
-                "> [!failure] Correction", "> What was wrong and what replaces it.", "",
-                "> [!todo] Next action", "> The next step to take. Your current action is at the top of this page.", ""]
-    return "\n".join(out) + "\n"
+        out.append("")
+    return "\n".join(out)
 
 
-def dashboard(subjects, today, warnings, openings):
-    out = ["---", "type: learning-dashboard", 'updated: "%s"' % today, "generated: true",
+# ------------------------------------------------------------ the dashboard
+
+def dashboard(subjects, today, warnings, openings, state=None, rewards_on=True):
+    """`learn/Dashboard.md`: a one-screen index of every subject (spec section 9).
+    `subjects` is `load_subjects()`'s list and `state` the vault's `rewards()`."""
+    out = ["---", "type: learning-dashboard", 'updated: "%s"' % today.isoformat(), "generated: true",
            "cssclasses: [learning-note]", "---", "",
-           "# Learning dashboard", "",
-           "> [!warning] Generated file",
-           "> Written by `.claude/hooks/learn-status.py` at every session start and learning session end.",
-           "> Anything edited here is overwritten. Edit `record.md` instead.", "",
-           "Node status key: " + " · ".join(status_label(status, True) for status in
-               ("solid", "checked", "introduced", "decayed", "planned")), ""]
+           "# Learning dashboard", "", "[[learn/Home|← Home]]", "", GENERATED, ""]
     if not subjects:
         out += ["No subjects yet. Use `/learn-start <subject>` in Claude Code or `$learn-start <subject>` in Codex.", ""]
-    for slug, data in subjects:
-        fields, nodes, folder = data["fields"], data["nodes"], data["folder"]
-        total = len(nodes)
-        done = sum(1 for node in nodes.values() if node["status"] in COVERED)
-        partial = sum(1 for node in nodes.values() if node["status"] in PARTIAL)
-        out += ["## %s" % fields.get("title", slug), "",
-                "%s **%d/%d nodes proven** · %s · %s session%s · last %s"
-                % (bar(done, partial, total), done, total, fields.get("status", "unknown"),
-                   fields.get("sessions", "0"), "" if fields.get("sessions") == "1" else "s",
-                   fields.get("last_session", "never")), "",
-                "> [!todo] Next action\n> %s" % fields.get("next", "—"), "",
-                " · ".join(part for part in [
-                    "[[learn/subjects/%s/progress|Progress]]" % slug,
-                    "[[learn/subjects/%s/resume|Resume]]" % slug,
-                    "[[learn/subjects/%s/record|Record]]" % slug,
-                    "[[learn/subjects/%s/plan|Plan]]" % slug,
-                    log_links(slug, folder),
-                ] if part), ""]
+    groups = [("Active", ("active", "diagnosing")), ("Paused", ("paused",)), ("Done", ("done",))]
+    placed = set()
+    for heading, statuses in groups + [("Other", None)]:
+        members = [s for s in subjects if s["slug"] not in placed
+                   and (statuses is None or s["fields"].get("status", "") in statuses)]
+        if not members:
+            continue
+        out += ["## " + heading, ""]
+        for s in sorted(members, key=lambda s: (s["fields"].get("title", s["slug"]).lower(), s["slug"])):
+            placed.add(s["slug"])
+            fields, nodes = s["fields"], s["nodes"]
+            partial = sum(1 for node in nodes.values() if node["status"] in PARTIAL)
+            last = to_date(fields.get("last_session"))
+            line = "- [[learn/subjects/%s/progress|%s]] %s %d/%d proven · last %s" % (
+                s["slug"], fields.get("title", s["slug"]), bar(proven_count(nodes), partial, len(nodes)),
+                proven_count(nodes), len(nodes), short_date(last) if last else "never")
+            line += "".join(" · " + part for part in (deadline_words(fields.get("deadline"), today),
+                                                       pending_tag(nodes, fields, today)) if part)
+            out.append(line)
+        out.append("")
+    if rewards_on and state and state["badges"]:
+        out += callout("abstract", plural(len(state["badges"]), "badge"),
+                       ["%s: %s%s, %s" % (found["kind"], found["name"],
+                                          "" if found["name"] == found["title"] else " (%s)" % found["title"],
+                                          found["date"]) for found in state["badges"]], fold="-")
     if openings:
         out += ["## Open session notes", "",
                 "> [!warning] A session note has no `end:`",
-                "> A note stays open until `/learn-resume` finalizes it "
+                "> A note stays open until `learn-resume` finalizes it "
                 "(`learn/system/records.md`, *Closing an open note*). While it is open its "
                 "nodes stay unproven and the next session can orphan it."]
         out += ["> - " + report for report in openings]
         out += [""]
     if warnings:
-        out += ["## Record inconsistencies", "",
-                "> [!bug] The records disagree with each other",
-                "> Fix these in `record.md` or `plan.md`; this file is regenerated, not edited."]
-        out += ["> - " + warning for warning in warnings]
-        out += [""]
-    out += ["## Running a session", "",
-            "From this vault, run `claude` or `codex`. In Claude Code use `/learn-start`, "
-            "`/learn-resume`, `/learn-check`, and `/learn-end`. In Codex use the matching "
-            "`$learn-start`, `$learn-resume`, `$learn-check`, and `$learn-end` skills.", "",
-            "Open the subject's Claude or Codex chat log in Obsidian. Claude's log streams; "
-            "Codex's log updates after each completed turn. Keep replies in chat.", "",
-            "## The system", "",
-            "- [[learn/Queries|Queries]] — live Dataview views across subjects and sessions",
-            "- [[learn/system/tutor|tutor.md]] — teaching philosophy and behaviour rules",
-            "- [[learn/system/workflow|workflow.md]] — the phases every subject goes through",
-            "- [[learn/system/records|records.md]] — what the records contain and how they update",
-            "- [[learn/system/diagrams|diagrams.md]] — mermaid and math rules for notes",
-            "- [[learn/me/preferences|preferences.md]] — how Edison learns, and what the evidence shows",
-            "- [[learn/README|README]] — how the whole thing fits together", ""]
+        out += callout("bug", "%d record inconsistenc%s" % (len(warnings), "y" if len(warnings) == 1 else "ies"),
+                       warnings, fold="-")
+    out += callout("info", "The system", [
+        "[[learn/Queries|Queries]] — live Dataview views across subjects and sessions",
+        "[[learn/system/tutor|tutor.md]] — teaching philosophy and behaviour rules",
+        "[[learn/system/workflow|workflow.md]] — the phases every subject goes through",
+        "[[learn/system/records|records.md]] — what the records contain and how they update",
+        "[[learn/system/diagrams|diagrams.md]] — mermaid and math rules for notes",
+        "[[learn/me/preferences|preferences.md]] — how Edison learns, and what the evidence shows",
+        "[[learn/README|README]] — how the whole thing fits together"], fold="-")
     return "\n".join(out)
 
 
@@ -1408,7 +1896,10 @@ def main():
                   "(no TYPESAFE_API_KEY or typesafe-sdk not installed) -- running the "
                   "deterministic fallback half of each semantic check instead")
 
-    subjects = []
+    rewards_on, setting_warning = rewards_setting(vault)
+    day = stamp.date()
+    inputs = rank_inputs(loaded)
+    state = rewards(inputs, day)
     for subject in loaded:
         slug, folder, fields, nodes = subject["slug"], subject["folder"], subject["fields"], subject["nodes"]
         plan_text, record_text = subject["plan_text"], subject["record_text"]
@@ -1421,10 +1912,11 @@ def main():
             warnings += semantic_warnings(nodes, plan_text, slug, fields, sessions, folder,
                                           vault=vault)
         note = folder / "progress.md"
-        note.write_text(progress_note(slug, folder, fields, nodes, plan_text,
-                                      record_text, sessions, today))
+        own = rewards([(slug, nodes, fields, subject["events"])], day)
+        note.write_text(progress_note(slug, folder, fields, nodes, record_text, sessions, day,
+                                      events=subject["events"], rewards_on=rewards_on,
+                                      state=own, streak=state["streak"]))
         written.append(str(note.relative_to(vault)))
-        subjects.append((slug, {"fields": fields, "nodes": nodes, "folder": folder}))
 
     # A review note is not a session note and deliberately lives outside
     # learn/subjects/, so the per-subject loop above never sees it -- but its
@@ -1433,11 +1925,16 @@ def main():
     # the vault where MC slots were ungated, which is precisely the kind of
     # silent gap PLAN-2026-09-22.md exists to close.
     warnings += g4_mc_slots("review", vault / "learn" / "reviews")
-    _, setting_warning = rewards_setting(vault)
     warnings += [setting_warning] if setting_warning else []
 
+    page = vault / "learn" / "Home.md"
+    page.write_text(home(rank(inputs, note_inputs(loaded), day), inputs, state, rewards_on, day))
+    written.append(str(page.relative_to(vault)))
     board = vault / "learn" / "Dashboard.md"
-    board.write_text(dashboard(subjects, today, warnings, openings))
+    board.write_text(dashboard(loaded, day, warnings,
+                               [report for subject in loaded
+                                for report in open_notes(subject["notes"], subject["slug"], host=None)],
+                               state, rewards_on))
     written.append(str(board.relative_to(vault)))
 
     if not args.quiet:

@@ -2160,51 +2160,257 @@ eq("and with no Jev at all it simply does not run, rather than guessing",
 
 
 
-section("Priority 4 — styled Dashboard and oop progress, legible with the snippet off")
+section("Home — the recommended action first, rewards on and off (spec section 8)")
+HOME_DAY = DUE_DAY  # Thursday, 24 September 2026
+HOME_SUBJECTS = [
+    rsubject("oop", [rnode("n1", "solid", "2026-09-22", name="Encapsulation"),
+                     rnode("n2", "checked", "2026-09-22", name="SRP"),
+                     rnode("n3", "planned", name="LSP", prereqs=["n2"])],
+             [marker_event("n1", "2026-09-15", "checked"), marker_event("n2", "2026-09-22", "checked"),
+              marker_event("n1", "2026-09-22", "solid")], title="OOP", last_session="2026-09-22"),
+    rsubject("ptr", [rnode("n1", "decayed", "2026-09-23", name="Aliasing")],
+             [marker_event("n1", "2026-09-10", "checked"), marker_event("n1", "2026-09-17", "solid"),
+              marker_event("n1", "2026-09-23")], title="Pointers", status="done", goal_met="2026-09-17"),
+]
+home_ranked = status.rank(HOME_SUBJECTS, [], HOME_DAY)
+home_state = status.rewards(HOME_SUBJECTS, HOME_DAY)
+home_on = status.home(home_ranked, HOME_SUBJECTS, home_state, True, HOME_DAY)
+home_off = status.home(home_ranked, HOME_SUBJECTS, home_state, False, HOME_DAY)
+eq("frontmatter marks Home as a generated learning note",
+   home_on.split("\n---\n", 1)[0].splitlines(),
+   ["---", "type: learning-home", 'updated: "2026-09-24"', "generated: true", "cssclasses: [learning-note]"])
+body = home_on.split("\n---\n", 1)[1].lstrip("\n")
+eq("no H1, and the welcome card leads with the date and the top candidate's welcome and bare command",
+   body.splitlines()[:4],
+   ["> [!question] Thursday, 24 September",
+    "> Ready when you are. A good next step is to bring back *Aliasing* in Pointers. It slipped on 23 Sep, "
+    "and one short session puts it back.", ">", "> `learn-resume ptr`"])
+eq("the other candidates are folded, one line each with the bare command",
+   [line for line in body.splitlines() if line.startswith("> - **")],
+   ["> - **Resume** OOP: *LSP* is next. `learn-resume oop`", "> - **Start** something new. `learn-start`"])
+eq("the fold counts them", "> [!note]- Other options (2)" in body, True)
+eq("section order: card, options, earned, milestone, counts, footer",
+   [body.index(mark) for mark in ("[!question]", "Other options", "## Recently earned", "Next up:",
+                                  "nodes proven", "*Rewards are on.")] == sorted(
+       body.index(mark) for mark in ("[!question]", "Other options", "## Recently earned", "Next up:",
+                                     "nodes proven", "*Rewards are on.")), True)
+eq("recently earned cards: newest first, one per subject, date, and kind",
+   [line for line in body.splitlines() if line.startswith("> [!success]") or line.startswith("> [!abstract]")
+    or line.startswith("> [!tip]")],
+   ["> [!success] Solid, 22 Sep · OOP", "> [!abstract] Goal met, 17 Sep · Pointers", "> [!success] Solid, 17 Sep · Pointers"])
+eq("the next milestone names the checked nodes", "Next up: *SRP* is one passed check from solid." in body, True)
+eq("the counts line holds nodes proven, goals met, and the live streak, then the Dashboard link",
+   [line for line in body.splitlines() if "nodes proven" in line],
+   ["3 nodes proven · 1 goal met · review streak 2 weeks · [[learn/Dashboard|all subjects and badges]]"])
+eq("the footer names the setting and how to change it",
+   ("*Rewards are on. Turn them off with `rewards: off` in [[learn/me/preferences|preferences]].*" in body,
+    body.rstrip().endswith("*Generated from the records; edits are overwritten.*")), (True, True))
+eq("with rewards off: no earned cards, no milestone, no counts, and only the link",
+   ("## Recently earned" in home_off, "Next up:" in home_off, "nodes proven" in home_off,
+    "\n[[learn/Dashboard|all subjects and badges]]\n" in home_off,
+    "*Rewards are off. Turn them on with `rewards: on` in [[learn/me/preferences|preferences]].*" in home_off),
+   (False, False, False, True, True))
+eq("with rewards off the recommended action still leads", "> `learn-resume ptr`" in home_off, True)
+QUIET = [rsubject("fin", [rnode("n1", "solid", "2026-09-22", name="Leaves"),
+                          rnode("n2", "checked", "2026-09-23", name="Roots")], status="done")]
+quiet = status.home(status.rank(QUIET, [], HOME_DAY), QUIET, status.rewards(QUIET, HOME_DAY), True, HOME_DAY)
+eq("nothing pending: the card says so and names the next review",
+   quiet.split("\n---\n", 1)[1].lstrip("\n").splitlines()[:5],
+   ["> [!question] Thursday, 24 September", "> Everything you've proven is up to date.",
+    "> The next review is *Roots* on 26 Sep.", ">", "> Curious about something new? `learn-start`"])
+eq("with nothing proven the next-review line is left out, and there are no other options",
+   [line for line in status.home(status.rank([rsubject("x", [], status="done")], [], HOME_DAY),
+                                 [rsubject("x", [], status="done")],
+                                 status.rewards([rsubject("x", [], status="done")], HOME_DAY), True,
+                                 HOME_DAY).splitlines() if "next review" in line or "Other options" in line], [])
+eq("up to 3 milestone nodes, soonest due first",
+   status.milestone([rsubject("m", [rnode("n%d" % i, "checked", "2026-09-%02d" % (20 - i), name="N%d" % i)
+                                    for i in range(1, 5)])]),
+   "Next up: *N4*, *N3*, and *N2* are each one passed check from solid.")
+eq("the 3 latest cards only",
+   len([line for line in status.earned_cards(status.rewards([TWICE, SOLID_ONCE, SAME_DATE[0], SAME_DATE[1]],
+                                                            DUE_DAY)["badges"]) if line.startswith("> [!")]), 3)
+HOME_VAULT = fresh()
+write(HOME_VAULT / "learn/subjects/fx/record.md",
+      '---\nsubject: "fx"\ntitle: "Fx"\nstatus: active\n---\n\n'
+      "## Nodes\n\n| Node | Status | Last checked | Evidence |\n| --- | --- | --- | --- |\n"
+      "| n1 Loops | planned | — | — |\n")
+subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(HOME_VAULT), "--quiet"], check=True)
+eq("every plain run writes Home", "`learn-resume fx`" in (HOME_VAULT / "learn/Home.md").read_text(), True)
+
+
+section("progress page — can-do callouts, tiles, badges, and details (spec section 6)")
 P4 = fresh()
-p4_nodes = {"n1": {"id": "n1", "name": "Classes", "status": "solid", "checked": "2026-09-17"},
-            "n2": {"id": "n2", "name": "Objects", "status": "decayed", "checked": "2026-09-17"},
-            "n3": {"id": "n3", "name": "Mystery", "status": "", "checked": ""}}
-p4_fields = {"title": "OOP", "status": "active", "sessions": "1", "next": "Teach n12."}
-styled = status.progress_note("oop", P4, p4_fields, p4_nodes, "", "", [], "2026-09-23")
-plain = status.progress_note("fx", P4, p4_fields, p4_nodes, "", "", [], "2026-09-23")
-styled_front = styled.split("\n---\n", 1)[0]
-eq("the oop page opts into the snippet in frontmatter",
-   "cssclasses: [learning-note]" in styled_front, True)
-eq("a known status carries its attribute and its literal name as text",
-   '| n1 | Classes | <code data-learning-status="solid">solid</code> |' in styled, True)
-eq("an unrecorded status keeps plain code and never enters the attribute",
-   "| n3 | Mystery | `unknown` |" in styled and 'data-learning-status="unknown"' not in styled, True)
-eq("every styled status label reads as its own name with the CSS off",
-   all(label == value for value, label in re.findall(
-       r'<code data-learning-status="([a-z]+)">([^<]*)</code>', styled)), True)
-eq("the status table lists all five core statuses, empty ones as None",
-   all(re.search(r'data-learning-status="%s">%s</code> \| [^|]+ \| None \|' % (s, s), styled)
-       for s in ("checked", "introduced", "planned")), True)
-eq("the next action is a todo callout at the top",
-   "> [!todo] Next action\n> Teach n12." in styled.split("## Nodes")[0], True)
-eq("the callout key labels its examples as not lesson evidence",
-   "## Callout key" in styled and "not questions or evidence" in styled
-   and all("> [!%s]" % kind in styled for kind in ("question", "hint", "failure", "todo")), True)
-eq("other subjects keep the unstyled page",
-   ("cssclasses" in plain, "data-learning-status" in plain, "Next: Teach n12." in plain,
-    "| n1 | Classes | `solid` |" in plain, "## Callout key" in plain),
-   (False, False, True, True, False))
+def pnode(node, st, checked="", name=None, can_do=None, prereqs=()):
+    return {"id": node, "name": name or node.upper(), "status": st, "checked": checked,
+            "prereqs": list(prereqs), "can_do": can_do or name or node.upper()}
+P_NODES = {entry["id"]: entry for entry in [
+    pnode("n1", "solid", "2026-09-22", "Classes", "say what a class is for"),
+    pnode("n2", "checked", "2026-09-17", "Objects", None, ["n8"]),
+    pnode("n3", "decayed", "2026-09-22", "Aliasing", "predict what a shared reference does"),
+    pnode("n4", "introduced", "", "Interfaces", "pick an interface or an abstract class", ["n1"]),
+    pnode("n5", "planned", "", "Strategy pattern", "recognise the Strategy pattern in code", ["n1", "n2"]),
+    pnode("n6", "planned", "", "Factory", None, ["n2"]),
+    pnode("n7", "planned", "", "A capstone that designs a class hierarchy live", None, ["n4", "n5"]),
+    pnode("n8", "skipped", "", "Syntax", "read Java syntax"),
+]}
+P_EVENTS = [marker_event("n1", "2026-09-15", "checked"), marker_event("n1", "2026-09-22", "solid"),
+            marker_event("n2", "2026-09-17", "checked"), marker_event("n3", "2026-09-15", "checked"),
+            marker_event("n3", "2026-09-17", "solid"), marker_event("n3", "2026-09-22")]
+p_fields = {"title": "OOP", "status": "active", "sessions": "2", "next": "Teach n5."}
+p_subject = ("oop", P_NODES, p_fields, P_EVENTS)
+p_state = status.rewards([p_subject], DUE_DAY)
+page_on = status.progress_note("oop", P4, p_fields, P_NODES, "", [], DUE_DAY, events=P_EVENTS,
+                               rewards_on=True, state=p_state, streak=p_state["streak"])
+page_off = status.progress_note("oop", P4, p_fields, P_NODES, "", [], DUE_DAY, events=P_EVENTS,
+                                rewards_on=False, state=p_state, streak=p_state["streak"])
+eq("every progress page opts into the snippet", "cssclasses: [learning-note]" in page_on.split("\n---\n", 1)[0], True)
+eq("the next action is a todo callout, and the link row has Resume and Home",
+   ("> [!todo] Next action\n> Teach n5." in page_on,
+    "[[learn/subjects/oop/resume|Resume]] · [[learn/subjects/oop/record|Record]] · "
+    "[[learn/subjects/oop/plan|Plan]] · [[learn/Home|Home]]" in page_on), (True, True))
+def callout_body(page, title):
+    lines = page.split("> [!%s" % title, 1)[1].split("\n\n", 1)[0].splitlines()[1:]
+    return lines
+eq("You can now: checked, solid, and skipped nodes as can-do statements, the name as fallback",
+   ("> [!success] You can now (3)" in page_on, callout_body(page_on, "success] You can now")),
+   (True, ["> - say what a class is for", "> - Objects", "> - read Java syntax"]))
+eq("Worth a refresh: a decayed node with the date it was last shown",
+   callout_body(page_on, "tip] Worth a refresh"),
+   ["> - predict what a shared reference does (you showed this on 17 Sep; one check brings it back)"])
+eq("You're learning: introduced nodes", callout_body(page_on, "info] You're learning"),
+   ["> - pick an interface or an abstract class"])
+eq("Up next: ready nodes as You'll be able to, a bare name as fallback, then how many follow",
+   callout_body(page_on, "todo] Up next"),
+   ["> - You'll be able to recognise the Strategy pattern in code", "> - Factory", ">", "> 1 more after that."])
+eq("an empty group is left out",
+   "You're learning" in status.progress_note("x", P4, p_fields, {"n1": pnode("n1", "checked", "2026-09-20")},
+                                             "", [], DUE_DAY), False)
+eq("badges are folded, this subject's only, newest first",
+   callout_body(page_on, "abstract]- 2 badges"),
+   ["> - Solid: Classes, 2026-09-22", "> - Solid: Aliasing, 2026-09-17"])
+eq("the count tiles are one SVG with the streak tile only while it is alive",
+   ("skills proven" in page_on, "checks passed later" in page_on, "best streak" in page_on,
+    "review streak" in page_on), (True, True, True, p_state["streak"]["alive"]))
+eq("with rewards off: no tiles and no badges; can-do callouts and the tree stay",
+   ("skills proven" in page_off, "badges" in page_off, "You can now" in page_off, "skill tree" in page_off),
+   (False, False, True, True))
+eq("the node table, strands, and sessions sit under Details, folded, with plain status labels",
+   ("## Details\n\n> [!note]- Nodes\n> | Id | Node | Status | Last checked |" in page_on,
+    "> | n3 | Aliasing | `decayed` | 2026-09-22 |" in page_on), (True, True))
+eq("the mermaid graph, status table, callout key, and status chips are gone",
+   [mark in page_on for mark in ("```mermaid", "Where each node stands", "Callout key", "data-learning-status",
+                                 "Dependency graph")], [False] * 5)
 
-board = status.dashboard([("oop", {"fields": p4_fields, "nodes": p4_nodes, "folder": P4})],
-                         "2026-09-23", [], [])
-eq("the Dashboard opts into the snippet in frontmatter",
-   "cssclasses: [learning-note]" in board.split("\n---\n", 1)[0], True)
-key_line = next((line for line in board.splitlines() if line.startswith("Node status key: ")), "")
-eq("its status key names all five statuses in text, in order",
-   re.findall(r'data-learning-status="([a-z]+)">\1</code>', key_line),
-   ["solid", "checked", "introduced", "decayed", "planned"])
-eq("each subject's next action is a todo callout",
-   "> [!todo] Next action\n> Teach n12." in board, True)
 
-snippet = (HOOKS.parent.parent / ".obsidian/snippets/learning-notes-prototype.css").read_text()
+section("skill tree — discs, edges, and the SVG rules (spec section 7)")
+def tree_of(page):
+    return next(block for block in re.findall(r"<svg.*?</svg>", page, re.S) if "skill tree" in block)
+tree_on, tree_off = tree_of(page_on), tree_of(page_off)
+def disc_near(tree, name):
+    """The elements drawn between the previous node's label and this node's."""
+    lines = tree.splitlines()
+    at = next(index for index, line in enumerate(lines) if line.endswith(">%s</text>" % name))
+    start = at
+    while start and not any(mark in lines[start - 1] for mark in ("font-size: 12px", "<path", "<defs")):
+        start -= 1
+    return "\n".join(lines[start:at])
+eq("★ and the glow only on solid discs, with rewards on",
+   (tree_on.count("★"), tree_on.count('filter="url(#'), "★" in disc_near(tree_on, "Classes")), (1, 1, True))
+eq("with rewards off a solid disc has no ★ and no glow, and a ✓ instead",
+   ("★" in tree_off, 'filter="url(#' in tree_off, "✓" in disc_near(tree_off, "Classes")), (False, False, True))
+eq("decayed keeps its full solid disc, with a cyan ↻ badge",
+   all(mark in disc_near(tree_on, "Aliasing") for mark in ("-solid)", 'r="8"', "var(--color-cyan)", "↻")), True)
+eq("introduced is a hollow ring in the checked gradient",
+   all(mark in disc_near(tree_on, "Interfaces") for mark in ('r="16"', "fill-opacity: 0.18", "stroke-width: 4")), True)
+eq("up next is an orange disc with an arrow; later planned nodes are small and faint",
+   (all(mark in disc_near(tree_on, "Factory") for mark in ('r="15"', "var(--color-orange)", "→")),
+    'r="12"' in tree_on), (True, True))
+edges = re.findall(r'<path d="[^"]*" style="([^"]*)"/>', tree_on)
+eq("edges: thick green between proven, dashed orange into up next, dotted grey otherwise",
+   sorted({("green" if "--color-green" in s else "orange" if "--color-orange" in s else "grey") for s in edges}),
+   ["green", "grey", "orange"])
+eq("one path per prereq edge", len(edges), 7)
+eq("no blank lines, and no <style>, <use>, or <foreignObject>",
+   ("\n\n" in tree_on, "<style" in tree_on, "<use" in tree_on, "<foreignObject" in tree_on),
+   (False, False, False, False))
+eq("colours are theme variables only", re.findall(r"#[0-9a-fA-F]{3,8}\b", re.sub(r"url\(#[^)]*\)", "", page_on)), [])
+ids = re.findall(r'id="([^"]+)"', page_on)
+eq("gradient and filter ids are unique on the page and prefixed per SVG",
+   (len(ids) == len(set(ids)), all(i.startswith(("st-oop-", "tl-oop-")) for i in ids)), (True, True))
+eq("the viewBox has an 800px floor and the SVG fits the note width",
+   (float(re.search(r'viewBox="0 0 ([\d.]+) ', tree_on).group(1)) >= 800, 'width="100%"' in tree_on), (True, True))
+eq("labels wrap at 22 characters on words, and the full name survives",
+   (status.wrap("A capstone that designs a class hierarchy live"),
+    " ".join(status.wrap("A capstone that designs a class hierarchy live"))),
+   (["A capstone that", "designs a class", "hierarchy live"], "A capstone that designs a class hierarchy live"))
+eq("a word longer than a line is kept whole", status.wrap("Supercalifragilisticexpialidocious n1"),
+   ["Supercalifragilisticexpialidocious", "n1"])
+eq("every label line is in the tree", all(">%s</text>" % line in tree_on
+                                         for line in status.wrap("A capstone that designs a class hierarchy live")), True)
+wide = {"n%d" % i: pnode("n%d" % i, "planned", "", "Node number %d with a long name" % i) for i in range(1, 13)}
+eq("a wide tree grows its viewBox past 800 rather than overlapping",
+   float(re.search(r'viewBox="0 0 ([\d.]+) ', status.skill_tree("w", "W", wide)).group(1)) > 800, True)
+loops = status.read_nodes("## Nodes\n\n| Node | Status |\n| --- | --- |\n| n1 A | planned |\n| n2 B | planned |\n",
+                          "## Nodes\n\n| Id | Node | Prereqs | Status |\n| --- | --- | --- | --- |\n"
+                          "| n1 | A | n1 | planned |\n| n2 | B | n1, n9 | planned |\n")
+eq("a self-loop and an unknown prereq are dropped before layout, and the tree still draws",
+   ([loops[n]["prereqs"] for n in ("n1", "n2")], status.skill_tree("x", "X", loops).count("<path")), ([[], ["n1"]], 1))
+eq("a plan with no nodes draws no tree", status.skill_tree("x", "X", {}), "")
+
+
+section("Dashboard — one line per subject, grouped, with tags and folds (spec section 9)")
+def dsubject(slug, nodes, **fields):
+    fields.setdefault("title", slug.title())
+    return {"slug": slug, "folder": P4, "fields": fields, "nodes": {n["id"]: n for n in nodes}, "events": []}
+BOARD = [
+    dsubject("zeta", [pnode("n1", "checked", "2026-09-23")], status="active", last_session="2026-09-23",
+             deadline="2026-09-28"),
+    dsubject("alpha", [pnode("n1", "planned")], status="active", last_session="2026-09-20"),
+    dsubject("fin", [pnode("n1", "decayed", "2026-09-22"), pnode("n2", "checked", "2026-09-01")], status="done",
+             last_session="2026-09-17", title="Finished"),
+    dsubject("old", [pnode("n1", "checked", "2026-09-01")], status="done", last_session="2026-09-02", title="Aged"),
+    dsubject("idle", [pnode("n1", "solid", "2026-09-23")], status="done", last_session="2026-09-23", title="Idle"),
+]
+board_state = status.rewards([SOLID_ONCE, SAME_DATE[1]], DUE_DAY)
+board = status.dashboard(BOARD, DUE_DAY, ["w1", "w2"], [], board_state, True)
+board_off = status.dashboard(BOARD, DUE_DAY, [], [], board_state, False)
+eq("the head links back to Home", board.split("\n---\n", 1)[1].lstrip("\n").splitlines()[:5],
+   ["# Learning dashboard", "", "[[learn/Home|← Home]]", "", "*Generated from the records; edits are overwritten.*"])
+eq("Active, then Done, alphabetical by title; an empty Paused is left out",
+   [line.split("|")[1].split("]]")[0] if line.startswith("- ") else line
+    for line in board.splitlines() if line.startswith(("## ", "- [["))],
+   ["## Active", "Alpha", "Zeta", "## Done", "Aged", "Finished", "Idle"])
+eq("a line holds the bar, proven count, last session, and a deadline ahead",
+   next(line for line in board.splitlines() if "|Zeta]]" in line),
+   "- [[learn/subjects/zeta/progress|Zeta]] `████████████████` 100% 1/1 proven · last 23 Sep · deadline in 4 days")
+eq("a done subject with a decayed node shows N to repair, one with a due node N due for review, an untouched one nothing",
+   [next(line for line in board.splitlines() if "|%s]]" % t in line).rsplit(" · ", 1)[-1]
+    for t in ("Finished", "Aged", "Idle")], ["1 to repair", "1 due for review", "last 23 Sep"])
+eq("the tag function is shared: repair before review",
+   (status.pending_tag(BOARD[2]["nodes"], {}, DUE_DAY), status.pending_tag(BOARD[3]["nodes"], {}, DUE_DAY),
+    status.pending_tag(BOARD[4]["nodes"], {}, DUE_DAY)), ("1 to repair", "1 due for review", ""))
+eq("badges fold into one callout, newest first, each naming its subject",
+   callout_body(board, "abstract]- 2 badges"),
+   ["> - Goal met: Alpha, 2026-09-20", "> - Solid: Aliasing (S), 2026-09-20"])
+eq("with rewards off there are no badges", "badges" in board_off, False)
+eq("record inconsistencies are folded", callout_body(board, "bug]- 2 record inconsistencies"), ["> - w1", "> - w2"])
+eq("the system links fold, and the session guide, status key, and per-subject next actions are gone",
+   ("> [!info]- The system" in board, "Running a session" in board, "Node status key" in board,
+    "Next action" in board), (True, False, False, False))
+
+snippet = (HOOKS.parent.parent / ".obsidian/snippets/learning-notes.css").read_text()
 eq("callout colors are full colors, since Obsidian reads them through color-mix()",
-   re.findall(r"--learning-[a-z]+:\s*\d+\s*,", snippet), [])
+   re.findall(r"--[a-z-]+:\s*\d+\s*,", snippet), [])
+eq("the snippet is renamed, enabled, and carries the variant C palette without the old chips",
+   ("learning-notes" in json.loads((HOOKS.parent.parent / ".obsidian/appearance.json").read_text())["enabledCssSnippets"],
+    "--lv-gold" in snippet, "data-learning-status" in snippet, "--learning-question" in snippet),
+   (True, True, False, False))
+eq("the conversation note links to Home", "[[learn/Home|Home]]" in olive.render({"session_id": "x"}), True)
+fresh(); note("oop", "2026-09-17-s01"); turn("/learn-resume oop")
+eq("the subject log header links to Home, not the Dashboard",
+   ("[[learn/Home|Home]]" in (VAULT / "learn/subjects/oop/log.md").read_text(),
+    "learn/Dashboard" in (VAULT / "learn/subjects/oop/log.md").read_text()), (True, False))
 
 
 

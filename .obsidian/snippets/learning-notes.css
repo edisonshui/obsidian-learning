@@ -1,0 +1,48 @@
+/* Generated learning views: Home, the Dashboard, and each progress page.
+   They opt in with cssclasses: [learning-note]; session notes and logs do not.
+   Every colour is a theme variable, so light and dark both work, and each
+   view stays legible with this snippet off. */
+.learning-note {
+  --file-line-width: 54rem;
+  --line-height-normal: 1.65;
+  /* from the prototype on branch prototype/visual-language, variant C.
+     Full colours: Obsidian reads --callout-color through color-mix(). */
+  --lv-warm: color-mix(in srgb, var(--color-orange) 65%, var(--color-yellow));
+  --lv-gold: color-mix(in srgb, var(--color-yellow) 70%, var(--color-orange));
+  --lv-checked: color-mix(in srgb, var(--color-blue) 60%, var(--color-purple));
+}
+
+.learning-note :is(h2, .HyperMD-header-2) {
+  margin-top: 2rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.learning-note :is(table, .table-wrapper) { max-width: 100%; }
+.learning-note .table-wrapper { overflow-x: auto; }
+.learning-note :is(th, td) { padding: 0.65rem 0.8rem; vertical-align: top; }
+.learning-note th { background: var(--background-secondary); }
+.learning-note :is(a, .internal-link) { text-underline-offset: 0.18em; }
+
+.learning-note .callout[data-callout="question"] { --callout-color: var(--lv-warm);       --callout-icon: lucide-sun; }
+.learning-note .callout[data-callout="success"]  { --callout-color: var(--color-green);   --callout-icon: lucide-sprout; }
+.learning-note .callout[data-callout="abstract"] { --callout-color: var(--lv-gold);       --callout-icon: lucide-flag; }
+.learning-note .callout[data-callout="info"]     { --callout-color: var(--lv-checked);    --callout-icon: lucide-book-open; }
+.learning-note .callout[data-callout="tip"]      { --callout-color: var(--color-cyan);    --callout-icon: lucide-rotate-ccw; }
+.learning-note .callout[data-callout="todo"]     { --callout-color: var(--color-orange);  --callout-icon: lucide-arrow-right; }
+.learning-note .callout[data-callout="question"] .callout-title { font-size: 1.25em; }
+
+.learning-note .callout {
+  margin-block: 1.1rem;
+  padding: 0.9rem 1.1rem;
+  border-left: 3px solid var(--callout-color);
+  border-radius: 0.4rem;
+}
+.learning-note .callout-title { line-height: 1.5; }
+.learning-note .callout-content { color: var(--text-normal); }
+.learning-note .callout-content > :last-child { margin-bottom: 0; }
+
+@media (max-width: 600px) {
+  .learning-note :is(th, td) { padding: 0.45rem; }
+  .learning-note .callout { padding: 0.75rem; }
+}

@@ -502,7 +502,7 @@ def write_subject_logs(vault, runtime, state):
                  f"> [[learn/subjects/{subject}/record|Record]] · "
                  f"[[learn/subjects/{subject}/plan|Plan]] · "
                  f"[[learn/subjects/{subject}/progress|Progress]] · "
-                 "[[learn/Dashboard|Dashboard]]", ""]
+                 "[[learn/Home|Home]]", ""]
         for conversation in conversations:
             first_time = conversation["entries"][0]["time"][:10]
             model = conversation.get("model") or "Not reported"
@@ -522,7 +522,7 @@ def render(state):
              "# Current conversation", "", f"**Model:** {model} · **Effort:** {effort}", "",
              "> [!info] Live note",
              "> Read here; type or speak your replies in the terminal. It updates as Claude speaks.", "",
-             f"[[Claude outputs/Conversations/{session_id}|Saved conversation]] · [[learn/Dashboard|Learning dashboard]]", ""]
+             f"[[Claude outputs/Conversations/{session_id}|Saved conversation]] · [[learn/Home|Home]]", ""]
     lines.extend(entry_lines(all_entries(state)))
     return "\n".join(lines)
 
