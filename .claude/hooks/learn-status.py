@@ -1703,6 +1703,57 @@ def progress_note(slug, folder, fields, nodes, record_text, sessions, today, eve
     return "\n".join(out)
 
 
+# ------------------------------------------------------------ the startup index
+
+def startup_block(subjects, notes, rewards_on, today, selected=None, host="claude"):
+    """The lines the session-start hook asks the agent to show verbatim (spec
+    section 10). `subjects` is the (slug, nodes, fields, events) list and
+    `notes` the (slug, session note) pairs. With a subject `selected`, only the
+    left-open notes and the subject lines remain."""
+    ranked = rank(subjects, notes, today)
+    titles = {slug: fields.get("title", slug) for slug, _, fields, _ in subjects}
+    out = []
+    if not selected:
+        top = ranked[0]
+        if top["kind"] == "Start":
+            upcoming = next_review(subjects)
+            out.append("**Recommended:** Everything you've proven is up to date.%s Curious about "
+                       "something new? `%s`" % (" The next review is *%s* on %s." % (
+                           upcoming[0], short_date(upcoming[1])) if upcoming else "",
+                           command_form("learn-start", host)))
+        else:
+            reason = top["reason"] + ("" if top["reason"].endswith(".") else ".")
+            out.append("**Recommended:** %s%s %s `%s`" % (
+                top["kind"], " · %s:" % top["title"] if top["title"] else ":", reason,
+                command_form(top["command"], host)))
+        streak = review_streak(subjects, today)
+        if rewards_on and streak["alive"]:
+            out.append("Review streak: " + weeks_word(streak["current"]))
+    for slug, note in notes:
+        if note.status in ("open", "stale pause"):
+            when = to_date(note.fields.get("date"))
+            out.append("Your %s session from %s was left open. Resuming will close it out first."
+                       % (titles.get(slug, slug), short_date(when) if when else "an earlier day"))
+    review_at = next((index for index, found in enumerate(ranked) if found["kind"] == "Review"), None)
+    pending, untouched = [], []
+    for slug, nodes, fields, _ in subjects:
+        tag = pending_tag(nodes, fields, today)
+        if fields.get("status") in ("active", "paused", "diagnosing") or tag:
+            places = [index for index, found in enumerate(ranked) if found["subject"] == slug]
+            if review_at is not None and any(is_due(entry, today, fields.get("deadline"))
+                                             for entry in nodes.values()):
+                places.append(review_at)
+            line = "- %s · %s" % (titles[slug], tag or "ready to resume")
+            words = deadline_words(fields.get("deadline"), today, passed=True)
+            pending.append((min(places, default=len(ranked)), line + (" · " + words if words else "")))
+        elif fields.get("status") == "done":
+            untouched.append(titles[slug])
+    out += [line for _, line in sorted(pending, key=lambda item: item[0])]
+    if untouched:
+        out.append("Done: " + ", ".join(untouched))
+    return ["Show the learner (verbatim):"] + out + ["End of block."]
+
+
 # ------------------------------------------------------------ the dashboard
 
 def dashboard(subjects, today, warnings, openings, state=None, rewards_on=True):

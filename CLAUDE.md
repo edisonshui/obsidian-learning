@@ -4,10 +4,10 @@ This vault is a one-to-one learning system. At boot, use the SessionStart index 
 
 ## At session start
 
-The SessionStart hook prints the date, each subject's title, status, last session and next step, operational preferences, and open-note warnings. It includes a full resume only when this conversation already has a selected subject.
+The SessionStart hook prints the date, a *Show the learner* block (the recommended action, the live review streak, notes left open, and subjects grouped by pending action), then for the agent only each subject's title, status, last session and next step, operational preferences, and open-note warnings. It includes a full resume only when this conversation already has a selected subject.
 
-1. List each subject on one line: title, status, last session, next step.
-2. Ask which to do: `/learn-resume <subject>`, `/learn-start <subject>`, or something else.
+1. Reproduce the hook's *Show the learner* block verbatim.
+2. Ask which to do, offering the block's recommended command first and marked recommended, then `/learn-resume <subject>`, `/learn-start <subject>`, or something else.
 3. Do not teach, quiz, or plan until one is chosen.
 4. After selection, read its `resume.md`, `record.md`, `plan.md`, and latest session note in full. Read `learn/system/records.md` before writing learning state.
 

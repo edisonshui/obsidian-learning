@@ -52,6 +52,12 @@ class LearningHookTest(unittest.TestCase):
                              "learn/system/tutor.md", "record.md", "plan.md"):
                     self.assertIn(term, output)
 
+    def test_start_block_prints_codex_commands(self):
+        output = self.event("SessionStart", "start")
+        block = output.split("Show the learner (verbatim):", 1)[1].split("End of block.", 1)[0]
+        self.assertIn("`$learn-", block)
+        self.assertNotIn("`/learn-", block)
+
     def test_start_recovers_only_this_conversations_selected_full_resume(self):
         detail = "Selected detail.\n" * 250 + "Uncertain: limit conclusion. Next: ask for proof."
         (self.vault / "learn/subjects/oop/resume.md").write_text("---\n---\n\n" + detail)

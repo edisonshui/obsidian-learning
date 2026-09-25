@@ -2414,6 +2414,49 @@ eq("the subject log header links to Home, not the Dashboard",
 
 
 
+section("startup index — the Show the learner block (spec section 10)")
+fresh()
+def start_subject(slug, title, st, nodes_rows, extra=""):
+    write(VAULT / "learn/subjects" / slug / "record.md",
+          '---\nsubject: "%s"\ntitle: "%s"\nstatus: %s\nlast_session: "2026-09-20"\n%s---\n\n'
+          "## Nodes\n\n| Node | Status | Last checked | Evidence |\n| --- | --- | --- | --- |\n%s"
+          % (slug, title, st, extra, nodes_rows))
+start_subject("oop", "OOP", "active", "| n1 Classes | planned | — | — |\n")
+start_subject("ptr", "Pointers", "done", "| n1 Aliasing | decayed | 2026-09-22 | — |\n")
+start_subject("fin", "Finished", "done", "| n1 Leaves | skipped | — | — |\n")
+start_subject("calc", "MATH 241", "paused", "| n1 Limits | planned | — | — |\n", 'deadline: "2026-09-01"\n')
+write(VAULT / "learn/subjects/calc/sessions/2026-09-22-s03.md",
+      '---\nsubject: "calc"\nsession: "03"\ndate: "2026-09-22"\nstart: "10:00"\npaused:\nend:\n---\n')
+session_context = load("session_context", "session_context.py")
+index = session_context.start_context(VAULT)
+block = index.split("Show the learner (verbatim):\n", 1)[1].split("\nEnd of block.", 1)[0].splitlines()
+eq("the block: recommended action, left-open note, subjects by pending action, then untouched done subjects",
+   block,
+   ["**Recommended:** Repair · Pointers: *Aliasing* slipped on 22 Sep. `/learn-resume ptr`",
+    "Your MATH 241 session from 22 Sep was left open. Resuming will close it out first.",
+    "- Pointers · 1 to repair",
+    "- OOP · ready to resume",
+    "- MATH 241 · ready to resume · deadline passed",
+    "Done: Finished"])
+eq("the agent-only index still follows the block",
+   index.index("End of block.") < index.index("- oop: OOP | active"), True)
+selected = session_context.start_context(VAULT, "oop")
+eq("with a subject selected only the left-open notes and subject lines remain",
+   [line for line in selected.split("Show the learner (verbatim):\n", 1)[1].split("\nEnd of block.", 1)[0].splitlines()
+    if line.startswith(("**Recommended", "Review streak", "Your "))],
+   ["Your MATH 241 session from 22 Sep was left open. Resuming will close it out first."])
+codex = session_context.start_context(VAULT, host="codex")
+eq("Codex gets $ commands in the block and in the open-note mechanics",
+   ("`$learn-resume ptr`" in codex, "`/learn-" in codex, "`$learn-resume`" in codex), (True, False, True))
+eq("nothing pending: the Home wording on one line",
+   status.startup_block(QUIET, [], True, HOME_DAY)[1],
+   "**Recommended:** Everything you've proven is up to date. The next review is *Roots* on 26 Sep. "
+   "Curious about something new? `/learn-start`")
+eq("the live streak shows with rewards on, and not with rewards off",
+   (status.startup_block(HOME_SUBJECTS, [], True, HOME_DAY)[2], "Review streak" in "".join(
+       status.startup_block(HOME_SUBJECTS, [], False, HOME_DAY))), ("Review streak: 2 weeks", False))
+
+
 print()
 if FAILS:
     print("FAILED (%d): %s" % (len(FAILS), ", ".join(FAILS)))

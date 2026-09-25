@@ -10,11 +10,14 @@ Codex does not expand Claude Code's `@file` imports, so read the files themselve
 
 ## At session start
 
-The Codex `SessionStart` hook prints the date, each subject's title, status, last session and next step, operational preferences, and open-note warnings. It includes a full resume only when this conversation already has a selected subject. If the hook did not run, use `date`, `python3 .claude/hooks/learn-status.py --open-notes`, the subjects' record frontmatter, and the operational preference summary.
+The Codex `SessionStart` hook prints the date, a *Show the learner* block (the recommended action, the live review streak, notes left open, and subjects grouped by pending action), then for the agent only each subject's title, status, last session and next step, operational preferences, and open-note warnings. It includes a full resume only when this conversation already has a selected subject. If the hook did not run, use `date`, `python3 .claude/hooks/learn-status.py --next --host codex`, `python3 .claude/hooks/learn-status.py --open-notes --host codex`, the subjects' record frontmatter, and the operational preference summary, and show the learner the first `--next` line the same way as the block's recommended action.
 
 After selection, read that subject's `resume.md`, `record.md`, `plan.md`, and latest session note in full. Read `learn/system/records.md` before writing learning state.
 
-List each subject on one line with title, status, last session, and next step. Ask which subject to resume with `$learn-resume <slug>`, whether to start one with `$learn-start <slug>`, or whether Edison wants something else. Do not teach, quiz, or plan until a subject is chosen.
+1. Reproduce the hook's *Show the learner* block verbatim.
+2. Ask which to do, offering the block's recommended command first and marked recommended, then `$learn-resume <slug>`, `$learn-start <slug>`, or something else.
+
+Do not teach, quiz, or plan until a subject is chosen.
 
 ## Hard rules
 

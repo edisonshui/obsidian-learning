@@ -1,6 +1,7 @@
 """Shared startup index; full learning state is loaded after subject selection."""
 
 import argparse
+import importlib.util
 import json
 import re
 import subprocess
@@ -11,7 +12,15 @@ from pathlib import Path
 from vaultlib import frontmatter
 
 
-def start_context(vault, subject=None):
+def learn_status():
+    """learn-status.py as a module; its file name has a hyphen, so no plain import."""
+    spec = importlib.util.spec_from_file_location("learn_status", Path(__file__).with_name("learn-status.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def start_context(vault, subject=None, host="claude"):
     status = Path(__file__).with_name("learn-status.py")
     command = [sys.executable, str(status), "--vault", str(vault)]
     refresh = subprocess.run(command + ["--quiet"], cwd=vault, text=True,
@@ -20,7 +29,18 @@ def start_context(vault, subject=None):
         "%A %Y-%m-%d %H:%M %Z"), ""]
     if refresh.returncode:
         lines += ["Dashboard refresh failed: " + refresh.stderr.strip()[:300], ""]
-    notes = subprocess.run(command + ["--open-notes"], cwd=vault, text=True,
+    # The one block the agent shows the learner as it stands; everything after
+    # it is for the agent alone.
+    try:
+        module = learn_status()
+        now = datetime.now()
+        loaded, _ = module.load_subjects(vault, now)
+        lines += module.startup_block(module.rank_inputs(loaded), module.note_inputs(loaded),
+                                      module.rewards_setting(vault)[0], now.date(),
+                                      selected=subject, host=host) + [""]
+    except Exception as error:  # the index below still lets the agent work
+        lines += ["Startup block failed: %s" % error, ""]
+    notes = subprocess.run(command + ["--open-notes", "--host", host], cwd=vault, text=True,
                            capture_output=True, check=False)
     if notes.stdout.strip():
         lines += ["Unfinished session notes:", notes.stdout.strip(),

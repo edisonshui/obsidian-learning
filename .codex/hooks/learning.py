@@ -144,7 +144,7 @@ def save_log(vault, rt, subject):
 
 
 def session_start(vault, subject=None):
-    return start_context(vault, subject)
+    return start_context(vault, subject, host="codex")
 
 
 def hook(vault, payload):
