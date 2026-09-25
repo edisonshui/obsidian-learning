@@ -29,7 +29,7 @@ Ask at most three questions in one round (use AskUserQuestion if available). Cov
 
 ## 4. Plan
 
-- Write `plan.md`: nodes from each strand's floor to the goal, one concept each, 10–20 minutes each. Fill every column of the Nodes table. Mark demonstrated nodes `skipped`. Draw the dependency graph per `learn/system/diagrams.md`. Group into 45–60 minute sessions.
+- Write `plan.md`: nodes from each strand's floor to the goal, one concept each, 10–20 minutes each. Fill every column of the Nodes table. The `Can do` column holds one can-do statement per node (`records.md`, *Plan table*). Mark demonstrated nodes `skipped`. Draw the dependency graph per `learn/system/diagrams.md`. Group into 45–60 minute sessions.
 - Mirror the node list into the Nodes table of `record.md` with status `planned` or `skipped`.
 
 ## 5. Review
@@ -43,6 +43,6 @@ Show the graph and the five-line summary (what they have, first session, last no
 
 ## 7. Begin
 
-Run `python3 .claude/hooks/learn-status.py` so `learn/Dashboard.md` and this subject's `progress.md` pick up the new subject. Never hand-write a row into either — they are generated files (`CLAUDE.md`, *Generated files are never hand-edited*) and the next run overwrites anything added by hand.
+Run `python3 .claude/hooks/learn-status.py` so `learn/Home.md`, `learn/Dashboard.md`, and this subject's `progress.md` pick up the new subject. Never hand-write a row into either — they are generated files (`CLAUDE.md`, *Generated files are never hand-edited*) and the next run overwrites anything added by hand.
 
 Run `date`, create `sessions/<YYYY-MM-DD>-s01.md` by copying `learn/system/templates/session-note.md` in full (every section heading, in order) and filling the frontmatter with the start time, set `sessions: 1` and `last_session` in `record.md`, and enter the teach loop (Phase 2 of `workflow.md`). Remind the learner that `/learn-end` checkpoints at any time and that you will call the 45-minute mark.

@@ -811,6 +811,21 @@ for name in ("learn-end", "learn-review"):
            "learn-status.py --rewards" in (VAULT_ROOT / host / "skills" / name / "SKILL.md").read_text(), True)
 
 
+section("skill drift — learn-start writes the Can do column and names Home; plan-reviewer checks it")
+for host in (".claude", ".agents"):
+    text = (VAULT_ROOT / host / "skills/learn-start/SKILL.md").read_text()
+    eq("%s/learn-start fills Can do and regenerates Home" % host,
+       ("The `Can do` column holds one can-do statement per node" in text, "`learn/Home.md`" in text), (True, True))
+for path in (".claude/agents/plan-reviewer.md", ".codex/agents/plan-reviewer.toml"):
+    text = (VAULT_ROOT / path).read_text()
+    eq("%s has check 8 and lists it under REVISE" % path,
+       ("8. **Can-do statements.**" in text, "checks 1, 4, 5, 7, or 8 exists" in text), (True, True))
+for plan in sorted((VAULT_ROOT / "learn/subjects").glob("*/plan.md")):
+    rows = status.table_by_header(vaultlib.section(plan.read_text(), "Nodes"))
+    eq("%s: every node has a can-do statement" % plan.parent.name,
+       [row.get("Id") for row in rows if not row.get("Can do")], [])
+
+
 section("skill drift, both learn-end copies set goal_met:, and the done subjects carry it")
 for host in (".claude", ".agents"):
     eq("%s/learn-end sets goal_met: when the goal is met" % host,
