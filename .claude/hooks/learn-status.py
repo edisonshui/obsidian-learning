@@ -16,6 +16,7 @@ Run: python3 .claude/hooks/learn-status.py [--vault PATH]
      python3 .claude/hooks/learn-status.py --next [--host claude|codex]  (read-only)
      python3 .claude/hooks/learn-status.py --rewards --subject SLUG --session NN  (read-only)
      python3 .claude/hooks/learn-status.py --rewards --review NN  (read-only)
+     python3 .claude/hooks/learn-status.py --due [--gen]  (read-only)
 """
 
 import argparse
@@ -108,6 +109,9 @@ def read_nodes(record_text, plan_text):
         if not entry["name"]:
             entry["name"] = row.get("Node", "")
         entry["can_do"] = row.get("Can do", "")
+        # The header is "Rests on (unconditional truth)" in every live plan;
+        # matching the prefix keeps a reworded parenthesis from losing the column.
+        entry["truth"] = next((cell for key, cell in row.items() if key.startswith("Rests on")), None)
         entry["prereqs"] = NODE_ID.findall(row.get("Prereqs", ""))
         entry["plan_status"] = row.get("Status", "").lower()
     # A prereq naming the node itself or an id not in the table is no edge.
@@ -192,6 +196,34 @@ def markers(line):
     return found[::-1]
 
 
+# A generation check makes the learner derive an answer from a node's
+# unconditional truth rather than recall it (`tutor.md`, *Checks and quizzes*).
+# Its evidence line carries the tag right after the colon that ends the date and
+# source, so the markers and everything read from them parse exactly as before
+# (`records.md`, *Evidence rule*). A tag anywhere else, such as inside the
+# question text, is not one.
+GEN_TAGGED = re.compile(r"^- \d{4}-\d{2}-\d{2}\b[^:→]*:\s*\[gen\]")
+
+# An allow-list, not a deny-list: real verdicts on a miss that still left the
+# node `checked` read "correct at rung 2.", "(a) wrong (...)", "incomplete.". Only
+# a clean pass, with no help or doubt named, credits a node. A line with more
+# than one marker credits none: one verdict over several nodes ("correct for n4,
+# wrong for n5") cannot say which node passed, so each node gets its own line.
+PASS_VERDICT = re.compile(r"^(correct|right)\b", re.I)
+HELPED_VERDICT = re.compile(r"\b(hints?|rung|pointer|supplied|after|partial|partially|but|though|guess\w*)\b",
+                            re.I)
+
+
+def generation_pass(line):
+    """True when an evidence line is a tagged generation check about one node
+    with a clean pass verdict."""
+    segments = line.split("→")
+    if not GEN_TAGGED.match(line) or len(markers(line)) != 1 or len(segments) < 3:
+        return False
+    verdict = segments[-2].strip()
+    return bool(PASS_VERDICT.match(verdict)) and not HELPED_VERDICT.search(verdict)
+
+
 def note_starts(folder):
     """{(date, "sNN" or "rNN"): start time} for a subject's session notes and the
     vault's review notes, the notes an evidence line can name."""
@@ -219,10 +251,12 @@ def evidence_events(record_text, starts):
     for position, line in enumerate(bullets):
         head = EVIDENCE_LINE.match(line)
         date, source = (head.group(1), head.group(2) or "") if head else ("", "")
+        generated = generation_pass(line)
         for node, status in markers(line):
             events.append({"date": date, "source": source, "position": position,
                            "start": starts.get((date, source), ""),
-                           "node": node, "status": status})
+                           "node": node, "status": status,
+                           "generation": generated and status in ("checked", "solid")})
     events.sort(key=lambda event: (event["date"], event["start"], event["position"]))
     return events
 
@@ -237,6 +271,37 @@ def lapses(events):
             found.append(event)
         last[event["node"]] = event["status"]
     return found
+
+
+def has_truth(node):
+    """False when the plan's *Rests on* cell says the node has no unconditional
+    truth: empty, a dash, or naming no (new) unconditional truth, as the
+    integrative review nodes do. A node with no plan row is given the benefit of
+    the doubt, since its cell was never written rather than written empty."""
+    cell = node.get("truth")
+    if cell is None:
+        return True
+    cell = cell.strip()
+    return not (not cell or cell.startswith(("\u2014", "-"))
+                or re.search(r"no (new )?unconditional truth", cell, re.I))
+
+
+def generation_eligible(nodes):
+    """Ids of `checked` or `solid` nodes that rest on an unconditional truth, in
+    plan order: the only nodes a generation check can be asked of."""
+    return [node for node in sorted(nodes, key=sort_key)
+            if nodes[node].get("status") in ("checked", "solid") and has_truth(nodes[node])]
+
+
+def recall_only(nodes, events):
+    """Ids of eligible nodes with no passed generation check in their evidence,
+    in plan order. Brain A, which memorized the answers, could have passed every
+    check these nodes have. A node with no unconditional truth is left out: the
+    skills forbid a generation check on it, so flagging it could never clear.
+    Reported on the dashboard only: it changes no status, reward, or `--due`
+    ranking."""
+    generated = {event["node"] for event in events if event.get("generation")}
+    return [node for node in generation_eligible(nodes) if node not in generated]
 
 
 # ------------------------------------------------------ the review picker (Phase 5)
@@ -803,13 +868,25 @@ def reward_lines(subjects, today, subject=None, session=None, review=None, sessi
     return (badge_lines + recovery + counts + streak)[:MAX_REWARD_LINES]
 
 
-def due_report(rows, undated):
-    """`--due` as the tutor and Edison read it. One node per line, stalest first."""
+# The suffix `--due --gen` puts on a generation candidate's line. Only that flag
+# adds it, so plain `--due`, which `/learn-check` also reads, prints as before.
+GEN_CANDIDATE = "  · gen candidate"
+
+
+def due_report(rows, undated, candidates=frozenset()):
+    """`--due` as the tutor and Edison read it. One node per line, stalest first.
+
+    `candidates` holds the (subject, node) pairs `--gen` marks: recall-only and
+    resting on an unconditional truth. A review asks its one generation question
+    of the first marked line in its picked set, so the choice is the picker's,
+    not the tutor's.
+    """
     out = []
     for row in rows:
         out.append("%4dd  %-34s %-4s [%s] last %s — %s"
                    % (row["days"], row["subject"], row["id"], row["status"],
-                      row["checked"] or "?", row["name"] or "?"))
+                      row["checked"] or "?", row["name"] or "?")
+                   + (GEN_CANDIDATE if (row["subject"], row["id"]) in candidates else ""))
         if row["evidence"]:
             out.append("        last evidence: %s" % row["evidence"])
     for row in undated:
@@ -1789,6 +1866,20 @@ def dashboard(subjects, today, warnings, openings, state=None, rewards_on=True):
                        ["%s: %s%s, %s" % (found["kind"], found["name"],
                                           "" if found["name"] == found["title"] else " (%s)" % found["title"],
                                           found["date"]) for found in state["badges"]], fold="-")
+    # One line per subject, never one per node: records that predate the tag
+    # leave nearly every proven node here, and that is the true state, not noise.
+    shallow, total = [], 0
+    for s in sorted(subjects, key=lambda s: (s["fields"].get("title", s["slug"]).lower(), s["slug"])):
+        ids = recall_only(s["nodes"], s.get("events", []))
+        passed = len(generation_eligible(s["nodes"]))
+        if ids:
+            total += len(ids)
+            shallow.append("%s: %d of %d checked or solid (%s)"
+                           % (s["fields"].get("title", s["slug"]), len(ids), passed, ", ".join(ids)))
+    if shallow:
+        out += ["> [!question]- %s recall-only" % plural(total, "node"),
+                "> Passed checks, but no generation check yet (`learn/system/records.md`, *Evidence rule*)."]
+        out += ["> - " + line for line in shallow] + [""]
     if openings:
         out += ["## Open session notes", "",
                 "> [!warning] A session note has no `end:`",
@@ -1885,6 +1976,10 @@ def main():
                         help="with --due, how many nodes one subject may contribute "
                              "before --limit (0 lifts the cap). Default 2, so one "
                              "long-neglected subject cannot fill a whole review set")
+    parser.add_argument("--gen", action="store_true",
+                        help="with --due, mark each node that is recall-only and rests on an "
+                             "unconditional truth: the candidates for a review's one "
+                             "generation question, stalest first")
     parser.add_argument("--semantic", action="store_true",
                         help="also run Jev-backed semantic checks (Phase 4). Off by "
                              "default: session start must stay offline, fast, and "
@@ -1892,6 +1987,8 @@ def main():
     args = parser.parse_args()
     if args.rewards and not (args.review or (args.subject and args.session)):
         parser.error("--rewards needs --subject and --session, or --review")
+    if args.gen and not args.due:
+        parser.error("--gen only applies to --due")
 
     vault = args.vault.resolve()
     stamp = datetime.now()
@@ -1916,7 +2013,9 @@ def main():
         rows, undated = due([(s["slug"], s["nodes"]) for s in loaded], stamp.date(),
                             subject=args.subject, per_subject=args.per_subject or None,
                             limit=args.limit)
-        print(due_report(rows, undated))
+        candidates = frozenset((s["slug"], node) for s in loaded
+                               for node in recall_only(s["nodes"], s["events"])) if args.gen else frozenset()
+        print(due_report(rows, undated, candidates))
         return 0
 
     if args.next_action:

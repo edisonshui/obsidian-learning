@@ -66,7 +66,7 @@ In this order:
 
 1. Read, in order: `resume.md`, `record.md`, `plan.md`, the most recent session note. Read them in full; do not skim.
 2. Give a recap of at most eight lines: where we are in the plan, what is solid, what is shaky, what the open misconceptions are, what today covers.
-3. Run a **decay check**: one retrieval question on each of the last 1–2 checked nodes before teaching anything new. Pass moves the node to `solid`; fail marks it `decayed`, and you re-establish it briefly before continuing.
+3. Run a **decay check**: one retrieval question on each of the last 1–2 checked nodes before teaching anything new, asking the learner to re-derive the node from its unconditional truth rather than recall it (a generation check, `tutor.md`, *Checks and quizzes*), logged with the generation tag `[gen]`, right after the colon that ends the date and source, or untagged as ordinary retrieval when the node has no unconditional truth. Pass moves the node to `solid`; fail marks it `decayed`, and you re-establish it briefly before continuing.
 4. Open a new session note and continue the teach loop from the plan.
 
 ## Reviewing across subjects (`/learn-review`)
@@ -76,7 +76,7 @@ The five phases above all run inside one subject, and that is the gap `/learn-re
 A review is not one of the phases. It opens no session note, teaches nothing, and belongs to no subject:
 
 1. **Pick in code.** `python3 .claude/hooks/learn-status.py --due` ranks every node in the vault by time since its last check, capped per subject. Read-only, offline, and the same picker `/learn-check` uses for its older spacing node.
-2. **Ask and grade** by `tutor.md`, *Checks and quizzes*. Every question is retrieval, and every question names its subject first — the learner has had no recap.
+2. **Ask and grade** by `tutor.md`, *Checks and quizzes*. Every question is retrieval, exactly one of them a re-derivation of the first `--due --gen` candidate in the picked set when there is one, and every question names its subject first — the learner has had no recap.
 3. **Log the split**, per `records.md`, *Reviews*: the narrative to `learn/reviews/YYYY-MM-DD-rNN.md`, the evidence and status moves to each subject's `record.md`, and nothing else in any subject. Close with `learn-status.py --rewards --review <NN>` and paste its lines verbatim.
 
 A node that fails a review is `decayed`, which is the signal to run `/learn-resume` on that subject. A review never re-teaches it.

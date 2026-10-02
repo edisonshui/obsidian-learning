@@ -40,6 +40,8 @@ An evidence line is `YYYY-MM-DD sNN: <what was asked> → <what they answered> �
 
 Every evidence line from a check that concerns a node ends with a transition marker per node, `→ nN <status>`, giving the node's status after that line even when it did not change: `2026-09-30 s05: … → correct → n9 solid`. A line that concerns several nodes ends with one marker each. Nothing follows the last marker. A line that concerns no node, such as a diagnostic probe before the plan exists, has none. Rewards are derived from these markers (`CONTEXT.md`, *Transition marker*), so a missing or wrong marker is a wrong reward.
 
+A generation check (`tutor.md`, *Checks and quizzes*), including a re-derivation decay check, carries the generation tag `[gen]` right after the colon that ends the date and source: `2026-10-02 s06: [gen] predict … from <truth> → … → correct → n4 checked`. The tag anywhere else does not count, and it never goes among the markers, so the markers parse as they would without it. A fallback retrieval question for a node with no unconditional truth is untagged, and so is the re-check after re-establishing a decayed node. A generation question that covers several nodes gets one evidence line per node, each with its own verdict and its one marker: a tagged line with more than one marker passes no node. A tagged line passes its node only when the marker is `checked` or `solid` and the verdict, the segment just before the marker, starts with `correct` or `right` and names no help or doubt (no hint, rung, pointer, supplied, after, partial, but, though, or guess). `learn-status.py` lists a `checked` or `solid` node as *recall-only* on the dashboard when no tagged line passed it. A node whose *Rests on* cell in `plan.md` is empty, starts with a dash, or says it has no (new) unconditional truth is left out, since no generation check can be asked of it. Recall-only is a report, not a status: it changes no status, reward, or `--due` ranking.
+
 ## Update rules
 
 - **Append, don't overwrite, evidence.** The history of how a node moved from `introduced` to `solid` is the point.
@@ -62,11 +64,11 @@ Because it touches several subjects, its writing splits, and the split is what k
 | Goes to | What |
 | --- | --- |
 | `learn/reviews/YYYY-MM-DD-rNN.md` | The narrative: the picked set, every question, answer and verdict, each MC question's `key: <slot>/<count> — options: <opt1> / <opt2> / <opt3>`, misconception candidates, corrections. `rNN` is per-vault and never reused |
-| each subject's `record.md` | Node status (`→ solid` on a pass, `→ decayed` on a fail), *Last checked*, and one `rNN`-prefixed evidence line per question. Every evidence line ends with its transition marker. |
+| each subject's `record.md` | Node status (`→ solid` on a pass, `→ decayed` on a fail), *Last checked*, and one `rNN`-prefixed evidence line per question. Every evidence line ends with its transition marker. The review's one generation question, if it has one, carries the generation tag (*Evidence rule*). |
 
 A review changes **nothing else** in a subject: not `sessions:`, not `last_session`, not the *Sessions* list, not `plan.md`, not `resume.md`. It is not a session of any one subject, and recording it as one would put `sessions:` and `last_session` permanently at odds with the notes on disk — which is exactly what G5 exists to catch. A `done` subject stays `done`; a node dropping to `decayed` is what says otherwise, written where the next `/learn-resume` reads it.
 
-The pick is a date comparison, so it lives in code: `python3 .claude/hooks/learn-status.py --due` ranks every node by time since its last check. `/learn-check` calls the same thing with `--subject <slug>` for its older spacing node. Only `checked`, `solid`, and `decayed` are eligible — a `planned` or `introduced` node is not stale, it is unstarted.
+The pick is a date comparison, so it lives in code: `python3 .claude/hooks/learn-status.py --due` ranks every node by time since its last check. `/learn-check` calls the same thing with `--subject <slug>` for its older spacing node. Only `checked`, `solid`, and `decayed` are eligible — a `planned` or `introduced` node is not stale, it is unstarted. `--due --gen` ranks the same nodes and marks each one that is recall-only and rests on an unconditional truth; a review asks its one generation question of the first marked node in its picked set, and of none if no picked node is marked.
 
 ## Frontmatter reference
 

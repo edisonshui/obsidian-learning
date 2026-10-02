@@ -2428,6 +2428,181 @@ eq("the subject log header links to Home, not the Dashboard",
     "learn/Dashboard" in (VAULT / "learn/subjects/oop/log.md").read_text()), (True, False))
 
 
+section("generation checks — the [gen] tag, and recall-only nodes on the Dashboard (tutor.md, records.md)")
+TAGGED = "- 2026-09-22 s03: [gen] predict a case never taught, from n1's truth → right answer → correct → n1 checked"
+UNTAGGED = TAGGED.replace("[gen] ", "")
+eq("a tagged line keeps its transition marker", status.markers(TAGGED), [("n1", "checked")])
+eq("an untagged line reads exactly as before", status.markers(UNTAGGED), [("n1", "checked")])
+eq("a tagged line's events are the untagged line's, plus the generation flag",
+   [dict(e, generation=None) for e in status.evidence_events(evidence(TAGGED[2:]), {})],
+   [dict(e, generation=None) for e in status.evidence_events(evidence(UNTAGGED[2:]), {})])
+eq("the flag is set on the tagged pass only",
+   ([e["generation"] for e in status.evidence_events(evidence(TAGGED[2:]), {})],
+    [e["generation"] for e in status.evidence_events(evidence(UNTAGGED[2:]), {})]), ([True], [False]))
+eq("a tagged miss, a tag after the first arrow, and a tag with no marker are not passes",
+   [status.generation_pass(line) for line in (
+       "- 2026-09-22 s03: [gen] q → a → wrong; used the wrong truth → n1 checked",
+       "- 2026-09-22 s03: [gen] q → a → partially right → n1 introduced",
+       "- 2026-09-22 s03: q → [gen] a → correct → n1 checked",
+       "- 2026-09-22 (diagnosis): [gen] q → a → correct")], [False, False, False, False])
+
+# Verdicts copied from real records (math241-exam1-review n7) and from the
+# verifier's list. Each left its node `checked`, so only the verdict can refuse it.
+MISSED = ["correct at rung 2. Untaught fact (triangle area = half cross-product magnitude)",
+          "(a) wrong (correct: 2, invariant to scaling a), (b) correct (proj scales linearly in b)",
+          "incomplete.", "not quite", "correct after hint", "correct after two hints, derivation supplied by tutor",
+          "half right", "mostly wrong", "no", "missed", "✗", "correct with a pointer to n3", "right, partially"]
+eq("a verdict on the allow-list's wrong side never credits, even with the node left checked",
+   [verdict for verdict in MISSED
+    if status.generation_pass("- 2026-09-21 s02: [gen] q → a → %s → n7 checked" % verdict)], [])
+eq("a clean pass credits, in either word and any case, with trailing reasoning",
+   [status.generation_pass("- 2026-09-21 s02: [gen] q → a → %s → n7 checked" % verdict)
+    for verdict in ("correct", "Correct.", "right", "RIGHT: used the definition, then n2")], [True] * 4)
+eq("a mixed verdict over several nodes credits neither",
+   [(e["node"], e["generation"]) for e in status.evidence_events(
+       evidence("2026-09-22 s03: [gen] q → a → n4 wrong, n5 right → n4 checked → n5 checked"), {})],
+   [("n4", False), ("n5", False)])
+eq("the tag counts only right after the colon that ends the date and source",
+   [status.generation_pass(line) for line in (
+       "- 2026-10-02 s06: [gen] q → a → correct → n1 checked",
+       "- 2026-10-02 s06 (decay check): [gen] q → a → correct → n1 solid",
+       "- 2026-10-02: [gen] q → a → correct → n1 checked",
+       "- 2026-10-02 s06: what does the [gen] tag in a record mean? → a → correct → n1 checked",
+       "- 2026-10-02 [gen] s06: q → a → correct → n1 checked")], [True, True, True, False, False])
+eq("a tagged line with several markers credits no node, even on a clean verdict",
+   [(e["node"], e["generation"]) for e in status.evidence_events(
+       evidence("2026-09-22 s03: [gen] q → a → correct → n1 solid → n2 decayed → n3 checked"), {})],
+   [("n1", False), ("n2", False), ("n3", False)])
+eq("a verdict that starts with correct but grades two nodes credits neither; nor does a clean two-marker line",
+   [status.generation_pass(line) for line in (
+       "- 2026-09-22 s03: [gen] q → a → correct for n4, wrong for n5 → n4 checked → n5 checked",
+       "- 2026-09-22 s03: [gen] q → a → correct → n4 checked → n5 checked")], [False, False])
+eq("one node per line: the same check split into two lines credits each passed node",
+   [(e["node"], e["generation"]) for e in status.evidence_events(
+       evidence("2026-09-22 s03: [gen] q, n4 part → a → correct → n4 checked",
+                "2026-09-22 s03: [gen] q, n5 part → a → wrong → n5 checked"), {})],
+   [("n4", True), ("n5", False)])
+eq("a pass hedged with but, though, or a guess does not credit",
+   [status.generation_pass("- 2026-09-22 s03: [gen] q → a → %s → n1 checked" % verdict)
+    for verdict in ("correct but wrong reason", "correct, though guessed", "right, a guess")], [False] * 3)
+
+GEN_NODES = {"n1": rnode("n1", "checked", "2026-09-22"), "n2": rnode("n2", "solid", "2026-09-22"),
+             "n3": rnode("n3", "planned"), "n4": rnode("n4", "introduced"), "n5": rnode("n5", "checked", "2026-09-22")}
+GEN_LOG = evidence("2026-09-22 s03: [gen] derive it from the truth → a → correct → n1 checked",
+                   "2026-09-22 s03: recall the definition → a → correct → n2 solid",
+                   "2026-09-22 s03: [gen] q → a → correct → n4 introduced",
+                   "2026-09-22 s03: [gen] q → a → wrong → n5 checked",
+                   "2026-09-22 s03: q → a → correct → n5 checked")
+eq("a tagged pass is not recall-only; untagged passes and a tagged miss are; planned and introduced never are",
+   status.recall_only(GEN_NODES, status.evidence_events(GEN_LOG, {})), ["n2", "n5"])
+eq("events built without the flag, as in older callers, count as recall-only and do not raise",
+   status.recall_only(GEN_NODES, [marker_event("n1", "2026-09-22", "checked")]), ["n1", "n2", "n5"])
+
+def gen_subject(log):
+    return rsubject("g", list(GEN_NODES.values()), status.evidence_events(log, {}), title="Gen")
+PLAIN_LOG = GEN_LOG.replace("[gen] ", "")
+eq("rewards are identical with and without the tag",
+   status.rewards([gen_subject(GEN_LOG)], DUE_DAY), status.rewards([gen_subject(PLAIN_LOG)], DUE_DAY))
+eq("reward lines are identical with and without the tag",
+   status.reward_lines([gen_subject(GEN_LOG)], DUE_DAY, subject="g", session="03"),
+   status.reward_lines([gen_subject(PLAIN_LOG)], DUE_DAY, subject="g", session="03"))
+eq("the recommended action is identical with and without the tag",
+   status.rank([gen_subject(GEN_LOG)], [], DUE_DAY), status.rank([gen_subject(PLAIN_LOG)], [], DUE_DAY))
+
+GEN_VAULT = fresh()
+def gen_vault(log):
+    write(GEN_VAULT / "learn/subjects/g/record.md",
+          '---\nsubject: "g"\ntitle: "Gen"\nstatus: active\nlast_session: "2026-09-22"\n---\n\n'
+          "## Nodes\n\n| Node | Status | Last checked | Evidence |\n| --- | --- | --- | --- |\n"
+          "| n1 Truth | checked | 2026-09-22 | — |\n| n2 Mixed review | solid | 2026-09-22 | — |\n"
+          "| n3 Later | planned | — | — |\n| n4 Other | checked | 2026-09-22 | — |\n\n"
+          + log.split("\n\n## Strands")[0].replace("## Nodes\n\n", "") + "\n")
+    # n2 is the fallback: its Rests on cell says it has no unconditional truth.
+    write(GEN_VAULT / "learn/subjects/g/plan.md",
+          '---\nsubject: "g"\nupdated: "2026-09-22"\n---\n\n## Nodes\n\n'
+          "| Id | Node | Rests on (unconditional truth) | Discovery question | Check type | Can do | Est. min | Prereqs | Status |\n"
+          "| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+          "| n1 | Truth | Every X has a Y | Why? | free response | derive Y | 10 | none | checked |\n"
+          "| n2 | Mixed review | — (integrative, no new unconditional truth) | — | mixed set | solve a mixed set | 20 | n1 | solid |\n"
+          "| n3 | Later | Every Y has a Z | Why? | MC | pick Z | 10 | n2 | planned |\n"
+          "| n4 | Other | Every Z has a W | Why? | MC | pick W | 10 | n1 | checked |\n")
+    due_run = subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(GEN_VAULT),
+                              "--due", "--per-subject", "0"], capture_output=True, text=True)
+    full_run = subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(GEN_VAULT), "--quiet"],
+                              capture_output=True, text=True)
+    return due_run, full_run, (GEN_VAULT / "learn/Dashboard.md").read_text()
+FALLBACK_LOG = evidence("2026-09-22 s01: [gen] predict a case from every X has a Y → a → correct → n1 checked",
+                        "2026-09-22 s02: retrieval, n2 has no unconditional truth → a → correct → n2 solid",
+                        "2026-09-22 s01: recall the W rule → a → correct → n4 checked")
+tagged_due, tagged_full, tagged_board = gen_vault(FALLBACK_LOG)
+plain_due, plain_full, plain_board = gen_vault(FALLBACK_LOG.replace("[gen] ", ""))
+eq("--due prints the same ranking with and without the tag",
+   (tagged_due.returncode, tagged_due.stdout), (plain_due.returncode, plain_due.stdout))
+eq("a full run with a no-truth node exits 0 and prints no error",
+   (tagged_full.returncode, tagged_full.stderr, plain_full.returncode, plain_full.stderr), (0, "", 0, ""))
+eq("the Dashboard folds recall-only into one line per subject; the no-truth node is neither listed nor counted",
+   callout_body(tagged_board, "question]- 1 node recall-only"),
+   ["> Passed checks, but no generation check yet (`learn/system/records.md`, *Evidence rule*).",
+    "> - Gen: 1 of 2 checked or solid (n4)"])
+eq("without the tag both nodes with a truth are recall-only, and the no-truth node still is not",
+   callout_body(plain_board, "question]- 2 nodes recall-only")[1:], ["> - Gen: 2 of 2 checked or solid (n1, n4)"])
+eq("no unconditional truth: empty, a dash in front, or naming none; a node with no plan row is not exempt",
+   [status.has_truth({"truth": cell}) for cell in (
+       "", "—", "— (integrative, no new unconditional truth)", "- see n3", "Mixed set: no unconditional truth",
+       "Every X has a Y", None)] + [status.has_truth({})],
+   [False, False, False, False, False, True, True, True])
+REVIEW_LOG = evidence("2026-09-22 s01: recall the Y rule → a → correct → n1 checked",
+                      "2026-09-30 r03: [gen] rebuild n1 from every X has a Y → a → correct → n1 solid",
+                      "2026-09-30 r03: recall the W rule → a → correct → n4 solid")
+REVIEW_NODES = {"n1": dict(rnode("n1", "solid", "2026-09-30"), truth="Every X has a Y"),
+                "n4": dict(rnode("n4", "solid", "2026-09-30"), truth="Every Z has a W")}
+eq("a tagged pass on a review line clears recall-only; the untagged review line does not",
+   status.recall_only(REVIEW_NODES, status.evidence_events(REVIEW_LOG, {})), ["n4"])
+def review_subject(log):
+    return rsubject("g", list(REVIEW_NODES.values()), status.evidence_events(log, {}), title="Gen")
+eq("rewards and review reward lines are identical with and without the tag on review lines",
+   (status.rewards([review_subject(REVIEW_LOG)], DUE_DAY),
+    status.reward_lines([review_subject(REVIEW_LOG)], datetime(2026, 10, 1).date(), review="03")),
+   (status.rewards([review_subject(REVIEW_LOG.replace("[gen] ", ""))], DUE_DAY),
+    status.reward_lines([review_subject(REVIEW_LOG.replace("[gen] ", ""))], datetime(2026, 10, 1).date(),
+                        review="03")))
+
+ROWS = [{"days": 9, "subject": "g", "id": "n1", "status": "checked", "checked": "2026-09-22", "name": "Truth",
+         "evidence": "e1"},
+        {"days": 9, "subject": "g", "id": "n2", "status": "solid", "checked": "2026-09-22", "name": "Mixed",
+         "evidence": ""}]
+eq("due_report with no candidates is the old output, and a candidate's line alone gains the suffix",
+   (status.due_report(ROWS, []) == status.due_report(ROWS, [], frozenset()),
+    [line.endswith(status.GEN_CANDIDATE) for line in status.due_report(ROWS, [], {("g", "n1")}).splitlines()],
+    status.due_report(ROWS, [], {("g", "n1")}).replace(status.GEN_CANDIDATE, "") == status.due_report(ROWS, [])),
+   (True, [True, False, False], True))
+def due_cli(*extra):
+    return subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(GEN_VAULT),
+                           "--due", "--per-subject", "0"] + list(extra), capture_output=True, text=True)
+gen_lines = due_cli("--gen").stdout.splitlines()
+eq("--due --gen marks recall-only nodes with a truth, never the no-truth node, and ranks as --due does",
+   ([line.split()[2] for line in gen_lines if line.endswith(status.GEN_CANDIDATE)],
+    [line.replace(status.GEN_CANDIDATE, "") for line in gen_lines] == due_cli().stdout.splitlines()),
+   (["n1", "n4"], True))
+eq("--gen without --due is refused",
+   subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(GEN_VAULT), "--gen"],
+                  capture_output=True, text=True).returncode, 2)
+eq("both learn-review copies run --due --gen and tag the one generation line",
+   [("--due --gen" in text, "`YYYY-MM-DD rNN: [gen] …`" in text, "Exactly one generation question per review" in text)
+    for text in ((VAULT_ROOT / host / "skills/learn-review/SKILL.md").read_text() for host in (".claude", ".agents"))],
+   [(True, True, True)] * 2)
+eq("read_nodes reads the Rests on cell from the plan",
+   status.read_nodes("", (GEN_VAULT / "learn/subjects/g/plan.md").read_text())["n2"]["truth"],
+   "— (integrative, no new unconditional truth)")
+eq("recall-only is not a record inconsistency",
+   [line for line in (callout_body(tagged_board, "bug]-") if "> [!bug]-" in tagged_board else [])
+    if "recall-only" in line or "generation" in line], [])
+eq("the existing Dashboard fixture lists its checked and solid nodes as recall-only",
+   callout_body(board, "question]- 4 nodes recall-only")[1:],
+   ["> - Aged: 1 of 1 checked or solid (n1)", "> - Finished: 1 of 1 checked or solid (n2)",
+    "> - Idle: 1 of 1 checked or solid (n1)", "> - Zeta: 1 of 1 checked or solid (n1)"])
+
+
 
 section("startup index — the Show the learner block (spec section 10)")
 fresh()

@@ -17,10 +17,12 @@ Evidence lines still go to each subject's own `record.md`, prefixed `rNN`.
 
 ## Picked
 
-Output of `python3 .claude/hooks/learn-status.py --due`, and any node added or
+Output of `python3 .claude/hooks/learn-status.py --due --gen`, and any node added or
 dropped by hand with the reason.
 
 ## Checks
+
+Mark the one generation question `[gen]`, or say why the review has none.
 
 - **<subject> <nN>** — Q: <the question, standing alone, code fenced inside it> / A: <what the learner said> / Verdict: <right | wrong | partial> / `key: <slot>/<count> — options: <opt1> / <opt2> / <opt3>` (multiple choice only)
   - Status: `checked` → `solid` on a pass, `→ decayed` on a fail.
