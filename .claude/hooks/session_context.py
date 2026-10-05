@@ -50,6 +50,10 @@ def start_context(vault, subject=None, host="claude"):
 
     subjects = vault / "learn/subjects"
     folders = sorted(path for path in subjects.iterdir() if path.is_dir()) if subjects.is_dir() else []
+    # A subject is a folder with record.md, as in learn-status.py. Anything else
+    # is named rather than hidden, so a stray folder stays visible.
+    strays = [folder.name for folder in folders if not (folder / "record.md").is_file()]
+    folders = [folder for folder in folders if folder.name not in strays]
     for folder in folders:
         fields = frontmatter(folder / "record.md")
         lines.append(f"- {folder.name}: {fields.get('title', folder.name)} | "
@@ -57,6 +61,8 @@ def start_context(vault, subject=None, host="claude"):
                      f"next: {fields.get('next', 'read record.md')}")
     if not folders:
         lines.append("No subjects yet. Offer learn-start <subject>.")
+    if strays:
+        lines.append("Not a subject (no record.md): " + ", ".join(strays))
     selected = next((folder for folder in folders if folder.name == subject), None)
     if selected:
         resume = selected / "resume.md"

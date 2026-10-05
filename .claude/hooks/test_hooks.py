@@ -294,13 +294,22 @@ def fresh():
     return VAULT
 
 
-def note(subject, stem, end=""):
-    folder = VAULT / "learn/subjects" / subject / "sessions"
+def subject(slug):
+    """A subject as /learn-start leaves it: a folder with record.md."""
+    record = VAULT / "learn/subjects" / slug / "record.md"
+    record.parent.mkdir(parents=True, exist_ok=True)
+    if not record.exists():
+        record.write_text('---\nsubject: "%s"\ntitle: "%s"\nstatus: active\n---\n' % (slug, slug))
+
+
+def note(subject_slug, stem, end=""):
+    subject(subject_slug)
+    folder = VAULT / "learn/subjects" / subject_slug / "sessions"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / (stem + ".md")).write_text(
         '---\nsubject: "%s"\nsession: "01"\ndate: "2026-09-17"\nstart: "10:00"\n'
         'paused:\nend:%s\nactive_minutes:\nidle_minutes:\nnodes: []\n---\n\n# note\n'
-        % (subject, (' "%s"' % end) if end else ""))
+        % (subject_slug, (' "%s"' % end) if end else ""))
 
 
 def close(subject, stem):
@@ -422,6 +431,69 @@ for index in range(olive.CLOCK_KEEP + 12):
     note("oop", stem)
     turn("/learn-resume oop"); turn("x")
 eq("clocks.json is pruned to its cap", len(clocks()) <= olive.CLOCK_KEEP, True)
+
+
+# /learn-start takes free text, so its first word is not a slug. "/learn-start I
+# want to learn about pointers" once made learn/subjects/I/, and every later hook
+# in that conversation rewrote I/log.md. Only a folder with record.md is a subject.
+
+def subject_log(slug):
+    path = VAULT / "learn/subjects" / slug / "log.md"
+    return path.read_text() if path.exists() else ""
+
+
+section("routing — a first word that is not a subject never becomes a folder")
+fresh(); subject("pointers-and-references")
+turn("/learn-start I want to learn about pointers"); turn("ok")
+eq("no folder is made from the first word",
+   sorted(path.name for path in (VAULT / "learn/subjects").iterdir()), ["pointers-and-references"])
+turn("/learn-resume pointers-and-references")
+eq("a later command naming a subject claims the held turns",
+   "I want to learn about pointers" in subject_log("pointers-and-references"), True)
+
+section("routing — the subject /learn-start creates claims the held turns")
+fresh(); subject("oop")
+turn("/learn-start I want to learn graphs")
+subject("graphs")   # the skill creating learn/subjects/graphs/ from the free text
+turn("ok")
+eq("the turns before the folder existed land in its log",
+   "I want to learn graphs" in subject_log("graphs"), True)
+eq("an existing subject is never mistaken for the new one",
+   "I want to learn graphs" in subject_log("oop"), False)
+
+section("routing — a dotted first word matches its hyphenated slug")
+fresh(); subject("lagrange-14-8")
+turn("/learn-start lagrange-14.8 Midterm 2 prep"); turn("ok")
+eq("a section number like 14.8 routes to the slug with 14-8",
+   "Midterm 2 prep" in subject_log("lagrange-14-8"), True)
+
+section("log heading — the conversation date is local, like the message times")
+import os, time
+saved_tz = os.environ.get("TZ")
+os.environ["TZ"] = "America/Chicago"; time.tzset()
+eq("a 23:52 Central start is dated that evening, not the UTC next day",
+   olive.local_date("2026-10-05T04:52:23.680Z"), "2026-10-04")
+if saved_tz is None:
+    del os.environ["TZ"]
+else:
+    os.environ["TZ"] = saved_tz
+time.tzset()
+
+section("routing — held turns do not bleed into the previous subject")
+fresh(); subject("oop")
+turn("/learn-resume oop"); turn("/learn-start I want to learn heaps"); turn("hi")
+eq("the earlier subject's log stops at the new command",
+   ("/learn-resume oop" in subject_log("oop"), "learn heaps" in subject_log("oop")), (True, False))
+eq("and no subject is selected while the new one is unresolved",
+   json.loads((VAULT / ".claude/obsidian-live/conv-a.json").read_text()).get("subject"), None)
+
+section("routing — the session-start index lists only folders with record.md")
+fresh(); subject("oop"); (VAULT / "learn/subjects/I").mkdir()
+session_context = load("session_context", "session_context.py")
+index = session_context.start_context(VAULT)
+eq("a real subject is listed", "- oop: oop | active" in index, True)
+eq("a folder without record.md is not listed as a subject", "- I: " in index, False)
+eq("but it is named, so the stray folder stays visible", "Not a subject (no record.md): I" in index, True)
 
 if VAULT and VAULT.exists():
     shutil.rmtree(VAULT)

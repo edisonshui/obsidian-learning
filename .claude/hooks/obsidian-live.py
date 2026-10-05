@@ -50,6 +50,12 @@ def local_clock(value):
     return stamp.astimezone().strftime("%H:%M") if stamp else ""
 
 
+def local_date(value):
+    """The YYYY-MM-DD in the learner's timezone; a UTC slice dates evening starts a day late."""
+    stamp = parse_time(value)
+    return stamp.astimezone().strftime("%Y-%m-%d") if stamp else str(value)[:10]
+
+
 def minutes(seconds):
     return int(round(seconds / 60.0))
 
@@ -390,17 +396,54 @@ def all_entries(state):
                          state.get("notices", []))
 
 
-def subject_segments(state):
-    """Route messages following /learn-start or /learn-resume to that subject."""
-    segments = {}
-    subject = None
+# A dot is allowed so "14.8" is read as a word; command_slug turns it into the hyphen slugs use.
+LEARN_COMMAND = re.compile(r"^\s*/learn-(?:start|resume)\s+([A-Za-z0-9][A-Za-z0-9_.-]{0,63})(?:\s|$)")
+
+
+def command_slug(match):
+    return match[1].rstrip(".").replace(".", "-")
+
+
+def known_subjects(vault):
+    """A subject is a folder with record.md, the same test learn-status.py uses."""
+    root = vault / "learn" / "subjects"
+    return {path.parent.name for path in root.glob("*/record.md")} if root.is_dir() else set()
+
+
+def subject_segments(vault, state):
+    """Route messages following /learn-start or /learn-resume to that subject.
+
+    /learn-start takes free text, so the word after it is a slug only when that
+    subject already exists. Otherwise the turns are held, never written to a
+    folder named after the word, until the conversation says which subject they
+    belong to: a later command naming an existing subject, or the one subject
+    whose record.md appeared after the command was typed. The subjects present
+    at that moment are saved in the state, keyed by the command text, because
+    the entry key changes when the transcript catches up.
+    """
+    known = known_subjects(vault)
+    before = state.setdefault("subjects_at_command", {})
+    segments, subject, held, held_command = {}, None, [], None
     for item in all_entries(state):
         if item["role"] == "You":
-            command = re.match(r"^\s*/learn-(?:start|resume)\s+([A-Za-z0-9][A-Za-z0-9_-]{0,63})(?:\s|$)", item["text"])
-            if command:
-                subject = command[1]
+            command = LEARN_COMMAND.match(item["text"])
+            if command and command_slug(command) in known:
+                subject = command_slug(command)
+                segments.setdefault(subject, []).extend(held)
+                held, held_command = [], None
+            elif command:
+                before.setdefault(item["text"], sorted(known))
+                subject, held_command = None, item["text"]
+        if not subject and held_command:
+            created = known - set(before[held_command])
+            if len(created) == 1:
+                subject = created.pop()
+                segments.setdefault(subject, []).extend(held)
+                held, held_command = [], None
         if subject:
             segments.setdefault(subject, []).append(item)
+        elif held_command:
+            held.append(item)
     return segments, subject
 
 
@@ -483,9 +526,10 @@ def entry_lines(items):
 
 def write_subject_logs(vault, runtime, state):
     """Update one visible log.md per subject, retaining earlier conversations."""
-    segments, active_subject = subject_segments(state)
-    if active_subject:
-        state["subject"] = active_subject
+    segments, active_subject = subject_segments(vault, state)
+    # Cleared while a new subject is unresolved, so its turns are not timed
+    # against the previous subject's open note.
+    state["subject"] = active_subject
     for subject, items in segments.items():
         directory = runtime / "subjects" / subject
         snapshot = {"session_id": state["session_id"], "model": state.get("model"),
@@ -504,7 +548,7 @@ def write_subject_logs(vault, runtime, state):
                  f"[[learn/subjects/{subject}/progress|Progress]] · "
                  "[[learn/Home|Home]]", ""]
         for conversation in conversations:
-            first_time = conversation["entries"][0]["time"][:10]
+            first_time = local_date(conversation["entries"][0]["time"])
             model = conversation.get("model") or "Not reported"
             effort = conversation.get("effort") or "Not reported"
             lines.extend([f"## Conversation — {first_time}", "",
