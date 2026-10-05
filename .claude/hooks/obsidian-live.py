@@ -125,9 +125,25 @@ def user_text(text):
     return text
 
 
+def stop_feedback(row):
+    """A meta row a blocking Stop hook leaves, telling the model to redo its reply."""
+    content = row.get("message", {}).get("content", "")
+    if isinstance(content, list):
+        content = "".join(block.get("text", "") for block in content if block.get("type") == "text")
+    return row.get("type") == "user" and str(content).startswith("Stop hook feedback:")
+
+
 def read_transcript(path):
+    """Read the transcript into log entries.
+
+    A blocking Stop hook (the em-dash check) makes the model rewrite its last
+    reply, and both versions stay in the JSONL. The blocked one is dropped here
+    and its text returned in metadata["superseded"], so a copy that already
+    streamed into the live buffer can be dropped too.
+    """
     entries, question_ids, seen = [], set(), set()
     metadata = {}
+    reply_id, reply_keys = None, []   # the text entries of the latest Claude reply
     if not path or not Path(path).is_file():
         return entries, metadata
     with Path(path).open() as handle:
@@ -136,6 +152,11 @@ def read_transcript(path):
                 row = json.loads(line)
             except json.JSONDecodeError:
                 continue  # A hook can run before the final JSONL line is flushed.
+            if row.get("isMeta") and stop_feedback(row) and reply_keys:
+                metadata.setdefault("superseded", []).extend(
+                    item["text"] for item in entries if item["key"] in reply_keys)
+                entries = [item for item in entries if item["key"] not in reply_keys]
+                reply_id, reply_keys = None, []
             if row.get("isSidechain") or row.get("isMeta"):
                 continue
             kind = row.get("type")
@@ -170,6 +191,11 @@ def read_transcript(path):
                         text = user_text(text)
                     if text:
                         entries.append(entry(f"{key}-{index}", "You" if kind == "user" else "Claude", text, stamp))
+                        if kind == "assistant":
+                            message_id = message.get("id") or key
+                            if message_id != reply_id:
+                                reply_id, reply_keys = message_id, []
+                            reply_keys.append(f"{key}-{index}")
                 elif block_type == "image" and kind == "user":
                     entries.append(entry(f"{key}-{index}", "You", "[Image attached in the terminal]", stamp))
                 elif block_type == "tool_use" and block.get("name") == "AskUserQuestion":
@@ -398,6 +424,7 @@ def all_entries(state):
 
 # A dot is allowed so "14.8" is read as a word; command_slug turns it into the hyphen slugs use.
 LEARN_COMMAND = re.compile(r"^\s*/learn-(?:start|resume)\s+([A-Za-z0-9][A-Za-z0-9_.-]{0,63})(?:\s|$)")
+LEARN_END = re.compile(r"^\s*/learn-end(?:\s|$)")
 
 
 def command_slug(match):
@@ -420,13 +447,23 @@ def subject_segments(vault, state):
     whose record.md appeared after the command was typed. The subjects present
     at that moment are saved in the state, keyed by the command text, because
     the entry key changes when the transcript catches up.
+
+    /learn-end closes the route. Its own turn, the wrap-up and any questions it
+    asks, still lands in the log; the next prompt does not, and neither does
+    anything after it until another /learn-start or /learn-resume.
     """
     known = known_subjects(vault)
     before = state.setdefault("subjects_at_command", {})
-    segments, subject, held, held_command = {}, None, [], None
+    segments, subject, held, held_command, ended = {}, None, [], None, False
     for item in all_entries(state):
         if item["role"] == "You":
             command = LEARN_COMMAND.match(item["text"])
+            if not command and ended:
+                subject, ended = None, False
+            if command:
+                ended = False
+            elif subject and LEARN_END.match(item["text"]):
+                ended = True
             if command and command_slug(command) in known:
                 subject = command_slug(command)
                 segments.setdefault(subject, []).extend(held)
@@ -668,6 +705,10 @@ def process(vault, payload, mode="hook"):
         deny = ""          # set only by the PreToolUse probe guard
         clock_event = ""   # set by whichever branch below counts as a turn
         canonical, metadata = read_transcript(transcript) if mode != "status" else ([], {})
+        superseded = metadata.pop("superseded", [])
+        if superseded:
+            state["current"] = [item for item in state["current"]
+                                if not (item["role"] == "Claude" and item["text"] in superseded)]
         for key, value in metadata.items():
             state.setdefault(key, value)
         model = payload.get("model")

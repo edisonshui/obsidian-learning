@@ -487,6 +487,17 @@ eq("the earlier subject's log stops at the new command",
 eq("and no subject is selected while the new one is unresolved",
    json.loads((VAULT / ".claude/obsidian-live/conv-a.json").read_text()).get("subject"), None)
 
+section("routing — /learn-end closes the log until the next start or resume")
+fresh(); subject("oop")
+turn("/learn-resume oop"); turn("teach n12"); turn("/learn-end"); turn("unrelated after the end")
+eq("the /learn-end turn itself is logged", "/learn-end" in subject_log("oop"), True)
+eq("the prompt after it is not", "unrelated after the end" in subject_log("oop"), False)
+eq("and no subject stays selected, so the clock stops too",
+   json.loads((VAULT / ".claude/obsidian-live/conv-a.json").read_text()).get("subject"), None)
+turn("still chatting"); turn("/learn-resume oop"); turn("back to it")
+eq("a later /learn-resume reopens the log",
+   ("still chatting" in subject_log("oop"), "back to it" in subject_log("oop")), (False, True))
+
 section("routing — the session-start index lists only folders with record.md")
 fresh(); subject("oop"); (VAULT / "learn/subjects/I").mkdir()
 session_context = load("session_context", "session_context.py")
@@ -2135,6 +2146,50 @@ eq("an orphaned notice is parked at the end rather than dropped",
 
 jev.ask = REAL_ASK
 
+
+
+section("transcript — a reply a Stop hook blocked is replaced by its rewrite")
+# The em-dash Stop hook blocks a reply and the model rewrites it. The transcript
+# then holds both replies with a meta "Stop hook feedback" row between them, and
+# the log once printed the 10:55 lagrange reply twice. Rows copy that shape.
+fresh(); subject("oop")
+DRAFT, REWRITE = "Pushed \u2014 all 13 commits.", "Pushed. All 13 commits."
+JSONL = VAULT / "conv-c.jsonl"
+JSONL.write_text("\n".join(json.dumps(row) for row in [
+    {"type": "user", "uuid": "u1", "timestamp": "2026-10-05T15:55:00Z",
+     "message": {"content": [{"type": "text", "text": "/learn-resume oop"}]}},
+    {"type": "assistant", "uuid": "a0", "timestamp": "2026-10-05T15:55:02Z",
+     "message": {"id": "m0", "content": [{"type": "text", "text": "Checking first."}]}},
+    {"type": "assistant", "uuid": "a0t", "timestamp": "2026-10-05T15:55:03Z",
+     "message": {"id": "m0", "content": [{"type": "tool_use", "name": "Bash", "id": "toolu_b", "input": {}}]}},
+    {"type": "user", "uuid": "r0", "timestamp": "2026-10-05T15:55:04Z",
+     "message": {"content": [{"type": "tool_result", "tool_use_id": "toolu_b", "content": "ok"}]}},
+    {"type": "assistant", "uuid": "a1", "timestamp": "2026-10-05T15:55:55Z",
+     "message": {"id": "m1", "content": [{"type": "text", "text": DRAFT}]}},
+    {"type": "user", "uuid": "f1", "isMeta": True, "timestamp": "2026-10-05T15:55:56Z",
+     "message": {"role": "user", "content": "Stop hook feedback:\nLast response contains an em dash."}},
+    {"type": "system", "uuid": "s1", "subtype": "stop_hook_summary", "timestamp": "2026-10-05T15:55:56Z"},
+    {"type": "assistant", "uuid": "a2", "timestamp": "2026-10-05T15:56:06Z",
+     "message": {"id": "m2", "content": [{"type": "text", "text": REWRITE}]}},
+]))
+entries, _ = olive.read_transcript(str(JSONL))
+eq("only the rewrite is read as the reply, and text before a tool call is kept",
+   [item["text"] for item in entries if item["role"] == "Claude"], ["Checking first.", REWRITE])
+
+# The live path: both replies streamed before the transcript caught up.
+for message_id, text in (("m1", DRAFT), ("m2", REWRITE)):
+    olive.process(VAULT, {"session_id": "conv-c", "hook_event_name": "MessageDisplay",
+                          "message_id": message_id, "index": 0, "delta": text, "final": True,
+                          "transcript_path": str(JSONL)})
+olive.process(VAULT, {"session_id": "conv-c", "hook_event_name": "Stop", "transcript_path": str(JSONL)})
+olive.process(VAULT, {"session_id": "conv-c", "hook_event_name": "UserPromptSubmit",
+                      "prompt": "next", "transcript_path": str(JSONL)})
+log = subject_log("oop")
+eq("the log holds the rewrite once and not the blocked draft",
+   (log.count(REWRITE), DRAFT in log), (1, False))
+state = json.loads((VAULT / ".claude/obsidian-live/conv-c.json").read_text())
+eq("and the streamed draft did not stop the transcript from being adopted",
+   [item["text"] for item in state["current"]], ["next"])
 
 
 # ------------- the within-item control, J2 and J4 (PLAN-2026-09-22.md, session 6)
