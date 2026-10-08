@@ -22,7 +22,7 @@ eval "$($S/make-sandbox.sh)"                 # sets SANDBOX and EVIDENCE
 eval "$($S/make-sandbox.sh --open-note)"     # same, plus an open s02 note dated today (for /learn-end)
 ```
 
-`make-sandbox.sh` rsyncs the vault, excluding `.git`, `.env`, learner data, generated views, `Claude outputs/`, hook runtime state, worktrees, and this skill. It then installs `fixtures/` (subject `vfx-binary-search` with one closed session, synthetic `learn/me/preferences.md`, empty `learn/reviews/`) and commits a git baseline in the sandbox. That baseline matters because `/learn-end` step 7 runs `git status --porcelain`. Ready means it printed `SANDBOX=` and `EVIDENCE=`.
+`make-sandbox.sh` rsyncs the vault, excluding `.git`, `.env`, learner data, generated views, `Claude outputs/`, hook runtime state, worktrees, and this skill. It then installs `fixtures/` (subject `vfx-binary-search` with one closed session, synthetic `learn/me/preferences.md`, empty `learn/reviews/`) and commits a git baseline in the sandbox, so a stray write to a tracked system file shows in `git status`. `/learn-end` step 7 no longer reads git; it compares `write-check.py` hashes. Ready means it printed `SANDBOX=` and `EVIDENCE=`.
 
 ## Doctor
 

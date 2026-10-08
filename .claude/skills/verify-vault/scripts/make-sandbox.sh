@@ -2,7 +2,7 @@
 # Usage: make-sandbox.sh [--open-note]
 # Copies the vault's system (no learner data, no .git, no .env) into a fresh
 # /tmp directory, installs the synthetic fixture subject, and commits a git
-# baseline so /learn-end's `git status --porcelain` step has something to read.
+# baseline so a stray write to a tracked system file shows in `git status`.
 # --open-note also adds an open s02 session note dated today (for /learn-end).
 # Prints SANDBOX= and EVIDENCE= lines; `eval "$(make-sandbox.sh)"` sets both.
 source "$(dirname "$0")/lib.sh"
@@ -18,7 +18,7 @@ rsync -a \
   --exclude '/.git' --exclude '/.env' --exclude '.DS_Store' --exclude '__pycache__' \
   --exclude '/learn/subjects/' --exclude '/learn/me/' --exclude '/learn/reviews/' \
   --exclude '/learn/Home.md' --exclude '/learn/Dashboard.md' \
-  --exclude '/learn/.codex-runtime/' --exclude '/learn/.mc-runtime/' \
+  --exclude '/learn/.codex-runtime/' --exclude '/learn/.mc-runtime/' --exclude '/learn/.write-check/' \
   --exclude '/Claude outputs/' --exclude '/.scratch/' \
   --exclude '/.claude/obsidian-live/' --exclude '/.claude/jev/' \
   --exclude '/.claude/worktrees/' --exclude '/.claude/verify-runs/' \

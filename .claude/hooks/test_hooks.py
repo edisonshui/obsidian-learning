@@ -2774,6 +2774,46 @@ eq("the live streak shows with rewards on, and not with rewards off",
        status.startup_block(HOME_SUBJECTS, [], False, HOME_DAY))), ("Review streak: 2 weeks", False))
 
 
+# ------------------------------------------------------------------ write-check: what /learn-end proves it wrote
+
+section("write-check — the step 7 cross-check reads hashes, not git")
+wcheck = load("write_check", "write-check.py")
+WC = Path(tempfile.mkdtemp())
+(WC / "learn/subjects/oop/sessions").mkdir(parents=True)
+(WC / "learn/me").mkdir()
+(WC / "learn/subjects/oop/record.md").write_text("old record\n")
+(WC / "learn/subjects/oop/resume.md").write_text("resume\n")
+(WC / "learn/subjects/oop/log.md").write_text("live log\n")
+(WC / "learn/me/preferences.md").write_text("prefs\n")
+eq("snapshot counts the files it hashed, log.md excluded",
+   wcheck.snapshot(WC, "oop-s05"), "snapshot oop-s05: 3 files under learn/")
+eq("nothing written: compare says so", wcheck.compare(WC, "oop-s05"), "no file under learn/ changed")
+(WC / "learn/subjects/oop/record.md").write_text("new record\n")
+(WC / "learn/subjects/oop/sessions/2026-10-08-s05.md").write_text("note\n")
+(WC / "learn/me/preferences.md").unlink()
+(WC / "learn/subjects/oop/log.md").write_text("streamed more\n")
+(WC / "learn/.mc-runtime").mkdir()
+(WC / "learn/.mc-runtime/placement.json").write_text("[]\n")
+eq("changed, added and removed are each named; log.md and dot-dirs are not",
+   wcheck.compare(WC, "oop-s05").splitlines(),
+   ["removed  learn/me/preferences.md",
+    "changed  learn/subjects/oop/record.md",
+    "added    learn/subjects/oop/sessions/2026-10-08-s05.md",
+    "no other files under learn/ changed"])
+eq("the snapshot never lists itself", "learn/.write-check/oop-s05.json" in wcheck.hashes(WC), False)
+try:
+    wcheck.compare(WC, "never-taken")
+    eq("compare with no snapshot refuses", "no error", "FileNotFoundError")
+except FileNotFoundError:
+    eq("compare with no snapshot refuses", True, True)
+try:
+    wcheck.snapshot(WC, "../escape")
+    eq("a snapshot id cannot leave .write-check/", "no error", "ValueError")
+except ValueError:
+    eq("a snapshot id cannot leave .write-check/", True, True)
+shutil.rmtree(WC)
+
+
 print()
 if FAILS:
     print("FAILED (%d): %s" % (len(FAILS), ", ".join(FAILS)))
