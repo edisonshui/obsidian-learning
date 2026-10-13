@@ -1,22 +1,79 @@
 {
   "collapse-filter": true,
-  "search": "",
-  "showTags": false,
+  "search": "-path:\"Claude outputs\" -file:\"log.md\" -path:\"learn/system/templates\"",
+  "showTags": true,
   "showAttachments": false,
-  "hideUnresolved": false,
-  "showOrphans": true,
-  "collapse-color-groups": true,
-  "colorGroups": [],
+  "hideUnresolved": true,
+  "showOrphans": false,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "path:\"learn/Home.md\" OR path:\"learn/Dashboard.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 14721280
+      }
+    },
+    {
+      "query": "file:\"progress.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 3123302
+      }
+    },
+    {
+      "query": "path:\"/sessions/\"",
+      "color": {
+        "a": 1,
+        "rgb": 3900150
+      }
+    },
+    {
+      "query": "file:\"record.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 9133302
+      }
+    },
+    {
+      "query": "file:\"plan.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 15760686
+      }
+    },
+    {
+      "query": "file:\"resume.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 1352632
+      }
+    },
+    {
+      "query": "path:\"learn/reviews\"",
+      "color": {
+        "a": 1,
+        "rgb": 14701978
+      }
+    },
+    {
+      "query": "path:\"learn/system\" OR path:\"learn/me\"",
+      "color": {
+        "a": 1,
+        "rgb": 8161176
+      }
+    }
+  ],
   "collapse-display": true,
   "showArrow": false,
   "textFadeMultiplier": 0,
-  "nodeSizeMultiplier": 1,
-  "lineSizeMultiplier": 1,
+  "nodeSizeMultiplier": 1.35,
+  "lineSizeMultiplier": 0.7,
   "collapse-forces": true,
-  "centerStrength": 0.518713248970312,
-  "repelStrength": 10,
-  "linkStrength": 1,
-  "linkDistance": 250,
-  "scale": 1,
+  "centerStrength": 0.45,
+  "repelStrength": 14,
+  "linkStrength": 0.9,
+  "linkDistance": 90,
+  "scale": 0.20803047217231543,
   "close": true
 }
