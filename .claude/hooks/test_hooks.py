@@ -905,8 +905,12 @@ for path in (".claude/agents/plan-reviewer.md", ".codex/agents/plan-reviewer.tom
        ("8. **Can-do statements.**" in text, "checks 1, 4, 5, 7, or 8 exists" in text), (True, True))
 for plan in sorted((VAULT_ROOT / "learn/subjects").glob("*/plan.md")):
     rows = status.table_by_header(vaultlib.section(plan.read_text(), "Nodes"))
+    # Only node rows count: a plan can hold a second table under *Nodes* (a
+    # check's item table keyed `#`), and a diagnosing plan still has the
+    # template's unnamed rows, which are not nodes yet.
     eq("%s: every node has a can-do statement" % plan.parent.name,
-       [row.get("Id") for row in rows if not row.get("Can do")], [])
+       [row.get("Id") for row in rows if status.NODE_ID.fullmatch(row.get("Id", ""))
+        and row.get("Node") and not row.get("Can do")], [])
 
 
 section("skill drift, both learn-end copies set goal_met:, and the done subjects carry it")
@@ -1238,6 +1242,9 @@ WIDE = status.read_nodes("", plan_table(TEMPLATE,
     ["n1", "Memory", "t", "q", "c", "say what an address is", "10", "none", "checked"],
     ["n2", "Pointers", "t", "q", "c", "", "15", "n1", "planned"]))
 eq("the can-do statement is read from its column", WIDE["n1"]["can_do"], "say what an address is")
+eq("an unnamed template row is not a node until the plan names it",
+   sorted(status.read_nodes("", plan_table(TEMPLATE, ["n1", "Memory", "t", "q", "c", "", "10", "none", "planned"],
+                                           ["n2", "", "", "", "", "", "", "", "planned"]))), ["n1"])
 eq("an empty Can do cell falls back to the node name", WIDE["n2"]["can_do"], "Pointers")
 eq("Prereqs and Status come from their headers, with Can do in the middle",
    (WIDE["n2"]["prereqs"], WIDE["n2"]["plan_status"]), (["n1"], "planned"))
@@ -1567,12 +1574,32 @@ RESUMES = [
 found = status.rank(RESUMES, [rnote("a", "s03", date="2026-09-20")], DUE_DAY)
 eq("most recent last_session first, then slug; a passed deadline sinks below every other Resume",
    kinds(found), [("Resume", "new"), ("Resume", "a"), ("Resume", "b"), ("Resume", "past"), ("Start", None)])
-eq("no planned node reads continue the plan",
-   (found[0]["reason"], found[0]["welcome"]), ("continue the plan", "continue New"))
+eq("every node proven reads as a wrap-up, not a lesson to continue",
+   (found[0]["reason"], found[0]["welcome"]),
+   ("every planned node is proven, so this is a wrap-up", "wrap up New, where every planned node is proven"))
+eq("no planned node but one still being learned reads continue the plan",
+   status.rank([rsubject("mid", [rnode("n1", "introduced")])], [], DUE_DAY)[0]["reason"], "continue the plan")
 eq("an open note is named as closed out first",
    found[1]["reason"], "*N1* is next. Its open s03 note is closed out first.")
 eq("a passed deadline is named",
    found[3]["reason"], "*N1* is next. The deadline (22 Sep) has passed.")
+eq("a deadline still ahead resumes first, soonest first, even outside the Deadline window",
+   kinds(status.rank(RESUMES + [rsubject("exam", [rnode("n1", "planned")], deadline="2026-10-05"),
+                                rsubject("quiz", [rnode("n1", "planned")], deadline="2026-10-02")],
+                     [], DUE_DAY))[:3],
+   [("Resume", "quiz"), ("Resume", "exam"), ("Resume", "new")])
+
+section("rank — a diagnosing subject is resumable, on Home and in the Deadline slot")
+DIAG = rsubject("lagrange", [rnode("n1", "planned"), rnode("n2", "planned", prereqs=["n1"])],
+                status="diagnosing", title="Lagrange")
+eq("a paused diagnosis is offered as Resume, worded as the diagnosis",
+   [(c["kind"], c["reason"], c["welcome"]) for c in status.rank([DIAG], [], DUE_DAY)][:1],
+   [("Resume", "finish the diagnosis, then build the plan",
+     "finish the diagnosis for Lagrange, then build its plan")])
+eq("inside the deadline window it takes the Deadline slot",
+   [(c["kind"], c["reason"]) for c in status.rank(
+       [(DIAG[0], DIAG[1], dict(DIAG[2], deadline="2026-09-30"), DIAG[3])], [], DUE_DAY)][:1],
+   [("Deadline", "deadline in 6 days: finish the diagnosis, then build the plan")])
 
 section("rank — the next node follows the plan's prereqs")
 def next_reason(*nodes):
@@ -2499,6 +2526,8 @@ loops = status.read_nodes("## Nodes\n\n| Node | Status |\n| --- | --- |\n| n1 A 
 eq("a self-loop and an unknown prereq are dropped before layout, and the tree still draws",
    ([loops[n]["prereqs"] for n in ("n1", "n2")], status.skill_tree("x", "X", loops).count("<path")), ([[], ["n1"]], 1))
 eq("a plan with no nodes draws no tree", status.skill_tree("x", "X", {}), "")
+eq("a progress page tags its subject, so the graph view can name the cluster",
+   (status.subject_tag("oop"), status.subject_tag("calc-14.8")), ("oop", "calc-14-8"))
 
 
 section("Dashboard — one line per subject, grouped, with tags and folds (spec section 9)")
@@ -2529,6 +2558,10 @@ eq("a line holds the bar, proven count, last session, and a deadline ahead",
 eq("a done subject with a decayed node shows N to repair, one with a due node N due for review, an untouched one nothing",
    [next(line for line in board.splitlines() if "|%s]]" % t in line).rsplit(" · ", 1)[-1]
     for t in ("Finished", "Aged", "Idle")], ["1 to repair", "1 due for review", "last 23 Sep"])
+eq("a subject with no nodes yet says so instead of an empty bar",
+   next(line for line in status.dashboard([dsubject("diag", [], status="diagnosing")], DUE_DAY, [], [],
+                                          board_state, True).splitlines() if "|Diag]]" in line),
+   "- [[learn/subjects/diag/progress|Diag]] no plan yet · last never")
 eq("the tag function is shared: repair before review",
    (status.pending_tag(BOARD[2]["nodes"], {}, DUE_DAY), status.pending_tag(BOARD[3]["nodes"], {}, DUE_DAY),
     status.pending_tag(BOARD[4]["nodes"], {}, DUE_DAY)), ("1 to repair", "1 due for review", ""))
@@ -2537,6 +2570,15 @@ eq("badges fold into one callout, newest first, each naming its subject",
    ["> - Goal met: Alpha, 2026-09-20", "> - Solid: Aliasing (S), 2026-09-20"])
 eq("with rewards off there are no badges", "badges" in board_off, False)
 eq("record inconsistencies are folded", callout_body(board, "bug]- 2 record inconsistencies"), ["> - w1", "> - w2"])
+SLOT = "s: 2026-09-01-s01 repeats the previous check's correct-answer slot 2 (slot_rotation.py)"
+board_dup = status.dashboard(BOARD, DUE_DAY, ["w1", "w1", "w2", SLOT, SLOT, SLOT], [], board_state, True)
+eq("an identical inconsistency shows once with a count",
+   callout_body(board_dup, "bug]- 2 record inconsistencies"), ["> - w1 (×2)", "> - w2"])
+eq("answer-slot repeats fold apart, as history rather than drift",
+   callout_body(board_dup, "info]- 1 answer-slot repeat")[1:],
+   ["> - s: 2026-09-01-s01 repeats the previous check's correct-answer slot 2 (×3)"])
+eq("with only slot history there is no bug callout",
+   "[!bug]" in status.dashboard(BOARD, DUE_DAY, [SLOT], [], board_state, True), False)
 eq("the system links fold, and the session guide, status key, and per-subject next actions are gone",
    ("> [!info]- The system" in board, "Running a session" in board, "Node status key" in board,
     "Next action" in board), (True, False, False, False))
@@ -2739,7 +2781,8 @@ def start_subject(slug, title, st, nodes_rows, extra=""):
           "## Nodes\n\n| Node | Status | Last checked | Evidence |\n| --- | --- | --- | --- |\n%s"
           % (slug, title, st, extra, nodes_rows))
 start_subject("oop", "OOP", "active", "| n1 Classes | planned | — | — |\n")
-start_subject("ptr", "Pointers", "done", "| n1 Aliasing | decayed | 2026-09-22 | — |\n")
+# A done subject's passed deadline is history, so its line leaves it out.
+start_subject("ptr", "Pointers", "done", "| n1 Aliasing | decayed | 2026-09-22 | — |\n", 'deadline: "2026-09-01"\n')
 start_subject("fin", "Finished", "done", "| n1 Leaves | skipped | — | — |\n")
 start_subject("calc", "MATH 241", "paused", "| n1 Limits | planned | — | — |\n", 'deadline: "2026-09-01"\n')
 write(VAULT / "learn/subjects/calc/sessions/2026-09-22-s03.md",
@@ -2755,6 +2798,11 @@ eq("the block: recommended action, left-open note, subjects by pending action, t
     "- OOP · ready to resume",
     "- MATH 241 · ready to resume · deadline passed",
     "Done: Finished"])
+start_subject("exam", "Calc III", "diagnosing", "", 'deadline: "2099-12-31"\n')
+eq("a subject with a deadline ahead lists first among the pending lines",
+   [line for line in session_context.start_context(VAULT).split("Show the learner (verbatim):\n", 1)[1]
+    .split("\nEnd of block.", 1)[0].splitlines() if line.startswith("- ")][0].split(" · deadline")[0],
+   "- Calc III · ready to resume")
 eq("the agent-only index still follows the block",
    index.index("End of block.") < index.index("- oop: OOP | active"), True)
 selected = session_context.start_context(VAULT, "oop")
@@ -2772,6 +2820,46 @@ eq("nothing pending: the Home wording on one line",
 eq("the live streak shows with rewards on, and not with rewards off",
    (status.startup_block(HOME_SUBJECTS, [], True, HOME_DAY)[2], "Review streak" in "".join(
        status.startup_block(HOME_SUBJECTS, [], False, HOME_DAY))), ("Review streak: 2 weeks", False))
+
+
+# ------------------------------------------------------------------ write-check: what /learn-end proves it wrote
+
+section("write-check — the step 7 cross-check reads hashes, not git")
+wcheck = load("write_check", "write-check.py")
+WC = Path(tempfile.mkdtemp())
+(WC / "learn/subjects/oop/sessions").mkdir(parents=True)
+(WC / "learn/me").mkdir()
+(WC / "learn/subjects/oop/record.md").write_text("old record\n")
+(WC / "learn/subjects/oop/resume.md").write_text("resume\n")
+(WC / "learn/subjects/oop/log.md").write_text("live log\n")
+(WC / "learn/me/preferences.md").write_text("prefs\n")
+eq("snapshot counts the files it hashed, log.md excluded",
+   wcheck.snapshot(WC, "oop-s05"), "snapshot oop-s05: 3 files under learn/")
+eq("nothing written: compare says so", wcheck.compare(WC, "oop-s05"), "no file under learn/ changed")
+(WC / "learn/subjects/oop/record.md").write_text("new record\n")
+(WC / "learn/subjects/oop/sessions/2026-10-08-s05.md").write_text("note\n")
+(WC / "learn/me/preferences.md").unlink()
+(WC / "learn/subjects/oop/log.md").write_text("streamed more\n")
+(WC / "learn/.mc-runtime").mkdir()
+(WC / "learn/.mc-runtime/placement.json").write_text("[]\n")
+eq("changed, added and removed are each named; log.md and dot-dirs are not",
+   wcheck.compare(WC, "oop-s05").splitlines(),
+   ["removed  learn/me/preferences.md",
+    "changed  learn/subjects/oop/record.md",
+    "added    learn/subjects/oop/sessions/2026-10-08-s05.md",
+    "no other files under learn/ changed"])
+eq("the snapshot never lists itself", "learn/.write-check/oop-s05.json" in wcheck.hashes(WC), False)
+try:
+    wcheck.compare(WC, "never-taken")
+    eq("compare with no snapshot refuses", "no error", "FileNotFoundError")
+except FileNotFoundError:
+    eq("compare with no snapshot refuses", True, True)
+try:
+    wcheck.snapshot(WC, "../escape")
+    eq("a snapshot id cannot leave .write-check/", "no error", "ValueError")
+except ValueError:
+    eq("a snapshot id cannot leave .write-check/", True, True)
+shutil.rmtree(WC)
 
 
 print()

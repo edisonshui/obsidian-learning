@@ -1,0 +1,43 @@
+---
+subject: "vfx-binary-search"
+session: "02"
+date: "{{DATE}}"
+start: "{{START}}"
+end:
+paused:
+active_minutes:
+idle_minutes:
+nodes: []
+---
+
+# VFX Fixture: Binary search — session 02 ({{DATE}})
+
+## Plan for this session
+
+Decay-check n1, then n2. Decay check: lo=2, hi=9 → 5 → correct, n1 holds.
+
+## Lesson
+
+### n2 — Discard half
+
+**Motivate.** Each step should throw away half the candidates.
+
+**Establish.** In a sorted array, if a[mid] < target, every index <= mid is too small, so lo = mid + 1.
+
+**Connect.** This is why n1's mid has to stay inside [lo, hi]: the update moves past it.
+
+**Diagram.** No diagram: a single comparison with two outcomes, said in one line.
+
+**Check.** Q: a = [1,3,5,7,9,11,13,15], target 11, lo=0, hi=7, mid=3, a[3]=7. Which indexes are dropped? / A: 0 to 3 / Verdict: correct
+
+## Retrieval checks
+
+## Misconception candidates
+
+## Preference candidates
+
+## Corrections
+
+## What worked / what didn't
+
+## Next step

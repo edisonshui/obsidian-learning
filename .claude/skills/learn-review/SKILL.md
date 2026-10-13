@@ -2,7 +2,7 @@
 name: learn-review
 description: Run a cross-subject spaced-repetition pass — pick the nodes that have gone longest without a check, quiz them, and log the evidence back to each subject. Use when Edison wants to review across subjects, or when a finished subject's nodes have gone stale.
 argument-hint: "[node count] [subject-slug ...]"
-allowed-tools: Read, Write, Edit, Glob, Bash(date *), Bash(python3 .claude/hooks/learn-status.py*), Bash(python3 .claude/hooks/mc-preflight.py*), Bash(git status*), AskUserQuestion
+allowed-tools: Read, Write, Edit, Glob, Bash(date *), Bash(python3 .claude/hooks/learn-status.py*), Bash(python3 .claude/hooks/mc-preflight.py*), Bash(python3 .claude/hooks/write-check.py*), AskUserQuestion
 ---
 
 A review is spaced repetition across every subject at once. It teaches nothing new. Arguments (optional): `$ARGUMENTS` — how many nodes to cover, and/or subject slugs to restrict to.
@@ -41,6 +41,8 @@ Question construction is `tutor.md`, *Checks and quizzes* — the same rules `/l
 
 ## 3. Log
 
+Before the first write below, run `python3 .claude/hooks/write-check.py snapshot review-r<NN>`. Step 4 compares against it.
+
 A review touches several subjects, so the writing splits in two. Both halves happen before the review closes, not after.
 
 **The narrative goes to `learn/reviews/YYYY-MM-DD-rNN.md`**, from `learn/system/templates/review-note.md`. `rNN` is per-vault and never reused. It holds the picked set, every question, answer, and verdict, a `key: <slot>/<count> — options: <opt1> / <opt2> / <opt3>` on each multiple-choice question, misconception candidates, and corrections. Mark the generation question as such, or write why there was none.
@@ -54,6 +56,6 @@ A review touches several subjects, so the writing splits in two. Both halves hap
 
 ## 4. Close
 
-Run `python3 .claude/hooks/learn-status.py` to regenerate the views. Run `python3 .claude/hooks/learn-status.py --rewards --review <NN>` and keep its output exactly. Re-read every file you just wrote and build a checklist: file, **changed** or **unchanged**, one phrase on what changed. Then run `git status --porcelain` and reconcile the two, by the same rule as `/learn-end` step 7 — a file the checklist calls changed that git does not list was not written, and saying so is the point of the step.
+Run `python3 .claude/hooks/learn-status.py` to regenerate the views. Run `python3 .claude/hooks/learn-status.py --rewards --review <NN>` and keep its output exactly. Re-read every file you just wrote and build a checklist: file, **changed** or **unchanged**, one phrase on what changed. Then run `python3 .claude/hooks/write-check.py compare review-r<NN>` and reconcile the two, by the same rule as `/learn-end` step 7 — a file the checklist calls changed that `compare` does not list was not written, and a file it lists that the checklist never mentions gets named. Saying so is the point of the step.
 
 Send one closing block: the checklist, one line per node saying where it landed (`solid`, `decayed`, or not reached), the reward lines verbatim (if any), and the next step. Write no reward text of your own. Then stop.

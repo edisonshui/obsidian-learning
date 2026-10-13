@@ -19,6 +19,9 @@ __pycache__/
 learn/.codex-runtime/
 learn/.mc-runtime/
 
+# /learn-end and /learn-review hash snapshots for their verify step.
+learn/.write-check/
+
 # Generated conversation views. The Claude view streams; the Codex view
 # updates after completed turns. Neither is a learning record.
 learn/subjects/*/log.md
@@ -40,3 +43,7 @@ learn/reviews/
 .obsidian/plugins/
 .scratch/
 CONTEXT.md
+
+# verify-vault evidence: transcripts and file copies from sandbox drives.
+# Proof for the person running it, never a record and never committed.
+.claude/verify-runs/
