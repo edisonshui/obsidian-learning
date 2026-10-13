@@ -103,6 +103,8 @@ def read_nodes(record_text, plan_text):
         node = row.get("Id", "")
         if not NODE_ID.fullmatch(node):
             continue
+        if not row.get("Node") and node not in nodes:
+            continue  # the template's empty row: a plan still being diagnosed toward
         entry = nodes.setdefault(node, {"id": node, "name": row.get("Node", ""),
                                         "status": "", "checked": "", "evidence": "",
                                         "prereqs": [], "plan_status": ""})
@@ -500,12 +502,28 @@ def review(due_nodes, titles, slug=None):
     return candidate("Review", slug, titles[slug] if slug else None, command, reason, welcome)
 
 
+# Statuses a learner can pick back up. `diagnosing` is here because
+# `/learn-resume` continues a paused diagnosis (its skill, step 1); leaving it
+# out hid a subject with an exam a week away from Home and from the Deadline slot.
+RESUMABLE = ("active", "paused", "diagnosing")
+
+
 def resume(slug, title, nodes, fields, open_stem, today):
     """The Resume candidate, naming a passed deadline or an open note if any."""
     upcoming = next_node(nodes)
-    reason = "*%s* is next" % upcoming["name"] if upcoming else "continue the plan"
-    welcome = ("continue %s, where *%s* is next" % (title, upcoming["name"]) if upcoming
-               else "continue %s" % title)
+    if fields.get("status") == "diagnosing":
+        reason = "finish the diagnosis, then build the plan"
+        welcome = "finish the diagnosis for %s, then build its plan" % title
+    elif upcoming:
+        reason = "*%s* is next" % upcoming["name"]
+        welcome = "continue %s, where *%s* is next" % (title, upcoming["name"])
+    elif nodes and all(entry["status"] in COVERED for entry in nodes.values()):
+        # Nothing left to teach: "continue the plan" promised a lesson that
+        # does not exist. Its due nodes are already under Review.
+        reason = "every planned node is proven, so this is a wrap-up"
+        welcome = "wrap up %s, where every planned node is proven" % title
+    else:
+        reason, welcome = "continue the plan", "continue %s" % title
     extra = []
     left = days_to_deadline(fields.get("deadline"), today)
     if left is not None and left < 0:
@@ -554,7 +572,7 @@ def rank(subjects, notes, today):
         found = repaired[0] if repaired else review(
             [(slug, entry) for entry in nodes.values() if is_due(entry, today, fields.get("deadline"))],
             titles, slug)
-        if not found and fields.get("status") in ("active", "paused"):
+        if not found and fields.get("status") in RESUMABLE:
             found = resume(slug, title, nodes, fields, open_stems.get(slug), today)
         if not found:
             continue
@@ -584,11 +602,15 @@ def rank(subjects, notes, today):
 
     resumes = []
     for slug, nodes, fields, _ in subjects:
-        if slug in listed or fields.get("status") not in ("active", "paused"):
+        if slug in listed or fields.get("status") not in RESUMABLE:
             continue
         left = days_to_deadline(fields.get("deadline"), today)
         last = to_date(fields.get("last_session"))
-        key = (left is not None and left < 0, -(last.toordinal() if last else 0), slug)
+        # A deadline still ahead goes first, soonest first: an exam next week
+        # outranks a subject with none, even before the Deadline window opens.
+        ahead = left if left is not None and left >= 0 else None
+        key = (left is not None and left < 0, ahead is None, ahead or 0,
+               -(last.toordinal() if last else 0), slug)
         resumes.append((key, resume(slug, titles[slug], nodes, fields, open_stems.get(slug), today)))
     ranked += [found for _, found in sorted(resumes, key=lambda item: item[0])]
 
@@ -1693,6 +1715,15 @@ def shown_before_lapse(node, events):
     return to_date(earlier[-1]["date"]) if earlier else None
 
 
+def subject_tag(slug):
+    """The slug as an Obsidian tag. The graph view draws each tag as a node
+    labelled with its name, so the tag on a progress page is what names the
+    subject's cluster there; every other node is labelled by its file name,
+    which is the same `progress`/`record`/`plan` in every subject. A tag holds
+    only letters, digits, `_`, `-`, and `/`, so a dotted slug loses its dots."""
+    return re.sub(r"[^A-Za-z0-9_/-]", "-", slug)
+
+
 def callout(kind, title, bullets, fold=""):
     return ["> [!%s]%s %s" % (kind, fold, title)] + ["> - " + bullet for bullet in bullets] + [""]
 
@@ -1705,12 +1736,13 @@ def progress_note(slug, folder, fields, nodes, record_text, sessions, today, eve
     partial = sum(1 for node in nodes.values() if node["status"] in PARTIAL)
     title = fields.get("title", slug)
     ordered = [nodes[node] for node in sorted(nodes, key=sort_key)]
-    out = ["---", "type: learning-progress", 'subject: "%s"' % slug,
+    out = ["---", "type: learning-progress", 'subject: "%s"' % slug, "tags: [%s]" % subject_tag(slug),
            'updated: "%s"' % today.isoformat(), "generated: true", "cssclasses: [learning-note]", "---", "",
            "# %s — progress" % title, "", GENERATED, "",
-           "**%d of %d nodes proven** %s · %s session%s · status **%s**"
-           % (done, total, bar(done, partial, total), fields.get("sessions", "0"),
-              "" if fields.get("sessions") == "1" else "s", fields.get("status", "unknown")), "",
+           ("**%d of %d nodes proven** %s" % (done, total, bar(done, partial, total)) if total
+            else "**No plan yet**") + " · %s session%s · status **%s**"
+           % (fields.get("sessions", "0"), "" if fields.get("sessions") == "1" else "s",
+              fields.get("status", "unknown")), "",
            "> [!todo] Next action", "> " + fields.get("next", "—"), "",
            " · ".join(part for part in [
                "[[learn/subjects/%s/resume|Resume]]" % slug,
@@ -1774,10 +1806,15 @@ def progress_note(slug, folder, fields, nodes, record_text, sessions, today, eve
                                          if entry.get("paused") else "**open**")
             out.append("| %s | %s | %s | %s | %s | [[learn/subjects/%s/sessions/%s\\|note]] |"
                        % (entry.get("session", "?"), entry.get("date", "?"),
-                          (entry.get("active_minutes") or "—") + (" min" if entry.get("active_minutes") else ""),
+                          active_cell(entry.get("active_minutes")),
                           ended, entry.get("nodes", "—"), slug, entry["file"]))
         out.append("")
     return "\n".join(out)
+
+
+def active_cell(minutes):
+    """`27 min`, or `—` when the clock was not read or read `unknown`."""
+    return minutes + " min" if minutes and minutes.isdigit() else "—"
 
 
 # ------------------------------------------------------------ the startup index
@@ -1815,14 +1852,21 @@ def startup_block(subjects, notes, rewards_on, today, selected=None, host="claud
     pending, untouched = [], []
     for slug, nodes, fields, _ in subjects:
         tag = pending_tag(nodes, fields, today)
-        if fields.get("status") in ("active", "paused", "diagnosing") or tag:
+        if fields.get("status") in RESUMABLE or tag:
             places = [index for index, found in enumerate(ranked) if found["subject"] == slug]
             if review_at is not None and any(is_due(entry, today, fields.get("deadline"))
                                              for entry in nodes.values()):
                 places.append(review_at)
             line = "- %s · %s" % (titles[slug], tag or "ready to resume")
-            words = deadline_words(fields.get("deadline"), today, passed=True)
-            pending.append((min(places, default=len(ranked)), line + (" · " + words if words else "")))
+            # A finished subject's passed deadline is history; on a paused one
+            # it still says the exam this was for is over.
+            words = deadline_words(fields.get("deadline"), today,
+                                   passed=fields.get("status") != "done" and not fields.get("goal_met"))
+            # A deadline still ahead lists first, soonest first; then rank order.
+            left = days_to_deadline(fields.get("deadline"), today)
+            order = (left if left is not None and left >= 0 else float("inf"),
+                     min(places, default=len(ranked)))
+            pending.append((order, line + (" · " + words if words else "")))
         elif fields.get("status") == "done":
             untouched.append(titles[slug])
     out += [line for _, line in sorted(pending, key=lambda item: item[0])]
@@ -1854,9 +1898,11 @@ def dashboard(subjects, today, warnings, openings, state=None, rewards_on=True):
             fields, nodes = s["fields"], s["nodes"]
             partial = sum(1 for node in nodes.values() if node["status"] in PARTIAL)
             last = to_date(fields.get("last_session"))
-            line = "- [[learn/subjects/%s/progress|%s]] %s %d/%d proven · last %s" % (
-                s["slug"], fields.get("title", s["slug"]), bar(proven_count(nodes), partial, len(nodes)),
-                proven_count(nodes), len(nodes), short_date(last) if last else "never")
+            line = "- [[learn/subjects/%s/progress|%s]] %s · last %s" % (
+                s["slug"], fields.get("title", s["slug"]),
+                "%s %d/%d proven" % (bar(proven_count(nodes), partial, len(nodes)), proven_count(nodes),
+                                     len(nodes)) if nodes else "no plan yet",
+                short_date(last) if last else "never")
             line += "".join(" · " + part for part in (deadline_words(fields.get("deadline"), today),
                                                        pending_tag(nodes, fields, today)) if part)
             out.append(line)
@@ -1888,9 +1934,21 @@ def dashboard(subjects, today, warnings, openings, state=None, rewards_on=True):
                 "nodes stay unproven and the next session can orphan it."]
         out += ["> - " + report for report in openings]
         out += [""]
-    if warnings:
-        out += callout("bug", "%d record inconsistenc%s" % (len(warnings), "y" if len(warnings) == 1 else "ies"),
-                       warnings, fold="-")
+    # Past MC checks whose answer slot did not rotate cannot be fixed by editing
+    # a record, so they fold apart from the drift a record edit does fix, and
+    # an identical line reported once per question shows once with a count.
+    history = [line for line in warnings if line.endswith("(slot_rotation.py)")]
+    fixable = [line for line in warnings if not line.endswith("(slot_rotation.py)")]
+    if fixable:
+        lines = counted(fixable)
+        out += callout("bug", "%d record inconsistenc%s" % (len(lines), "y" if len(lines) == 1 else "ies"),
+                       lines, fold="-")
+    if history:
+        lines = counted(line[:-len(" (slot_rotation.py)")] for line in history)
+        out += ["> [!info]- %s" % plural(len(lines), "answer-slot repeat"),
+                "> Logged multiple-choice checks where the correct answer did not rotate (`slot_rotation.py`). "
+                "History to learn from, not a record to fix."]
+        out += ["> - " + line for line in lines] + [""]
     out += callout("info", "The system", [
         "[[learn/Queries|Queries]] — live Dataview views across subjects and sessions",
         "[[learn/system/tutor|tutor.md]] — teaching philosophy and behaviour rules",
@@ -1900,6 +1958,14 @@ def dashboard(subjects, today, warnings, openings, state=None, rewards_on=True):
         "[[learn/me/preferences|preferences.md]] — how Edison learns, and what the evidence shows",
         "[[learn/README|README]] — how the whole thing fits together"], fold="-")
     return "\n".join(out)
+
+
+def counted(lines):
+    """Each distinct line once, in first-seen order, with ` (×N)` when repeated."""
+    seen = {}
+    for line in lines:
+        seen[line] = seen.get(line, 0) + 1
+    return [line if count == 1 else "%s (×%d)" % (line, count) for line, count in seen.items()]
 
 
 # --------------------------------------------------------------------- driver
