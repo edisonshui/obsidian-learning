@@ -50,3 +50,61 @@
 /* Graph view: each subject's tag node (from its progress page's tags:) is the
    one node named after the subject, so it is drawn in the strongest colour. */
 .graph-view.color-fill-tag { color: var(--text-normal); }
+
+/* Typography for every note in the vault (picked 2026-10-13 from Edison's
+   references). Two faces:
+     Helvetica Neue    everything that is prose: body, headings, labels, and
+                       the learner's messages
+     Google Sans Code  code, the Mono build, matching Edison's WezTerm, so
+                       box-drawn diagrams stay aligned
+   Tried and dropped the same day: Montserrat headings (pulled the eye away from
+   the text) and Host Grotesk body (Edison preferred Helvetica). Headings differ
+   by weight and ink only; the learner's messages are set apart by their
+   callout, not by a font. Both faces ship with macOS or are installed already.
+   They go in the slots a theme fills (--font-text-theme,
+   --font-monospace-theme), so a font picked in Settings still wins.
+   Ink is warm rather than pure black or white: cream headings on dark,
+   near-black on light, and a warm grey for labels. It is set on note views
+   only, so the sidebars and menus keep the theme's colours. */
+body {
+  --font-text-theme: "Helvetica Neue", Helvetica, sans-serif;
+  --font-monospace-theme: "GoogleSansCode Nerd Font Mono", "GoogleSansCode NFM", Menlo, monospace;
+}
+.markdown-preview-view,
+.markdown-source-view {
+  --text-normal: #2b2824;
+  --text-muted: #6f685f;
+  --lv-ink-head: #14120f;
+  --h1-color: var(--lv-ink-head);
+  --h2-color: var(--lv-ink-head);
+  --h3-color: var(--lv-ink-head);
+  --h4-color: var(--lv-ink-head);
+  --inline-title-color: var(--lv-ink-head);
+  --bold-color: var(--lv-ink-head);
+  --bold-weight: 650;
+}
+.theme-dark .markdown-preview-view,
+.theme-dark .markdown-source-view {
+  --text-normal: #e8e3d9;
+  --text-muted: #9a9389;
+  --lv-ink-head: #fbf2d0;
+}
+
+/* Callout titles in a log become quiet labels, like "Font" over the name in
+   the reference: small caps, tracked out, warm grey. */
+.learning-log .callout-title {
+  font-size: 0.72em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+.learning-log .callout-title .callout-icon { color: var(--callout-color); }
+
+/* The model and effort line under each conversation heading. */
+.learning-log h2 + p > em:only-child {
+  font-style: normal;
+  font-size: 0.75em;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
