@@ -1,0 +1,9 @@
+{
+  "id": "learn-live",
+  "name": "Learn live",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Follows the live tutoring log as it streams, and adds a Code runner pane that runs Java, Python, and C++ locally and can send the result to the tutor.",
+  "author": "edisonshui",
+  "isDesktopOnly": true
+}

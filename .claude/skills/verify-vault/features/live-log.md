@@ -10,6 +10,10 @@ Once a conversation types `/learn-start <slug>` or `/learn-resume <slug>`, `obsi
 - `ll-reply` includes Claude's reply text, reconciled from the transcript at Stop.
 - `ll-end` stops routing after `/learn-end`.
 - `ll-archive` writes `Claude outputs/Conversations/<sid>.md`.
+- `ll-thinking` mirrors non-empty thinking summaries (what the terminal prints) as a `> [!thinking]+` callout.
+- `ll-image` saves each pasted image to `Claude outputs/attachments/<sha16>.<ext>` and embeds it where `[Image #N]` was.
+- `ll-theme` writes `cssclasses: [learning-log, lv-theme-<theme>]`, from `theme:` in `record.md` or the title.
+- `ll-share` hands `.claude/obsidian-live/runner/shared.json` (written by the `learn-live` plugin's Send to tutor) to the next UserPromptSubmit once, and shows it as a `> [!code]` callout before that prompt. A share with `subject` set (the plugin stamps the learning note opened last) goes only to a conversation whose routed subject matches.
 - `ll-clock` keys active and idle time on the subject's open session note. `obsidian-live.py clock --subject <slug>` reads it back, or prints `unknown`.
 
 ## How to get to it (user POV)
@@ -25,6 +29,7 @@ Preconditions:
 - **Route from a prompt (hook only).** Run `echo '{"session_id":"v-log","hook_event_name":"UserPromptSubmit","prompt":"/learn-resume vfx-binary-search"}' > /tmp/ups.json` and `$S/step.sh "$SANDBOX" log-route --stdin /tmp/ups.json -- python3 .claude/hooks/obsidian-live.py hook`. `diff.txt` lists `learn/subjects/vfx-binary-search/log.md` (`added` on a fresh sandbox, `changed` if an earlier step already routed there) and `added Claude outputs/Conversations/v-log.md`. `files/.../log.md` has the `ll-content` markers and a `> [!quote] You` block containing `/learn-resume vfx-binary-search`. If an earlier session id routed there too, the file has one `## Conversation` heading per conversation, which proves earlier ones are retained.
 - **No folder for a non-subject.** Same as above with prompt `/learn-resume vfx-nope` as step `log-nope`. `diff.txt` has no `learn/subjects/vfx-nope` line.
 - **Full turn (claude -p).** In an `--open-note` sandbox, run `sid=$($S/claude-turn.sh "$SANDBOX" resume "/learn-resume vfx-binary-search" | tail -1)`. `files/learn/subjects/vfx-binary-search/log.md` holds the prompt and Claude's reply text from `result.md`.
+- **Thinking, image, share (hook only, proven 2026-10-13).** Write a JSONL in the sandbox with a thinking block and a user row carrying `imagePasteIds` plus a base64 image block, and pass it as `transcript_path` on the UserPromptSubmit. `diff.txt` adds `Claude outputs/attachments/<sha16>.png`; `log.md` has the `[!thinking]+` callout and the `![[...|600]]` embed in place of the token. For `ll-share`, produce `shared.json` with the plugin's own `runCode` and `share()` under node with `obsidian` stubbed and `getBasePath` returning `$SANDBOX`, then a UserPromptSubmit: `stdout.txt` holds the code and output, and a second prompt's `stdout.txt` is empty.
 - **Clock.** After that turn, run `$S/step.sh "$SANDBOX" clock -- python3 .claude/hooks/obsidian-live.py clock --subject vfx-binary-search`. `stdout.txt` reports minutes for `<today>-s02`, or `unknown` with a reason.
 - **End.** Continue with `$S/claude-turn.sh "$SANDBOX" end "/learn-end" "$sid"`, then a third turn `"thanks"`. The `thanks` text is absent from `log.md`.
 - **Proof.** `diff.txt` and `files/` for each step. Quote the `log.md` lines.

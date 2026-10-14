@@ -12,6 +12,7 @@ runs on every prompt, so it may not be slow, and it may not fail in a way that
 blocks a session.
 """
 
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -60,6 +61,31 @@ def frontmatter(path):
         return split_frontmatter(path.read_text())[0]
     except OSError:
         return {}
+
+
+# A subject's colour theme, drawn behind every note in its folder and its
+# progress page (.obsidian/snippets/learning-notes.css). First match wins, so
+# "Computer Architecture" is circuits before "CS" is code.
+THEMES = (
+    ("circuits", r"architecture|circuit|logic gate|cs 233|hardware"),
+    ("design", r"\bdtx\b|\bhcd\b|human.centered|\bux\b"),
+    ("code", r"\bcs \d|java|python|c\+\+|program|pointer|object.oriented|software|code|\bbsts?\b|data structure|algorithm|binary search|sort"),
+    ("math", r"\bmath\b|calc|lagrange|algebra|derivative|integral|vector|matri"),
+    ("literature", r"\bealc\b|literature|poetry|poem|analects|novel|history|rhet"),
+)
+
+
+def theme_of(fields, slug):
+    """The theme for a subject, from its record.md `fields`.
+
+    `theme:` wins, so a learner can pick one; otherwise it is read off the
+    title, and anything unrecognised gets the plain "calm" background.
+    """
+    chosen = str(fields.get("theme") or "").strip().lower()
+    if re.fullmatch(r"[a-z][a-z0-9-]{0,30}", chosen):
+        return chosen
+    title = str(fields.get("title") or slug).lower()
+    return next((name for name, pattern in THEMES if re.search(pattern, title)), "calm")
 
 
 def note_datetime(date_text, time_text, after=None):

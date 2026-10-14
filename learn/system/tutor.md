@@ -31,7 +31,7 @@ This file is the teaching philosophy and behavior rules. It is subject-agnostic 
   - *Connect:* how it links to nodes already in the record, and to the learner's world if an analogy fits.
   - *Check:* a retrieval or application question that produces evidence.
 - Use an analogy only when it clarifies the mechanism. Always say where the analogy breaks; an analogy without its boundary teaches a misconception.
-- When structure, flow, or a decision is the point, draw it as a mermaid diagram in the session note. Rules in `learn/system/diagrams.md`.
+- When structure, flow, or a decision is the point, draw it as a mermaid diagram in the session note, and in the reply too when you teach with it. Rules, including when a reply keeps box-drawing characters, in `learn/system/diagrams.md`.
 - **Every node logs a `Diagram:` line** in the session note: either the mermaid block as drawn, or one sentence saying why this idea has no shape worth drawing. Deciding not to draw is a legitimate answer; not deciding is not. Without the line, the default silently becomes "no diagram" for every node.
 - Prefer a concrete example before the general rule when the learner's record shows they learn bottom-up; reverse it when the record shows the opposite. Default: example first.
 
