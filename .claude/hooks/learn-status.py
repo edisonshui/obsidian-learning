@@ -799,11 +799,18 @@ def is_due_on(markers, day, deadline):
 # into the `/learn-end` or `/learn-review` closing block (spec section 11,
 # `CONTEXT.md`, *Reward line*). It compares the reward state with and without
 # the scope's marker lines, so it can only name what that session or review
-# added. Record voice: dated facts, no praise, no exclamation marks, no emoji.
+# added. Record voice: facts, no praise, no exclamation marks, no emoji.
+# Edison reads these lines at the end of a session, so they are plain English,
+# not the record's terms (2026-10-13): a node is a topic, a solid check is a
+# topic remembered on a later day. Home and the dashboard keep the short badge
+# names.
 
 MAX_REWARD_LINES = 4
-COUNT_LABELS = [("nodes_proven", "Nodes proven"), ("checks_passed", "Retrieval checks passed"),
-                ("goals_met", "Goals met")]
+COUNT_LABELS = [("nodes_proven", "Topics passed"), ("checks_passed", "Topics remembered on a later day"),
+                ("goals_met", "Goals reached")]
+STRAND_TAG = re.compile(r"\s*\(S\d+\)\s*$")  # "Writing equals (S4)": the strand number is record shorthand
+PLAIN_BADGE = {"Goal met": "Goal reached", "Recovered": "Remembered again after slipping",
+               "Solid": "Remembered on a later day"}
 
 
 def same_source(source, letter, number):
@@ -854,9 +861,11 @@ def reward_lines(subjects, today, subject=None, session=None, review=None, sessi
     was_open = {(r["subject"], r["node"], r["date"]) for r in before["open_recoveries"]}
     opened = [r for r in after["open_recoveries"] if (r["subject"], r["node"], r["date"]) not in was_open]
 
-    badge_lines = [found["text"] for found in earned]
-    recovery = (["Recovery open: %s. Passing it in a later session earns Recovered."
-                 % ", ".join(r["name"] for r in opened)] if opened else [])
+    def name(found):
+        return STRAND_TAG.sub("", found["name"])
+    badge_lines = ["%s: %s" % (PLAIN_BADGE[found["kind"]], name(found)) for found in earned]
+    recovery = (["Slipped: %s. Get it right in a later session and it counts as remembered again."
+                 % ", ".join(name(r) for r in opened)] if opened else [])
     changed = ["%s: %d → %d" % (label, before["counts"][name], after["counts"][name])
                for name, label in COUNT_LABELS if before["counts"][name] != after["counts"][name]]
     counts = [" · ".join(changed)] if changed and review is None else []
@@ -874,8 +883,8 @@ def reward_lines(subjects, today, subject=None, session=None, review=None, sessi
                       if is_due(entry, today, fields.get("deadline")))
         this_week_passed = bool(weeks_after) and weeks_after[-1]["result"] == "pass"
         if due_now and not this_week_passed:
-            streak = ["This week isn't counted yet: %s %s due"
-                      % (plural(due_now, "check"), "is" if due_now == 1 else "are")]
+            streak = ["This week's review isn't done yet: %s %s due for a re-check"
+                      % (plural(due_now, "older topic"), "is" if due_now == 1 else "are")]
         elif after["streak"]["alive"]:
             streak = ["Review streak: %s" % weeks_word(streak_now)]
         else:
@@ -885,8 +894,8 @@ def reward_lines(subjects, today, subject=None, session=None, review=None, sessi
 
     if len(earned) > 2 or len(badge_lines + recovery + counts + streak) > MAX_REWARD_LINES:
         if len(earned) > 1:
-            badge_lines = ["%d badges: %s" % (len(earned), " · ".join(
-                "%s: %s" % (found["kind"], found["name"]) for found in earned))]
+            badge_lines = ["%d wins: %s" % (len(earned), " · ".join(
+                "%s (%s)" % (name(found), PLAIN_BADGE[found["kind"]].lower()) for found in earned))]
     return (badge_lines + recovery + counts + streak)[:MAX_REWARD_LINES]
 
 

@@ -1,6 +1,6 @@
 ---
 name: learn-end
-description: End or checkpoint the current learning session — finalize the session note, update the learner record and plan, rewrite the resume summary, and print it. Use at the end of a session, before a break, or whenever Edison says stop, pause, checkpoint, or break.
+description: End or checkpoint the current learning session — finalize the session note, update the learner record and plan, rewrite the resume summary, and print a plain-English summary. Use at the end of a session, before a break, or whenever Edison says stop, pause, checkpoint, or break.
 argument-hint: [break]
 allowed-tools: Read, Write, Edit, Glob, Bash(date *), Bash(python3 .claude/hooks/learn-status.py*), Bash(python3 .claude/hooks/obsidian-live.py clock*), Bash(python3 .claude/hooks/jev.py*), Bash(python3 .claude/hooks/write-check.py*)
 ---
@@ -60,7 +60,7 @@ If evidence contradicts a *Stated* preference, write it under *Proposed changes 
 
 ## 6. Regenerate the status views
 
-Run `python3 .claude/hooks/learn-status.py --semantic`. It rewrites `learn/Home.md`, `learn/Dashboard.md`, and every subject's `progress.md` from `record.md` and `plan.md`, so Home, the dashboard, and the skill tree cannot drift from the records. Do not hand-edit any of them — the next run overwrites it. Report the script's output.
+Run `python3 .claude/hooks/learn-status.py --semantic`. It rewrites `learn/Home.md`, `learn/Dashboard.md`, and every subject's `progress.md` from `record.md` and `plan.md`, so Home, the dashboard, and the skill tree cannot drift from the records. Do not hand-edit any of them — the next run overwrites it. In the closing block, report only warnings about this subject that this session caused and did not fix, one plain line each. Warnings that were already there, or that you fixed, are not reported.
 
 `--semantic` adds the Jev-backed checks on top of the deterministic ones: J1 asks of every logged check whether it could be answered from its own text alone; J4 asks whether each `resume.md` names a next action and says where each node stands, which is the cold-start test `records.md` states and a word count cannot make; J5 flags a node entry that draws an analogy without saying where it breaks. Those lines are prefixed `semantic:` and appear only on a `--semantic` run, so a flag that vanishes from the dashboard later was a judgement not re-made, not a problem fixed. With no key or no network it prints one line saying so and falls back to the deterministic half. A flag is for a human to read: it never edits a note, and a probe logged tersely can be flagged even though the question the learner saw was complete.
 
@@ -96,10 +96,33 @@ Read the two lists against each other and report both kinds of mismatch in the c
 - **Claimed but absent.** A file the checklist calls *changed* that `compare` does not list. The write did not land, whatever the transcript says. Say so plainly; do not let it pass as done.
 - **Present but unclaimed.** A file `compare` lists that the checklist never mentions. Something was written this session did not account for. Name it.
 
-Two limits, stated rather than papered over. The baseline is the start of this skill, so it proves only what steps 1–6b wrote; edits made earlier in the session are already in it. And `log.md` is skipped, because the hooks rewrite it while a reply streams. If `compare` says there is no snapshot, step 1's snapshot did not run: report every row as unproven, not as changed.
+Two limits, stated whenever a mismatch is reported, so the learner can judge it. The baseline is the start of this skill, so it proves only what steps 1–6b wrote; edits made earlier in the session are already in it. And `log.md` is skipped, because the hooks rewrite it while a reply streams. If `compare` says there is no snapshot, step 1's snapshot did not run: say the saves could not be checked, not that they happened.
 
 A step that was skipped, blocked by a permission prompt, or not applicable is reported as such in plain words. Never report a write that did not happen: a record the learner believes exists and does not is worse than no record at all.
 
 ## 8. Hand-off
 
-After every write and the verification pass are complete, send exactly one closing block. It contains the verification checklist from step 7, the preference-bar result from step 5, the reward lines from step 6b verbatim (if any), the resume summary exactly once, and one handoff line. For `break`, the handoff is "Back after break. Reopen this note with `/learn-resume <slug>`." Otherwise, use the one-line next step. Progress updates before this block must not include a provisional checklist, session summary, or handoff. After the closing block, stop. Do not restate or paraphrase it.
+After every write and the verification pass are complete, send exactly one closing block. Edison reads it, so it is plain English, not the record's terms: say "topic", not "node", and leave out `n` numbers, strand numbers (S1, S4), and the words checked, solid, decayed, strand, candidate, and decay-check, unless the same sentence says what they mean. It contains, in order:
+
+1. **What was saved, in one line** when the step 7 checklist and `compare` agree: "Saved and checked: session note, record, plan, resume, preferences, Home, Dashboard, progress." Any file that is claimed but absent, present but unclaimed, skipped, or blocked by a permission prompt gets its own line saying what happened, followed by the two limits from step 7.
+2. **The preference result** from step 5, in one line.
+3. **The reward lines** from step 6b, verbatim, if any.
+4. **Where you are**, at most five short lines: what this session covered, what is secure, what to watch, and what comes next. Draw it from `resume.md`, but do not paste the file: `resume.md` stays in the record's terms because the next session reads it cold.
+5. **One handoff line.** For `break`, it is "Back after break. Reopen this note with `/learn-resume <slug>`." Otherwise, use the one-line next step.
+
+```
+Saved and checked: session note, record, plan, resume, preferences, Home, Dashboard, progress.
+Preferences: nothing changed. One new pattern noted: tracing the calls by hand helped when a hint didn't.
+
+Slipped: Writing `equals(Object)`. Get it right in a later session and it counts as remembered again.
+Topics passed: 83 → 88
+This week's review isn't done yet: 63 older topics are due for a re-check
+
+**Where you are**
+- Covered today: copy constructors, a class that tracks running state, and the CS People questions.
+- Secure: 13 of 14 topics for Quiz 7.
+- Watch: writing `equals` (you wrote it as `static`), and calling a static method from another class.
+- Next: ask how Quiz 7 went, then rewrite a running-state class with no hints.
+
+Next: take PQ7, then Quiz 7 at 14:00.
+``` Progress updates before this block must not include a provisional checklist, session summary, or handoff. After the closing block, stop. Do not restate or paraphrase it.

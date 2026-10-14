@@ -26,7 +26,7 @@ Preconditions:
 
 - **Regenerate.** Run `$S/step.sh "$SANDBOX" status -- python3 .claude/hooks/learn-status.py --vault "$SANDBOX"`. `stdout.txt` starts `learn-status: wrote learn/subjects/vfx-binary-search/progress.md, learn/Home.md, learn/Dashboard.md`. On a fresh sandbox `diff.txt` lists those three as `added` and `files/learn/Home.md` names `VFX Fixture: Binary search`. After a session-start step on the same day, `diff.txt` is empty: the script rewrites identical bytes, so "wrote" in stdout does not mean "changed".
 - **Source drives the view.** Run `sed -i '' 's/^| n2 | planned |  |  |$/| n2 | checked | 2026-10-07 | fixture edit |/' "$SANDBOX/learn/subjects/vfx-binary-search/record.md"`, then regenerate as step `status-2`. `diff.txt` lists `changed .../progress.md`. Because `plan.md` still says `planned`, `stdout.txt` has `inconsistency: vfx-binary-search n2: record says 'checked', plan says 'planned'` (and a second n2 line about the missing transition marker), and `record.md` is absent from `diff.txt` (reported, not repaired).
-- **Read-only modes.** Run each of `--next`, `--open-notes`, `--due`, `--rewards --subject vfx-binary-search --session 01` as its own step. Each `diff.txt` is empty. After the n2 edit above, `--rewards` printed `Nodes proven: 1 → 2`.
+- **Read-only modes.** Run each of `--next`, `--open-notes`, `--due`, `--rewards --subject vfx-binary-search --session 01` as its own step. Each `diff.txt` is empty. After the n2 edit above, `--rewards` printed `Nodes proven: 1 → 2`, worded `Topics passed: 1 → 2` since 2026-10-13.
 - **Offline semantic.** Run `--semantic` as a step. `stdout.txt` contains `jev is not available`.
 - **Proof.** Keep each step's `stdout.txt`, `diff.txt`, and `files/`.
 
