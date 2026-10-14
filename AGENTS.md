@@ -42,3 +42,13 @@ The Codex hook keeps its runtime state under `learn/.codex-runtime/`. `$learn-en
 Obsidian renders mermaid and LaTeX. Follow `learn/system/diagrams.md` and use full-root wikilinks such as `[[learn/subjects/oop/record|OOP record]]`.
 
 For probes, put any code, data, or diagram inside the question itself. If a picker cannot display a long snippet, show it in chat, confirm Edison can see it, then ask. If he cannot see something, resend it before grading.
+
+## Agent skills
+
+### Issue tracker
+
+Local markdown under `.scratch/<feature-slug>/`. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.

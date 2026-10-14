@@ -40,7 +40,11 @@ learn/reviews/
 .obsidian/workspace.json
 
 # Third-party Obsidian plugins. Reinstallable, and dataview alone is 2.3MB.
-.obsidian/plugins/
+# learn-live is this vault's own plugin, so it is tracked; its data.json holds
+# the learner's code drafts and is not.
+.obsidian/plugins/*
+!.obsidian/plugins/learn-live/
+.obsidian/plugins/learn-live/data.json
 .scratch/
 CONTEXT.md
 

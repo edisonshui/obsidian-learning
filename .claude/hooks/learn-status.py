@@ -20,6 +20,7 @@ Run: python3 .claude/hooks/learn-status.py [--vault PATH]
 """
 
 import argparse
+import html
 import math
 import re
 import sys
@@ -29,7 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import session_note  # noqa: E402
 import slot_rotation  # noqa: E402
-from vaultlib import STALE_HOURS, frontmatter, section, strip_frontmatter  # noqa: E402
+from vaultlib import STALE_HOURS, frontmatter, section, strip_frontmatter, theme_of  # noqa: E402
 
 # Teaching order, worst to best.
 STATUSES = ["decayed", "planned", "introduced", "checked", "solid", "skipped"]
@@ -1181,14 +1182,27 @@ def sort_key(node):
     return int(node[1:])
 
 
-def bar(done, partial, total, width=16):
-    """A progress bar that distinguishes proven nodes from merely taught ones."""
-    if not total:
-        return "`" + "░" * width + "` 0%"
-    filled = int(round(width * done / float(total)))
-    half = int(round(width * (done + partial) / float(total))) - filled
-    cells = "█" * filled + "▒" * max(half, 0)
-    return "`" + cells + "░" * max(width - len(cells), 0) + "` " + str(int(round(100.0 * done / total))) + "%"
+def meter(done, partial, total, width=112):
+    """A thin progress meter, one line of inline SVG: proven nodes solid green,
+    taught but unproven ones faint green, the rest an empty track. Then the
+    percent proven, so the number survives with the snippet off."""
+    proven = int(round(width * done / float(total))) if total else 0
+    taught = int(round(width * (done + partial) / float(total))) if total else 0
+    rects = ['<rect width="%d" height="6" rx="3" style="fill: var(--background-modifier-border)"/>' % width]
+    if taught > proven:
+        rects.append('<rect width="%d" height="6" rx="3" style="fill: var(--color-green); fill-opacity: 0.35"/>' % taught)
+    if proven:
+        rects.append('<rect width="%d" height="6" rx="3" style="fill: var(--color-green)"/>' % proven)
+    percent = int(round(100.0 * done / total)) if total else 0
+    return ('<svg class="lv-meter" width="%d" height="6" viewBox="0 0 %d 6" role="img" aria-label="%d of %d proven">'
+            '%s</svg> <span class="lv-num">%d%%</span>' % (width, width, done, total, "".join(rects), percent))
+
+
+def tag(text):
+    """A Dashboard row's status word as a chip, its tone from what it asks for.
+    The ` · ` before it is kept for the snippet-off view and hidden by the snippet."""
+    tone = "repair" if "repair" in text else "due" if "due" in text else "deadline"
+    return '<span class="lv-sep"> · </span><span class="lv-tag" data-tone="%s">%s</span>' % (tone, text)
 
 
 def log_links(slug, folder):
@@ -1294,12 +1308,18 @@ def earned_cards(badges, limit=3):
     out = []
     for subject, date, kind in order[:limit]:
         group = cards[(subject, date, kind)]
-        out.append("> [!%s] %s, %s · %s" % (CARD_CALLOUT[kind], kind, short_date(to_date(date)),
-                                           group[0]["title"]))
-        if kind != "Goal met":
-            out.append("> " + " · ".join(found["name"] for found in group))
-        out.append("")
-    return out
+        names = "" if kind == "Goal met" else " <span>%s</span>" % html.escape(
+            " · ".join(found["name"] for found in group))
+        out.append('<div class="lv-card" data-kind="%s"><span class="lv-label">%s · %s</span> '
+                   "<strong>%s</strong>%s</div>" % (CARD_CALLOUT[kind], kind, short_date(to_date(date)),
+                                                   html.escape(group[0]["title"]), names))
+    # One HTML block, so the cards sit side by side; with the snippet off each
+    # is still a line of plain text.
+    return ['<div class="lv-cards">' + "".join(out) + "</div>", ""] if out else []
+
+
+# Home and the Dashboard span every subject, so they take the neutral theme.
+SHARED_CLASSES = "learning-note, learning-themed, lv-theme-calm"
 
 
 def long_date(when):
@@ -1315,8 +1335,9 @@ def home(ranked, subjects, state, rewards_on, today):
     hosts read this note.
     """
     out = ["---", "type: learning-home", 'updated: "%s"' % today.isoformat(), "generated: true",
-           "cssclasses: [learning-note]", "---", "",
-           "> [!question] %s" % long_date(today)]
+           "cssclasses: [%s]" % SHARED_CLASSES, "---", "",
+           # `|welcome` lets the snippet draw this one card as the page's hero.
+           "> [!question|welcome] %s" % long_date(today)]
     top, others = ranked[0], ranked[1:]
     if top["kind"] == "Start":
         out.append("> Everything you've proven is up to date.")
@@ -1329,7 +1350,7 @@ def home(ranked, subjects, state, rewards_on, today):
                 "> `%s`" % top["command"]]
     out.append("")
     if others:
-        out += ["> [!note]- Other options (%d)" % len(others)] + ["> " + option_line(found) for found in others]
+        out += ["> [!note|options]- Other options (%d)" % len(others)] + ["> " + option_line(found) for found in others]
         out.append("")
     if rewards_on:
         cards = earned_cards(state["badges"])
@@ -1339,14 +1360,13 @@ def home(ranked, subjects, state, rewards_on, today):
         if line:
             out += [line, ""]
     counts = state["counts"]
-    parts = []
     if rewards_on:
-        parts = ["%d node%s proven" % (counts["nodes_proven"], "" if counts["nodes_proven"] == 1 else "s"),
-                 "%d goal%s met" % (counts["goals_met"], "" if counts["goals_met"] == 1 else "s")]
+        tiles = [(counts["nodes_proven"], "node proven" if counts["nodes_proven"] == 1 else "nodes proven"),
+                 (counts["goals_met"], "goal met" if counts["goals_met"] == 1 else "goals met")]
         if state["streak"]["alive"]:
-            parts.append("review streak " + weeks_word(counts["current_streak"]))
-    parts.append("[[learn/Dashboard|all subjects and badges]]")
-    out += [" · ".join(parts), "", "---", ""]
+            tiles.append((counts["current_streak"], "week review streak"))  # "4 week review streak"
+        out += [stat_tiles(tiles), ""]
+    out += ["[[learn/Dashboard|All subjects and badges →]]", "", "---", ""]
     out.append("*Rewards are %s. Turn them %s with `rewards: %s` in [[learn/me/preferences|preferences]].*"
                % (("on", "off", "off") if rewards_on else ("off", "on", "on")))
     out += ["", GENERATED, ""]
@@ -1577,10 +1597,8 @@ def svg_prefix(kind, slug):
     return "%s-%s" % (kind, re.sub(r"[^a-z0-9]", "", slug.lower())[:24] or "x")
 
 
-def gradients(prefix, gold=False):
+def gradients(prefix):
     stops = [("solid", "--color-green", "--color-cyan"), ("checked", "--color-blue", "--color-purple")]
-    if gold:
-        stops.append(("gold", "--color-yellow", "--color-orange"))
     return ("<defs>" + "".join(
         '<linearGradient id="%s-%s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color: var(%s)"/>'
         '<stop offset="1" style="stop-color: var(%s)"/></linearGradient>' % (prefix, name, start, end)
@@ -1687,27 +1705,21 @@ def skill_tree(slug, title, nodes, rewards_on=True):
     return "\n".join(out)
 
 
+def stat_tiles(tiles):
+    """(number, label) pairs as one row of glass tiles, the same on Home and a
+    progress page. One HTML block; with the snippet off, a line per count."""
+    return ('<div class="lv-stats">' + "".join('<div class="lv-stat"><b>%s</b> <span>%s</span></div>' % tile
+                                               for tile in tiles) + "</div>")
+
+
 def count_tiles(slug, counts, streak):
-    """Four tiles in the tree's colours: skills proven, checks passed later,
-    the review streak while it is alive, and the best streak."""
-    rows = [("✓", str(counts["nodes_proven"]), "skills proven", "checked", "--color-blue"),
-            ("★", str(counts["checks_passed"]), "checks passed later", "solid", "--color-green")]
+    """Four tiles: skills proven, checks passed later, the review streak while
+    it is alive, and the best streak."""
+    tiles = [(counts["nodes_proven"], "skills proven"), (counts["checks_passed"], "checks passed later")]
     if streak["alive"]:
-        rows.append(("↻", "%d wk" % streak["current"], "review streak", "gold", "--color-yellow"))
-    rows.append(("▲", "%d wk" % streak["best"], "best streak", "gold", "--color-yellow"))
-    prefix = svg_prefix("tl", slug)
-    out = ['<svg viewBox="0 0 800 96" width="100%" role="img" aria-label="Counts">', "<title>Counts</title>",
-           gradients(prefix, gold=True)]
-    for index, (icon, number, text, fill, colour) in enumerate(rows):
-        x = index * 200 + 10
-        out.append('<rect x="%d" y="6" width="180" height="84" rx="14" style="fill: url(#%s-%s); '
-                   'fill-opacity: 0.16; stroke: url(#%s-%s); stroke-width: 2"/>' % (x, prefix, fill, prefix, fill))
-        out.append(circle(x + 26, 30, 13, "fill: url(#%s-%s)" % (prefix, fill)))
-        out.append(glyph(x + 26, 35, icon, "fill: var(--text-on-accent); font-size: 14px; font-weight: 800"))
-        out.append(glyph(x + 100, 50, number, "fill: var(%s); font-size: 30px; font-weight: 800" % colour))
-        out.append(glyph(x + 90, 76, text, "fill: var(--text-muted); font-size: 13px"))
-    out.append("</svg>")
-    return "\n".join(out)
+        tiles.append((streak["current"], "week review streak"))
+    tiles.append((streak["best"], "week best streak"))
+    return stat_tiles(tiles)
 
 
 # ------------------------------------------------------------ the progress page
@@ -1746,9 +1758,10 @@ def progress_note(slug, folder, fields, nodes, record_text, sessions, today, eve
     title = fields.get("title", slug)
     ordered = [nodes[node] for node in sorted(nodes, key=sort_key)]
     out = ["---", "type: learning-progress", 'subject: "%s"' % slug, "tags: [%s]" % subject_tag(slug),
-           'updated: "%s"' % today.isoformat(), "generated: true", "cssclasses: [learning-note]", "---", "",
+           'updated: "%s"' % today.isoformat(), "generated: true",
+           "cssclasses: [learning-note, learning-themed, lv-theme-%s]" % theme_of(fields, slug), "---", "",
            "# %s — progress" % title, "", GENERATED, "",
-           ("**%d of %d nodes proven** %s" % (done, total, bar(done, partial, total)) if total
+           ("**%d of %d nodes proven** %s" % (done, total, meter(done, partial, total)) if total
             else "**No plan yet**") + " · %s session%s · status **%s**"
            % (fields.get("sessions", "0"), "" if fields.get("sessions") == "1" else "s",
               fields.get("status", "unknown")), "",
@@ -1890,7 +1903,7 @@ def dashboard(subjects, today, warnings, openings, state=None, rewards_on=True):
     """`learn/Dashboard.md`: a one-screen index of every subject (spec section 9).
     `subjects` is `load_subjects()`'s list and `state` the vault's `rewards()`."""
     out = ["---", "type: learning-dashboard", 'updated: "%s"' % today.isoformat(), "generated: true",
-           "cssclasses: [learning-note]", "---", "",
+           "cssclasses: [%s]" % SHARED_CLASSES, "---", "",
            "# Learning dashboard", "", "[[learn/Home|← Home]]", "", GENERATED, ""]
     if not subjects:
         out += ["No subjects yet. Use `/learn-start <subject>` in Claude Code or `$learn-start <subject>` in Codex.", ""]
@@ -1907,14 +1920,15 @@ def dashboard(subjects, today, warnings, openings, state=None, rewards_on=True):
             fields, nodes = s["fields"], s["nodes"]
             partial = sum(1 for node in nodes.values() if node["status"] in PARTIAL)
             last = to_date(fields.get("last_session"))
-            line = "- [[learn/subjects/%s/progress|%s]] %s · last %s" % (
+            # The title, then one quiet line: meter, counts, and status chips.
+            line = '- [[learn/subjects/%s/progress|%s]] <span class="lv-row">%s · last %s' % (
                 s["slug"], fields.get("title", s["slug"]),
-                "%s %d/%d proven" % (bar(proven_count(nodes), partial, len(nodes)), proven_count(nodes),
+                "%s %d/%d proven" % (meter(proven_count(nodes), partial, len(nodes)), proven_count(nodes),
                                      len(nodes)) if nodes else "no plan yet",
                 short_date(last) if last else "never")
-            line += "".join(" · " + part for part in (deadline_words(fields.get("deadline"), today),
-                                                       pending_tag(nodes, fields, today)) if part)
-            out.append(line)
+            line += "".join(tag(part) for part in (deadline_words(fields.get("deadline"), today),
+                                                   pending_tag(nodes, fields, today)) if part)
+            out.append(line + "</span>")
         out.append("")
     if rewards_on and state and state["badges"]:
         out += callout("abstract", plural(len(state["badges"]), "badge"),

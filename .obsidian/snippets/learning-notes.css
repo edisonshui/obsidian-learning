@@ -1,7 +1,12 @@
 /* Generated learning views: Home, the Dashboard, and each progress page.
    They opt in with cssclasses: [learning-note]; session notes and logs do not.
-   Every colour is a theme variable, so light and dark both work, and each
-   view stays legible with this snippet off. */
+   They are drawn like the live log (redesigned 2026-10-14): the subject's
+   background further down, frosted-glass surfaces, callout titles as quiet
+   small-caps labels, and section headings as labels too, so the page reads
+   like an app rather than a document. The pieces learn-status.py writes as
+   HTML (.lv-cards, .lv-stats, .lv-row, .lv-meter) are styled here; with this
+   snippet off each one is still a plain line of text. Every colour is a theme
+   variable, so light and dark both work. */
 .learning-note {
   --file-line-width: 54rem;
   --line-height-normal: 1.65;
@@ -10,46 +15,434 @@
   --lv-warm: color-mix(in srgb, var(--color-orange) 65%, var(--color-yellow));
   --lv-gold: color-mix(in srgb, var(--color-yellow) 70%, var(--color-orange));
   --lv-checked: color-mix(in srgb, var(--color-blue) 60%, var(--color-purple));
+  /* The log's glass, as tokens for the surfaces below. */
+  --lv-glass: color-mix(in srgb, var(--background-primary) 62%, transparent);
+  --lv-glass-rim: color-mix(in srgb, var(--background-primary) 70%, transparent);
+  --lv-lift: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(40, 20, 90, 0.18);
+  --lv-hairline: color-mix(in srgb, var(--text-normal) 8%, transparent);
+  --lv-chip: color-mix(in srgb, var(--text-normal) 6%, transparent);
+}
+.theme-dark .learning-note {
+  --lv-glass: color-mix(in srgb, var(--background-primary) 55%, transparent);
+  --lv-glass-rim: color-mix(in srgb, var(--text-normal) 9%, transparent);
+  --lv-lift: 0 1px 2px rgba(0, 0, 0, 0.25), 0 10px 28px -14px rgba(0, 0, 0, 0.6);
+  --lv-hairline: color-mix(in srgb, var(--text-normal) 9%, transparent);
+  --lv-chip: color-mix(in srgb, var(--text-normal) 9%, transparent);
 }
 
-.learning-note :is(h2, .HyperMD-header-2) {
-  margin-top: 2rem;
-  padding-top: 0.6rem;
-  border-top: 1px solid var(--background-modifier-border);
+.learning-note h1 { font-size: 1.85em; font-weight: 700; letter-spacing: -0.015em; }
+/* Section headings are labels over the surface they introduce. */
+.markdown-preview-view.learning-note h2 {
+  margin: 2.4rem 0 0.75rem;
+  font-size: 0.74em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+.learning-note h3 { font-size: 1.05em; font-weight: 600; }
+.learning-note hr { margin: 2.6rem 0 1.2rem; border-color: var(--lv-hairline); }
+/* The generated-file and rewards notes: a single italic line is fine print. */
+.learning-note p > em:only-child {
+  font-style: normal;
+  font-size: 0.8em;
+  color: var(--text-faint);
+}
+/* Links read as app navigation: accent ink, underlined only on hover. */
+.learning-note :is(a, .internal-link) {
+  color: var(--text-accent);
+  font-weight: 500;
+  text-decoration: none;
+  text-underline-offset: 0.18em;
+}
+.learning-note :is(a, .internal-link):hover { text-decoration: underline; }
+.learning-note code {
+  padding: 0.12em 0.42em;
+  border-radius: 0.35rem;
+  background: var(--lv-chip);
+  font-size: 0.84em;
 }
 
 .learning-note :is(table, .table-wrapper) { max-width: 100%; }
 .learning-note .table-wrapper { overflow-x: auto; }
 .learning-note :is(th, td) { padding: 0.65rem 0.8rem; vertical-align: top; }
-.learning-note th { background: var(--background-secondary); }
-.learning-note :is(a, .internal-link) { text-underline-offset: 0.18em; }
+.learning-note th { background: var(--lv-chip); }
 
+/* Each callout kind keeps its colour on the icon only, as in the log. */
 .learning-note .callout[data-callout="question"] { --callout-color: var(--lv-warm);       --callout-icon: lucide-sun; }
 .learning-note .callout[data-callout="success"]  { --callout-color: var(--color-green);   --callout-icon: lucide-sprout; }
 .learning-note .callout[data-callout="abstract"] { --callout-color: var(--lv-gold);       --callout-icon: lucide-flag; }
 .learning-note .callout[data-callout="info"]     { --callout-color: var(--lv-checked);    --callout-icon: lucide-book-open; }
 .learning-note .callout[data-callout="tip"]      { --callout-color: var(--color-cyan);    --callout-icon: lucide-rotate-ccw; }
 .learning-note .callout[data-callout="todo"]     { --callout-color: var(--color-orange);  --callout-icon: lucide-arrow-right; }
-.learning-note .callout[data-callout="question"] .callout-title { font-size: 1.25em; }
-
 .learning-note .callout {
-  margin-block: 1.1rem;
-  padding: 0.9rem 1.1rem;
-  border-left: 3px solid var(--callout-color);
-  border-radius: 0.4rem;
+  margin-block: 0.75rem;
+  padding: 0.95rem 1.15rem;
+  border-radius: 0.6rem;
 }
-.learning-note .callout-title { line-height: 1.5; }
 .learning-note .callout-content { color: var(--text-normal); }
 .learning-note .callout-content > :last-child { margin-bottom: 0; }
+.learning-note .callout.is-collapsed { padding-block: 0.8rem; }
+.learning-note .callout-content :is(ul, ol) { padding-inline-start: 1.1rem; }
+.learning-note .callout-content li + li { margin-top: 0.3rem; }
+/* Home's other options: rows like the Dashboard's, the kind ("**Deadline**")
+   as a chip, and the command on its own line under the reason. */
+.learning-note .callout[data-callout-metadata="options"] .callout-content ul { padding: 0; list-style: none; }
+.learning-note .callout[data-callout-metadata="options"] li { margin: 0; padding: 0.65rem 0; }
+.learning-note .callout[data-callout-metadata="options"] li + li { border-top: 1px solid var(--lv-hairline); }
+.learning-note .callout[data-callout-metadata="options"] li:last-child { padding-bottom: 0; }
+.learning-note .callout[data-callout-metadata="options"] li::marker { content: none; }
+.learning-note .callout[data-callout-metadata="options"] li > :is(.list-bullet, .list-collapse-indicator) { display: none; }
+.learning-note .callout[data-callout-metadata="options"] li > strong:first-of-type {
+  display: inline-block;
+  margin-right: 0.4rem;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  background: var(--lv-chip);
+  font-size: 0.68em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  vertical-align: 0.14em;
+}
+.learning-note .callout[data-callout-metadata="options"] li > code:last-child {
+  display: block;
+  width: fit-content;
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+}
+
+/* Home's welcome card: the one thing to do now. Bigger text, and the command
+   as the page's single solid button. */
+.learning-note .callout[data-callout-metadata="welcome"] { padding: 1.3rem 1.5rem 1.4rem; }
+.learning-note .callout[data-callout-metadata="welcome"] .callout-content { font-size: 1.14em; line-height: 1.55; }
+.learning-note .callout[data-callout-metadata="welcome"] .callout-content code {
+  display: inline-block;
+  margin-top: 0.2rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.5rem;
+  background: var(--lv-ink-head);
+  color: var(--background-primary);
+  font-size: 0.78em;
+  font-weight: 500;
+  box-shadow: 0 6px 16px -8px rgba(20, 10, 40, 0.45);
+}
+
+/* The Dashboard's way back Home under its title, and Home's way to the
+   Dashboard under the counts, are small. */
+.learning-note :is(.el-h1 + .el-p, .el-div:has(> .lv-stats) + .el-p) .internal-link { font-size: 0.9em; }
+/* Home's "Next up" line sits under the earned cards as their caption. */
+.learning-note .el-div:has(> .lv-cards) + .el-p > p { font-size: 0.88em; color: var(--text-muted); }
+
+/* Glass tiles: Home's earned cards and counts. */
+:is(.lv-cards, .lv-stats) {
+  display: grid;
+  gap: 0.75rem;
+  margin-block: 0.4rem 1rem;
+}
+.lv-cards { grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
+.lv-stats { grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); margin-top: 1.6rem; }
+:is(.lv-card, .lv-stat) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.95rem 1.1rem;
+  border: 1px solid var(--lv-glass-rim);
+  border-radius: 0.6rem;
+  background: var(--lv-glass);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: var(--lv-lift);
+}
+:is(.lv-label, .lv-stat > span) {
+  font-size: 0.7em;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.lv-card { --lv-kind: var(--lv-gold); }
+.lv-card[data-kind="success"] { --lv-kind: var(--color-green); }
+.lv-card[data-kind="tip"] { --lv-kind: var(--color-cyan); }
+.lv-card .lv-label::before {
+  content: "";
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.5rem;
+  border-radius: 50%;
+  background: var(--lv-kind);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lv-kind) 22%, transparent);
+  vertical-align: 0.05em;
+}
+.lv-card strong { font-weight: 600; line-height: 1.35; }
+.lv-card > span:not(.lv-label) { font-size: 0.86em; line-height: 1.45; color: var(--text-muted); }
+.lv-stat { gap: 0.1rem; }
+.lv-stat b {
+  font-size: 1.9em;
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--lv-ink-head);
+}
+
+/* Dashboard rows: each section's list is one glass panel, a subject per row,
+   its title over a quiet line of meter, counts, and status chips. */
+.learning-note ul:has(> li > .lv-row) {
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--lv-glass-rim);
+  border-radius: 0.6rem;
+  background: var(--lv-glass);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: var(--lv-lift);
+  overflow: hidden;
+}
+.learning-note li:has(> .lv-row) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0.75rem 1.15rem 0.8rem;
+}
+.learning-note li:has(> .lv-row) + li { border-top: 1px solid var(--lv-hairline); }
+.learning-note li:has(> .lv-row)::marker { content: none; }
+.learning-note li:has(> .lv-row) > :is(.list-bullet, .list-collapse-indicator) { display: none; }
+.learning-note li:has(> .lv-row) > .internal-link {
+  align-self: flex-start;
+  font-weight: 600;
+  color: var(--lv-ink-head);
+  text-decoration: none;
+}
+.learning-note li:has(> .lv-row) > .internal-link:hover { color: var(--text-accent); }
+.lv-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.55rem;
+  font-size: 0.84em;
+  color: var(--text-muted);
+}
+.lv-meter { flex: none; }
+.lv-num {
+  min-width: 2.4em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+}
+.lv-sep { display: none; }
+.lv-tag {
+  --lv-tone: var(--color-orange);
+  padding: 0.05rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lv-tone) 14%, transparent);
+  font-size: 0.92em;
+  font-weight: 550;
+  color: color-mix(in srgb, var(--lv-tone) 70%, var(--text-normal));
+}
+.lv-tag[data-tone="due"] { --lv-tone: var(--color-blue); }
+.lv-tag[data-tone="repair"] { --lv-tone: var(--color-red); }
+/* The progress page's header line carries a meter too. */
+.learning-note p > .lv-meter { margin-inline: 0.3rem 0.1rem; vertical-align: 0.12em; }
 
 @media (max-width: 600px) {
   .learning-note :is(th, td) { padding: 0.45rem; }
   .learning-note .callout { padding: 0.75rem; }
+  .learning-note li:has(> .lv-row) { padding-inline: 0.85rem; }
 }
 
 /* Graph view: each subject's tag node (from its progress page's tags:) is the
    one node named after the subject, so it is drawn in the strongest colour. */
 .graph-view.color-fill-tag { color: var(--text-normal); }
+
+/* Background themes. A live chat log (learn/subjects/<subject>/log.md) gets
+   cssclasses: [learning-log, lv-theme-<theme>] from obsidian-live.py, the
+   theme coming from `theme:` in record.md or else the subject's title
+   (vaultlib.theme_of). Every other learning note wears the same theme as
+   .learning-themed: progress pages, Home and the Dashboard through their own
+   cssclasses (learn-status.py; Home and the Dashboard are calm), and a
+   subject's hand-written notes (record, plan, resume, sessions) through the
+   learn-live plugin, which puts the classes on the note's pane because those
+   files carry no cssclasses of their own. The pane is matched with child
+   steps so an embedded note does not draw a second background.
+
+   Light mode is "Holo": an iridescent conic sweep from the top right, faded
+   toward the bottom so long logs end calm. Dark mode is "Aurora": three soft
+   glows bleeding in from the corners, because Holo's pastels over a dark page
+   mixed to brown (both picked 2026-10-13). Each theme sets its own colours.
+   Callouts and code blocks are frosted glass so the colour reads through. */
+.learning-log { --file-line-width: 50rem; --line-height-normal: 1.65; }
+/* Set on the element that carries the theme class, so a theme's own
+   --lv-turn wins. Set on the page, they would beat one inherited from the pane. */
+:is(.learning-log, .learning-themed) { --lv-mix: 48%; --lv-turn: 210deg; --lv-at: 70% 20%; }
+.markdown-preview-view:is(.learning-log, .learning-themed),
+.markdown-source-view:is(.learning-log, .learning-themed) .cm-scroller,
+.learning-themed .markdown-reading-view > .markdown-preview-view,
+.learning-themed .markdown-source-view > .cm-editor > .cm-scroller {
+  background-color: var(--background-primary);
+  background-image:
+    radial-gradient(ellipse at 50% 120%, var(--background-primary) 10%, transparent 60%),
+    conic-gradient(from var(--lv-turn) at var(--lv-at),
+      color-mix(in srgb, var(--lv-a) var(--lv-mix), transparent),
+      color-mix(in srgb, var(--lv-b) var(--lv-mix), transparent),
+      color-mix(in srgb, var(--lv-c) var(--lv-mix), transparent),
+      color-mix(in srgb, var(--lv-d) var(--lv-mix), transparent),
+      color-mix(in srgb, var(--lv-e) var(--lv-mix), transparent),
+      color-mix(in srgb, var(--lv-a) var(--lv-mix), transparent));
+  background-repeat: no-repeat;
+}
+.theme-dark .markdown-preview-view:is(.learning-log, .learning-themed),
+.theme-dark .markdown-source-view:is(.learning-log, .learning-themed) .cm-scroller,
+.theme-dark .learning-themed .markdown-reading-view > .markdown-preview-view,
+.theme-dark .learning-themed .markdown-source-view > .cm-editor > .cm-scroller {
+  background-image:
+    radial-gradient(60rem 40rem at 100% 0%, color-mix(in srgb, var(--lv-glow-1) 38%, transparent), transparent 70%),
+    radial-gradient(50rem 36rem at 0% 45%, color-mix(in srgb, var(--lv-glow-2) 30%, transparent), transparent 70%),
+    radial-gradient(56rem 40rem at 85% 100%, color-mix(in srgb, var(--lv-glow-3) 30%, transparent), transparent 70%);
+}
+
+.lv-theme-code       { --lv-a: #fda4af; --lv-b: #fde68a; --lv-c: #86efac; --lv-d: #67e8f9; --lv-e: #c4b5fd; }
+.lv-theme-math       { --lv-a: #93c5fd; --lv-b: #67e8f9; --lv-c: #5eead4; --lv-d: #c4b5fd; --lv-e: #a5b4fc; --lv-turn: 150deg; }
+.lv-theme-circuits   { --lv-a: #bef264; --lv-b: #86efac; --lv-c: #67e8f9; --lv-d: #fde68a; --lv-e: #a7f3d0; --lv-turn: 60deg; }
+.lv-theme-literature { --lv-a: #fdba74; --lv-b: #fda4af; --lv-c: #fde68a; --lv-d: #f9a8d4; --lv-e: #fcd34d; --lv-turn: 300deg; --lv-at: 25% 15%; }
+.lv-theme-design     { --lv-a: #f9a8d4; --lv-b: #fdba74; --lv-c: #fde68a; --lv-d: #c4b5fd; --lv-e: #fda4af; --lv-at: 30% 25%; }
+.lv-theme-calm       { --lv-a: #c4b5fd; --lv-b: #a5b4fc; --lv-c: #bae6fd; --lv-d: #f5d0fe; --lv-e: #ddd6fe; }
+
+.theme-dark .lv-theme-code       { --lv-glow-1: #8b5cf6; --lv-glow-2: #06b6d4; --lv-glow-3: #ec4899; }
+.theme-dark .lv-theme-math       { --lv-glow-1: #3b82f6; --lv-glow-2: #14b8a6; --lv-glow-3: #8b5cf6; }
+.theme-dark .lv-theme-circuits   { --lv-glow-1: #22c55e; --lv-glow-2: #06b6d4; --lv-glow-3: #84cc16; }
+.theme-dark .lv-theme-literature { --lv-glow-1: #f97316; --lv-glow-2: #e11d48; --lv-glow-3: #d946ef; }
+.theme-dark .lv-theme-design     { --lv-glow-1: #ec4899; --lv-glow-2: #f97316; --lv-glow-3: #a855f7; }
+.theme-dark .lv-theme-calm       { --lv-glow-1: #8b5cf6; --lv-glow-2: #6366f1; --lv-glow-3: #0ea5e9; }
+
+/* Dusk: one quiet diagonal sweep, for a subject whose record.md says
+   `theme: dusk`. Muted on purpose; the first try was too loud in the blues. */
+.markdown-preview-view.lv-theme-dusk,
+.markdown-source-view.lv-theme-dusk .cm-scroller,
+.lv-theme-dusk .markdown-reading-view > .markdown-preview-view,
+.lv-theme-dusk .markdown-source-view > .cm-editor > .cm-scroller {
+  background-image: linear-gradient(150deg,
+    color-mix(in srgb, #f5d0fe 34%, transparent) 0%,
+    color-mix(in srgb, #ddd6fe 30%, transparent) 40%,
+    color-mix(in srgb, #c7d2fe 28%, transparent) 75%,
+    color-mix(in srgb, #cffafe 30%, transparent) 100%);
+}
+.theme-dark .markdown-preview-view.lv-theme-dusk,
+.theme-dark .markdown-source-view.lv-theme-dusk .cm-scroller,
+.theme-dark .lv-theme-dusk .markdown-reading-view > .markdown-preview-view,
+.theme-dark .lv-theme-dusk .markdown-source-view > .cm-editor > .cm-scroller {
+  background-image: linear-gradient(150deg,
+    color-mix(in srgb, #a78bfa 20%, transparent) 0%,
+    color-mix(in srgb, #818cf8 16%, transparent) 45%,
+    color-mix(in srgb, #38bdf8 14%, transparent) 100%);
+}
+
+:is(.learning-log, .learning-themed) :is(.callout, pre) {
+  background-color: color-mix(in srgb, var(--background-primary) 62%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3);
+  border: 1px solid color-mix(in srgb, var(--background-primary) 70%, transparent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(40, 20, 90, 0.18);
+}
+:is(.learning-log, .learning-themed) pre { background-color: color-mix(in srgb, var(--background-primary) 78%, transparent); }
+/* Obsidian blends every callout into the page (darken in light mode, lighten
+   in dark), so code inside a callout shows the gradient through it. A code
+   block outside a callout blends the same way, or it reads as a white slab
+   next to tinted ones (2026-10-13). */
+:is(.learning-log, .learning-themed) pre:not(.callout pre) { mix-blend-mode: var(--callout-blend-mode); }
+
+/* Mermaid diagrams in a live log, drawn in the same glass as the callouts so
+   the page's colour carries through them: translucent nodes with a light rim
+   and the callouts' soft shadow, rounded corners, quiet grey wires. No node
+   gets a colour of its own, since a fixed tint fought the gradient behind it
+   (2026-10-13). A node given `class <id> key` is the solid one, outlined in
+   ink. Obsidian inverts diagrams in dark mode; here the dark colours are set
+   directly instead. Mermaid scopes its own styles by id, so these need
+   !important to win. A diagram inside a callout takes the callout's blend, so
+   its glass fades into the page. */
+:is(.learning-log, .learning-themed) .mermaid {
+  --lv-glass: color-mix(in srgb, var(--background-primary) 52%, transparent);
+  --lv-rim: color-mix(in srgb, var(--background-primary) 88%, transparent);
+  --lv-shadow: drop-shadow(0 6px 12px rgba(40, 20, 90, 0.13));
+  --lv-key: color-mix(in srgb, var(--background-primary) 90%, transparent);
+  --lv-key-rim: color-mix(in srgb, var(--text-normal) 50%, transparent);
+  --lv-wire: color-mix(in srgb, var(--text-muted) 75%, transparent);
+  display: flex;
+  justify-content: center;
+  margin-block: 1.2rem;
+}
+.theme-dark :is(.learning-log, .learning-themed) .mermaid {
+  --lv-glass: color-mix(in srgb, var(--background-primary) 45%, transparent);
+  --lv-rim: color-mix(in srgb, var(--text-normal) 16%, transparent);
+  --lv-shadow: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
+  --lv-key: color-mix(in srgb, var(--background-primary) 82%, transparent);
+  --lv-key-rim: color-mix(in srgb, var(--text-normal) 60%, transparent);
+}
+.theme-dark :is(.learning-log, .learning-themed) .mermaid > svg { filter: none; }
+/* The node shadows reach past the diagram's edge; let them show. */
+:is(.learning-log, .learning-themed) .mermaid > svg { overflow: visible; }
+/* Inside a callout the blend erases a light rim along with the glass, so the
+   shapes would vanish. A darker rim survives it. */
+:is(.learning-log, .learning-themed) .callout .mermaid { --lv-rim: color-mix(in srgb, var(--text-normal) 22%, transparent); }
+.theme-dark :is(.learning-log, .learning-themed) .callout .mermaid { --lv-rim: color-mix(in srgb, var(--text-normal) 30%, transparent); }
+
+:is(.learning-log, .learning-themed) .mermaid .node :is(.label-container, .label-container > path) {
+  fill: var(--lv-glass) !important;
+  stroke: var(--lv-rim) !important;
+  stroke-width: 1.25px !important;
+}
+:is(.learning-log, .learning-themed) .mermaid .node { filter: var(--lv-shadow); }
+:is(.learning-log, .learning-themed) .mermaid .node > rect.label-container { rx: 12px; ry: 12px; }
+:is(.learning-log, .learning-themed) .mermaid .node.key :is(.label-container, .label-container > path) {
+  fill: var(--lv-key) !important;
+  stroke: var(--lv-key-rim) !important;
+  stroke-width: 1.5px !important;
+}
+:is(.learning-log, .learning-themed) .mermaid .cluster > rect {
+  fill: color-mix(in srgb, var(--background-primary) 20%, transparent) !important;
+  stroke: var(--lv-rim) !important;
+  stroke-width: 1.25px !important;
+  stroke-dasharray: 5 4;
+  rx: 16px;
+  ry: 16px;
+}
+:is(.learning-log, .learning-themed) .mermaid .divider path { stroke: var(--lv-rim) !important; }
+
+:is(.learning-log, .learning-themed) .mermaid :is(.flowchart-link, .relation, .messageLine0, .messageLine1, .transition) {
+  stroke: var(--lv-wire) !important;
+  stroke-width: 1.5px !important;
+}
+:is(.learning-log, .learning-themed) .mermaid marker :is(path, circle) { stroke: var(--lv-wire) !important; }
+:is(.learning-log, .learning-themed) .mermaid .arrowMarkerPath { fill: var(--lv-wire) !important; }
+
+:is(.learning-log, .learning-themed) .mermaid :is(.nodeLabel, .label, .cluster-label) { color: var(--text-normal) !important; }
+/* Mermaid sizes each label box from the text as rendered, so a label may
+   change colour here but never weight or size, or it clips. */
+:is(.learning-log, .learning-themed) .mermaid .cluster-label .nodeLabel { color: var(--text-muted) !important; }
+:is(.learning-log, .learning-themed) .mermaid .edgeLabel p { background-color: transparent !important; }
+:is(.learning-log, .learning-themed) .mermaid :is(.labelBkg, span.edgeLabel) {
+  background-color: color-mix(in srgb, var(--background-primary) 70%, transparent) !important;
+  border-radius: 6px;
+  color: var(--text-muted) !important;
+}
+
+/* Thinking summaries: the terminal shows them, so the log does, quietly. */
+.callout[data-callout="thinking"] {
+  --callout-color: var(--text-faint);
+  --callout-icon: lucide-brain;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+/* Code the learner sent from the Code runner pane. */
+.callout[data-callout="code"] { --callout-color: var(--color-cyan); --callout-icon: lucide-terminal-square; }
+:is(.learning-log, .learning-themed) .callout { border-radius: 0.4rem; }
+
+/* Code in a live log keeps its lines: a long line scrolls sideways instead of
+   wrapping back to the left edge, which made indentation look wrong. */
+.learning-log pre,
+.learning-log pre code { white-space: pre; }
+.learning-log pre { overflow-x: auto; }
 
 /* Typography for every note in the vault (picked 2026-10-13 from Edison's
    references). Two faces:
@@ -90,16 +483,17 @@ body {
   --lv-ink-head: #fbf2d0;
 }
 
-/* Callout titles in a log become quiet labels, like "Font" over the name in
-   the reference: small caps, tracked out, warm grey. */
-.learning-log .callout-title {
+/* Callout titles in a log, and in every themed note, become quiet labels,
+   like "Font" over the name in the reference: small caps, tracked out, warm
+   grey, with the kind's colour on the icon. */
+:is(.learning-log, .learning-themed) .callout-title {
   font-size: 0.72em;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--text-muted);
 }
-.learning-log .callout-title .callout-icon { color: var(--callout-color); }
+:is(.learning-log, .learning-themed) .callout-title .callout-icon { color: var(--callout-color); }
 
 /* The model and effort line under each conversation heading. */
 .learning-log h2 + p > em:only-child {

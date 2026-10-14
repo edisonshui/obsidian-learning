@@ -506,6 +506,122 @@ eq("a real subject is listed", "- oop: oop | active" in index, True)
 eq("a folder without record.md is not listed as a subject", "- I: " in index, False)
 eq("but it is named, so the stray folder stays visible", "Not a subject (no record.md): I" in index, True)
 
+# What the terminal shows has to reach log.md. Two lesson explanations
+# (2026-10-08, 2026-10-13) lived only in a thinking summary: the terminal
+# printed it, the mirror skipped it, and the miss was blamed on tool-call order.
+
+def transcript(*rows, sid="conv-a"):
+    """Write a JSONL transcript; each row is (type, content[, extra fields])."""
+    path = VAULT / ("%s.jsonl" % sid)
+    with path.open("w") as handle:
+        for index, row in enumerate(rows):
+            kind, content = row[0], row[1]
+            line = {"type": kind, "uuid": "u%d" % index,
+                    "timestamp": "2026-10-13T05:%02d:00.000Z" % index,
+                    "message": {"role": kind, "id": "m%d" % index, "content": content}}
+            line.update(row[2] if len(row) > 2 else {})
+            handle.write(json.dumps(line) + "\n")
+    return path
+
+
+def stop(path, sid="conv-a"):
+    return olive.process(VAULT, {"session_id": sid, "hook_event_name": "Stop",
+                                 "transcript_path": str(path)})
+
+
+section("mirror — a thinking summary the terminal shows reaches the log")
+fresh(); subject("oop")
+stop(transcript(
+    ("user", "/learn-resume oop"),
+    ("assistant", [{"type": "thinking", "thinking": "For MC1, the answer is B since area is private."},
+                   {"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "true"}}]),
+    ("user", [{"type": "tool_result", "tool_use_id": "t1", "content": "ok"}]),
+    ("assistant", [{"type": "thinking", "thinking": ""},
+                   {"type": "text", "text": "Logged."}])))
+eq("the explanation that lived only in thinking is in log.md",
+   "For MC1, the answer is B since area is private." in subject_log("oop"), True)
+eq("an empty thinking block adds nothing",
+   subject_log("oop").count("[!thinking]"), 1)
+
+section("mirror — a pasted screenshot is embedded where [Image #N] was")
+import base64, hashlib  # noqa: E401
+PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==")
+fresh(); subject("oop")
+stop(transcript(
+    ("user", "/learn-resume oop"),
+    ("user", [{"type": "text", "text": "[Image #2] here's my compiler"},
+              {"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                                           "data": base64.b64encode(PNG).decode()}}],
+     {"imagePasteIds": [2]})))
+saved = VAULT / "Claude outputs/attachments" / (hashlib.sha256(PNG).hexdigest()[:16] + ".png")
+eq("the screenshot is written to the vault byte for byte",
+   saved.read_bytes() if saved.exists() else None, PNG)
+embed = "![[Claude outputs/attachments/%s|600]]" % saved.name
+eq("log.md embeds it in place of the token",
+   ("> " + embed + " here's my compiler" in subject_log("oop"), "[Image #2]" in subject_log("oop")),
+   (True, False))
+
+section("mirror — each subject's log gets a background theme")
+fresh()
+for slug, title, extra in (("q7", "CS 124 Quiz 7 — Inheritance", ""),
+                           ("arch", "CS 100 Quiz: Computer Architecture (CS 233 preview)", ""),
+                           ("lagr", "MATH 241 Lagrange multipliers (14.8)", ""),
+                           ("ealc", "EALC 275 Quiz 2 — Analects, Bai Juyi", ""),
+                           ("dtx", "DTX 221 Midterm — HCD spaces", ""),
+                           ("home", "Homelessness in Champaign", ""),
+                           ("mine", "CS 124 Quiz 8", "theme: literature\n")):
+    (VAULT / "learn/subjects" / slug).mkdir(parents=True)
+    (VAULT / "learn/subjects" / slug / "record.md").write_text(
+        '---\nsubject: "%s"\ntitle: "%s"\n%sstatus: active\n---\n' % (slug, title, extra))
+    turn("/learn-resume " + slug)
+themes = {slug: re.search(r"cssclasses: \[learning-log, lv-theme-(\w+)\]", subject_log(slug))
+          for slug in ("q7", "arch", "lagr", "ealc", "dtx", "home", "mine")}
+eq("the theme follows the subject, and record.md theme: overrides it",
+   {slug: match and match[1] for slug, match in themes.items()},
+   {"q7": "code", "arch": "circuits", "lagr": "math", "ealc": "literature",
+    "dtx": "design", "home": "calm", "mine": "literature"})
+eq("a progress page wears the same theme as its subject's log",
+   {slug: re.search(r"lv-theme-(\w+)", status.progress_note(
+       slug, VAULT / "learn/subjects" / slug,
+       vaultlib.frontmatter(VAULT / "learn/subjects" / slug / "record.md"), {}, "", [], datetime(2026, 10, 14).date())
+       .split("\n---\n", 1)[0])[1] for slug in themes},
+   {slug: match and match[1] for slug, match in themes.items()})
+
+section("mirror — code sent from the Obsidian runner reaches the tutor once")
+fresh(); subject("oop")
+turn("/learn-resume oop")
+runner = VAULT / ".claude/obsidian-live/runner"
+runner.mkdir(parents=True)
+(runner / "shared.json").write_text(json.dumps({
+    "id": "run-1", "sent_at": olive.now(), "language": "java",
+    "code": 'void main() { System.out.println("meow"); }', "stdin": "",
+    "stdout": "meow\n", "stderr": "", "exit_code": 0, "timed_out": False, "ms": 412}))
+told = turn("check my code")
+eq("the tutor is handed the code and what it printed",
+   ('System.out.println("meow")' in told, "meow\n" in told, "exit 0" in told), (True, True, True))
+log = subject_log("oop")
+eq("log.md shows it as a code callout before the prompt that sent it",
+   0 <= log.find("[!code]") < log.find("check my code"), True)
+eq("it is delivered once, not on every later prompt",
+   'System.out.println("meow")' in turn("next"), False)
+
+section("mirror — runner code for a subject skips a conversation teaching something else")
+# 2026-10-13: a share sent during the Quiz 7 lesson went to an engineering chat
+# that happened to prompt first, and the lesson got a screenshot instead.
+fresh(); subject("oop")
+turn("/learn-resume oop", sid="lesson")
+turn("fix the plugin", sid="other")
+runner = VAULT / ".claude/obsidian-live/runner"
+runner.mkdir(parents=True)
+(runner / "shared.json").write_text(json.dumps({
+    "id": "run-2", "sent_at": olive.now(), "language": "java", "subject": "oop",
+    "code": 'System.out.println("woof");', "stdin": "",
+    "stdout": "woof\n", "stderr": "", "exit_code": 0, "timed_out": False, "ms": 300}))
+eq("a conversation with no subject leaves it alone",
+   'println("woof")' in turn("unrelated", sid="other"), False)
+eq("the conversation teaching that subject gets it",
+   'println("woof")' in turn("check my code", sid="lesson"), True)
+
 if VAULT and VAULT.exists():
     shutil.rmtree(VAULT)
 
@@ -2354,36 +2470,46 @@ home_on = status.home(home_ranked, HOME_SUBJECTS, home_state, True, HOME_DAY)
 home_off = status.home(home_ranked, HOME_SUBJECTS, home_state, False, HOME_DAY)
 eq("frontmatter marks Home as a generated learning note",
    home_on.split("\n---\n", 1)[0].splitlines(),
-   ["---", "type: learning-home", 'updated: "2026-09-24"', "generated: true", "cssclasses: [learning-note]"])
+   ["---", "type: learning-home", 'updated: "2026-09-24"', "generated: true",
+    "cssclasses: [learning-note, learning-themed, lv-theme-calm]"])
 body = home_on.split("\n---\n", 1)[1].lstrip("\n")
 eq("no H1, and the welcome card leads with the date and the top candidate's welcome and bare command",
    body.splitlines()[:4],
-   ["> [!question] Thursday, 24 September",
+   ["> [!question|welcome] Thursday, 24 September",
     "> Ready when you are. A good next step is to bring back *Aliasing* in Pointers. It slipped on 23 Sep, "
     "and one short session puts it back.", ">", "> `learn-resume ptr`"])
 eq("the other candidates are folded, one line each with the bare command",
    [line for line in body.splitlines() if line.startswith("> - **")],
    ["> - **Resume** OOP: *LSP* is next. `learn-resume oop`", "> - **Start** something new. `learn-start`"])
-eq("the fold counts them", "> [!note]- Other options (2)" in body, True)
+eq("the fold counts them", "> [!note|options]- Other options (2)" in body, True)
 eq("section order: card, options, earned, milestone, counts, footer",
-   [body.index(mark) for mark in ("[!question]", "Other options", "## Recently earned", "Next up:",
+   [body.index(mark) for mark in ("[!question|welcome]", "Other options", "## Recently earned", "Next up:",
                                   "nodes proven", "*Rewards are on.")] == sorted(
-       body.index(mark) for mark in ("[!question]", "Other options", "## Recently earned", "Next up:",
+       body.index(mark) for mark in ("[!question|welcome]", "Other options", "## Recently earned", "Next up:",
                                      "nodes proven", "*Rewards are on.")), True)
-eq("recently earned cards: newest first, one per subject, date, and kind",
-   [line for line in body.splitlines() if line.startswith("> [!success]") or line.startswith("> [!abstract]")
-    or line.startswith("> [!tip]")],
-   ["> [!success] Solid, 22 Sep · OOP", "> [!abstract] Goal met, 17 Sep · Pointers", "> [!success] Solid, 17 Sep · Pointers"])
+eq("recently earned cards: one HTML row, newest first, one per subject, date, and kind",
+   re.findall(r'data-kind="(\w+)"><span class="lv-label">([^<]+)</span> <strong>([^<]+)</strong>',
+              next(line for line in body.splitlines() if line.startswith('<div class="lv-cards">'))),
+   [("success", "Solid · 22 Sep", "OOP"), ("abstract", "Goal met · 17 Sep", "Pointers"),
+    ("success", "Solid · 17 Sep", "Pointers")])
+eq("a card escapes its title and names, and a goal card lists no names",
+   status.earned_cards([{"subject": "a", "date": "2026-09-20", "kind": "Solid", "name": "x < y & z", "title": "A&B"},
+                        {"subject": "b", "date": "2026-09-19", "kind": "Goal met", "name": "B", "title": "B"}]),
+   ['<div class="lv-cards"><div class="lv-card" data-kind="success"><span class="lv-label">Solid · 20 Sep</span> '
+    '<strong>A&amp;B</strong> <span>x &lt; y &amp; z</span></div><div class="lv-card" data-kind="abstract">'
+    '<span class="lv-label">Goal met · 19 Sep</span> <strong>B</strong></div></div>', ""])
 eq("the next milestone names the checked nodes", "Next up: *SRP* is one passed check from solid." in body, True)
-eq("the counts line holds nodes proven, goals met, and the live streak, then the Dashboard link",
-   [line for line in body.splitlines() if "nodes proven" in line],
-   ["3 nodes proven · 1 goal met · review streak 2 weeks · [[learn/Dashboard|all subjects and badges]]"])
+eq("the count tiles hold nodes proven, goals met, and the live streak, then the Dashboard link",
+   [re.findall(r"<b>(\w+)</b> <span>([^<]+)</span>", line) for line in body.splitlines() if "nodes proven" in line]
+   + [line for line in body.splitlines() if "learn/Dashboard" in line],
+   [[("3", "nodes proven"), ("1", "goal met"), ("2", "week review streak")],
+    "[[learn/Dashboard|All subjects and badges →]]"])
 eq("the footer names the setting and how to change it",
    ("*Rewards are on. Turn them off with `rewards: off` in [[learn/me/preferences|preferences]].*" in body,
     body.rstrip().endswith("*Generated from the records; edits are overwritten.*")), (True, True))
 eq("with rewards off: no earned cards, no milestone, no counts, and only the link",
    ("## Recently earned" in home_off, "Next up:" in home_off, "nodes proven" in home_off,
-    "\n[[learn/Dashboard|all subjects and badges]]\n" in home_off,
+    "\n[[learn/Dashboard|All subjects and badges →]]\n" in home_off,
     "*Rewards are off. Turn them on with `rewards: on` in [[learn/me/preferences|preferences]].*" in home_off),
    (False, False, False, True, True))
 eq("with rewards off the recommended action still leads", "> `learn-resume ptr`" in home_off, True)
@@ -2392,7 +2518,7 @@ QUIET = [rsubject("fin", [rnode("n1", "solid", "2026-09-22", name="Leaves"),
 quiet = status.home(status.rank(QUIET, [], HOME_DAY), QUIET, status.rewards(QUIET, HOME_DAY), True, HOME_DAY)
 eq("nothing pending: the card says so and names the next review",
    quiet.split("\n---\n", 1)[1].lstrip("\n").splitlines()[:5],
-   ["> [!question] Thursday, 24 September", "> Everything you've proven is up to date.",
+   ["> [!question|welcome] Thursday, 24 September", "> Everything you've proven is up to date.",
     "> The next review is *Roots* on 26 Sep.", ">", "> Curious about something new? `learn-start`"])
 eq("with nothing proven the next-review line is left out, and there are no other options",
    [line for line in status.home(status.rank([rsubject("x", [], status="done")], [], HOME_DAY),
@@ -2404,8 +2530,8 @@ eq("up to 3 milestone nodes, soonest due first",
                                     for i in range(1, 5)])]),
    "Next up: *N4*, *N3*, and *N2* are each one passed check from solid.")
 eq("the 3 latest cards only",
-   len([line for line in status.earned_cards(status.rewards([TWICE, SOLID_ONCE, SAME_DATE[0], SAME_DATE[1]],
-                                                            DUE_DAY)["badges"]) if line.startswith("> [!")]), 3)
+   "".join(status.earned_cards(status.rewards([TWICE, SOLID_ONCE, SAME_DATE[0], SAME_DATE[1]],
+                                              DUE_DAY)["badges"])).count('class="lv-card"'), 3)
 HOME_VAULT = fresh()
 write(HOME_VAULT / "learn/subjects/fx/record.md",
       '---\nsubject: "fx"\ntitle: "Fx"\nstatus: active\n---\n\n'
@@ -2440,7 +2566,8 @@ page_on = status.progress_note("oop", P4, p_fields, P_NODES, "", [], DUE_DAY, ev
                                rewards_on=True, state=p_state, streak=p_state["streak"])
 page_off = status.progress_note("oop", P4, p_fields, P_NODES, "", [], DUE_DAY, events=P_EVENTS,
                                 rewards_on=False, state=p_state, streak=p_state["streak"])
-eq("every progress page opts into the snippet", "cssclasses: [learning-note]" in page_on.split("\n---\n", 1)[0], True)
+eq("every progress page opts into the snippet, in its subject's theme",
+   "cssclasses: [learning-note, learning-themed, lv-theme-calm]" in page_on.split("\n---\n", 1)[0], True)
 eq("the next action is a todo callout, and the link row has Resume and Home",
    ("> [!todo] Next action\n> Teach n5." in page_on,
     "[[learn/subjects/oop/resume|Resume]] · [[learn/subjects/oop/record|Record]] · "
@@ -2513,7 +2640,7 @@ eq("no blank lines, and no <style>, <use>, or <foreignObject>",
 eq("colours are theme variables only", re.findall(r"#[0-9a-fA-F]{3,8}\b", re.sub(r"url\(#[^)]*\)", "", page_on)), [])
 ids = re.findall(r'id="([^"]+)"', page_on)
 eq("gradient and filter ids are unique on the page and prefixed per SVG",
-   (len(ids) == len(set(ids)), all(i.startswith(("st-oop-", "tl-oop-")) for i in ids)), (True, True))
+   (len(ids) == len(set(ids)), all(i.startswith("st-oop-") for i in ids)), (True, True))
 eq("the viewBox has an 800px floor and the SVG fits the note width",
    (float(re.search(r'viewBox="0 0 ([\d.]+) ', tree_on).group(1)) >= 800, 'width="100%"' in tree_on), (True, True))
 eq("labels wrap at 22 characters on words, and the full name survives",
@@ -2559,16 +2686,27 @@ eq("Active, then Done, alphabetical by title; an empty Paused is left out",
    [line.split("|")[1].split("]]")[0] if line.startswith("- ") else line
     for line in board.splitlines() if line.startswith(("## ", "- [["))],
    ["## Active", "Alpha", "Zeta", "## Done", "Aged", "Finished", "Idle"])
-eq("a line holds the bar, proven count, last session, and a deadline ahead",
-   next(line for line in board.splitlines() if "|Zeta]]" in line),
-   "- [[learn/subjects/zeta/progress|Zeta]] `████████████████` 100% 1/1 proven · last 23 Sep · deadline in 4 days")
+eq("a line holds the meter, proven count, last session, and a deadline ahead as a chip",
+   re.sub(r"<svg.*?</svg>", "<svg/>", next(line for line in board.splitlines() if "|Zeta]]" in line)),
+   '- [[learn/subjects/zeta/progress|Zeta]] <span class="lv-row"><svg/> <span class="lv-num">100%</span> '
+   '1/1 proven · last 23 Sep<span class="lv-sep"> · </span><span class="lv-tag" data-tone="deadline">'
+   'deadline in 4 days</span></span>')
+eq("the meter: proven solid, taught faint, over a full track, with the count in its label",
+   status.meter(1, 1, 4, width=100),
+   '<svg class="lv-meter" width="100" height="6" viewBox="0 0 100 6" role="img" aria-label="1 of 4 proven">'
+   '<rect width="100" height="6" rx="3" style="fill: var(--background-modifier-border)"/>'
+   '<rect width="50" height="6" rx="3" style="fill: var(--color-green); fill-opacity: 0.35"/>'
+   '<rect width="25" height="6" rx="3" style="fill: var(--color-green)"/></svg> <span class="lv-num">25%</span>')
+eq("a chip's tone follows what it asks for",
+   [re.search(r'data-tone="(\w+)"', status.tag(text))[1] for text in ("1 to repair", "3 due for review", "deadline today")],
+   ["repair", "due", "deadline"])
 eq("a done subject with a decayed node shows N to repair, one with a due node N due for review, an untouched one nothing",
-   [next(line for line in board.splitlines() if "|%s]]" % t in line).rsplit(" · ", 1)[-1]
+   [re.sub(r"<[^>]+>", "", next(line for line in board.splitlines() if "|%s]]" % t in line)).rsplit(" · ", 1)[-1]
     for t in ("Finished", "Aged", "Idle")], ["1 to repair", "1 due for review", "last 23 Sep"])
 eq("a subject with no nodes yet says so instead of an empty bar",
    next(line for line in status.dashboard([dsubject("diag", [], status="diagnosing")], DUE_DAY, [], [],
                                           board_state, True).splitlines() if "|Diag]]" in line),
-   "- [[learn/subjects/diag/progress|Diag]] no plan yet · last never")
+   '- [[learn/subjects/diag/progress|Diag]] <span class="lv-row">no plan yet · last never</span>')
 eq("the tag function is shared: repair before review",
    (status.pending_tag(BOARD[2]["nodes"], {}, DUE_DAY), status.pending_tag(BOARD[3]["nodes"], {}, DUE_DAY),
     status.pending_tag(BOARD[4]["nodes"], {}, DUE_DAY)), ("1 to repair", "1 due for review", ""))

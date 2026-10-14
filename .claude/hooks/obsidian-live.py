@@ -7,6 +7,7 @@ No network calls, background service, Obsidian plugin, or AI tokens are needed.
 """
 
 import argparse
+import base64
 import fcntl
 import hashlib
 import json
@@ -19,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from vaultlib import open_session_note  # noqa: E402
+from vaultlib import frontmatter, open_session_note, theme_of  # noqa: E402
 
 
 IDLE_SECONDS = 15 * 60      # a longer gap means the learner stepped away
@@ -31,6 +32,10 @@ NOTICE_KEEP = 20            # standing log notices held per conversation
 FLAGGED_KEEP = 40           # probe digests remembered, so one is withdrawn once
 PROBE_BUDGET = 3.0          # seconds of Jev time per picker; the hook timeout is 5
 NOTICE_ROLE = "Tutor — notice"
+CODE_ROLE = "You — code"
+SHARE_MAX_AGE = 6 * 3600    # a runner share older than this is stale, not a reply
+SHARE_CODE_CHARS = 20000
+SHARE_OUTPUT_CHARS = 8000
 
 
 def now():
@@ -133,7 +138,47 @@ def stop_feedback(row):
     return row.get("type") == "user" and str(content).startswith("Stop hook feedback:")
 
 
-def read_transcript(path):
+IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}
+ATTACHMENTS = "Claude outputs/attachments"   # gitignored with the rest of Claude outputs/
+
+
+def save_image(vault, block):
+    """Write a pasted image into the vault once, named by its content, and
+    return the embed for it, or "" when it cannot be shown."""
+    source = block.get("source") or {}
+    extension = IMAGE_TYPES.get(source.get("media_type"))
+    if not vault or source.get("type") != "base64" or not extension:
+        return ""
+    try:
+        data = base64.b64decode(source.get("data", ""), validate=True)
+    except ValueError:
+        return ""
+    name = hashlib.sha256(data).hexdigest()[:16] + "." + extension
+    path = vault / ATTACHMENTS / name
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    return "![[%s/%s|600]]" % (ATTACHMENTS, name)
+
+
+def place_images(texts, embeds, paste_ids):
+    """Swap each "[Image #N]" token for its embed; return the embeds left over.
+
+    `imagePasteIds` lists the paste number of each image block in order, which
+    is what the terminal printed as [Image #N].
+    """
+    leftover = []
+    for position, embed in enumerate(embeds):
+        token = "[Image #%s]" % paste_ids[position] if position < len(paste_ids) else None
+        holder = next((item for item in texts if token and token in item["display"]), None)
+        if holder:
+            holder["display"] = holder["display"].replace(token, embed, 1)
+        else:
+            leftover.append(embed)
+    return leftover
+
+
+def read_transcript(path, vault=None):
     """Read the transcript into log entries.
 
     A blocking Stop hook (the em-dash check) makes the model rewrite its last
@@ -183,6 +228,7 @@ def read_transcript(path):
                 if text:
                     entries.append(entry(key, "You" if kind == "user" else "Claude", text, stamp))
                 continue
+            texts, embeds = [], []
             for index, block in enumerate(content):
                 block_type = block.get("type")
                 if block_type == "text":
@@ -191,13 +237,24 @@ def read_transcript(path):
                         text = user_text(text)
                     if text:
                         entries.append(entry(f"{key}-{index}", "You" if kind == "user" else "Claude", text, stamp))
+                        if kind == "user":
+                            # `text` stays as typed so reconciliation still matches
+                            # the prompt the hook saw; only rendering reads display.
+                            entries[-1]["display"] = text
+                            texts.append(entries[-1])
                         if kind == "assistant":
                             message_id = message.get("id") or key
                             if message_id != reply_id:
                                 reply_id, reply_keys = message_id, []
                             reply_keys.append(f"{key}-{index}")
+                elif block_type == "thinking" and kind == "assistant":
+                    # The terminal prints the thinking summary; twice a lesson
+                    # explanation existed only there, so the log must show it too.
+                    text = (block.get("thinking") or "").strip()
+                    if text:
+                        entries.append(entry(f"{key}-{index}", "Claude — thinking", text, stamp))
                 elif block_type == "image" and kind == "user":
-                    entries.append(entry(f"{key}-{index}", "You", "[Image attached in the terminal]", stamp))
+                    embeds.append((index, save_image(vault, block) or "[Image attached in the terminal]"))
                 elif block_type == "tool_use" and block.get("name") == "AskUserQuestion":
                     question_ids.add(block["id"])
                     entries.append(entry("questions-" + block["id"], "Claude — questions",
@@ -211,6 +268,10 @@ def read_transcript(path):
                             text = "\n".join(b.get("text", "") for b in text if b.get("type") == "text")
                     if text:
                         entries.append(entry("answers-" + block["tool_use_id"], "You — answers", text, stamp))
+            if embeds:
+                leftover = place_images(texts, [embed for _, embed in embeds], row.get("imagePasteIds") or [])
+                for index, embed in [pair for pair in embeds if pair[1] in leftover]:
+                    entries.append(entry(f"{key}-{index}", "You", embed, stamp))
     return entries, metadata
 
 
@@ -416,10 +477,82 @@ def merge_notices(items, notices):
     return merged + pending
 
 
+def merge_by_time(items, extras):
+    """Put each extra entry before the first conversation entry that is later.
+
+    Code sent from the runner has no JSONL row, so like a notice it must live
+    outside `baseline` and `current`. It has no entry to anchor to either: the
+    prompt it precedes changes key when the transcript catches up. Its time
+    does not change, and it was sent before the prompt that delivered it.
+    """
+    merged, pending = [], sorted(extras, key=lambda item: item["time"])
+    for item in items:
+        stamp = parse_time(item.get("time"))
+        while pending and stamp and parse_time(pending[0]["time"]) < stamp:
+            merged.append(pending.pop(0))
+        merged.append(item)
+    return merged + pending
+
+
 def all_entries(state):
-    """The one definition of "the conversation", notices included."""
-    return merge_notices(state.get("baseline", []) + state.get("current", []),
-                         state.get("notices", []))
+    """The one definition of "the conversation", notices and shared code included."""
+    return merge_by_time(merge_notices(state.get("baseline", []) + state.get("current", []),
+                                       state.get("notices", [])),
+                         state.get("shared", []))
+
+
+def clip(text, limit):
+    text = str(text or "")
+    return text if len(text) <= limit else text[:limit] + "\n[... cut at %d characters]" % limit
+
+
+def share_body(share):
+    """The code and its result, as Markdown: what the log shows and the tutor reads."""
+    language = re.sub(r"[^a-z0-9+#]", "", str(share.get("language", "")).lower())
+    if share.get("timed_out"):
+        result = "stopped after %s ms (time limit)" % share.get("ms", "?")
+    else:
+        result = "exit %s in %s ms" % (share.get("exit_code", "?"), share.get("ms", "?"))
+    parts = ["```" + language, clip(share.get("code"), SHARE_CODE_CHARS).rstrip("\n"), "```", "",
+             "Result: " + result]
+    for label, key in (("Input", "stdin"), ("Output", "stdout"), ("Errors", "stderr")):
+        if str(share.get(key) or "").strip():
+            parts.extend(["", label + ":", "```text",
+                          clip(share[key], SHARE_OUTPUT_CHARS).rstrip("\n"), "```"])
+    return "\n".join(parts)
+
+
+def take_share(runtime, state):
+    """Claim code the learner sent from the Obsidian runner, at most once.
+
+    The runner pane (.obsidian/plugins/learn-live) writes runner/shared.json
+    and cannot reach the terminal itself, so the next prompt carries it.
+    `delivered` is global, not per conversation: a share is one message from
+    the learner and only one conversation should answer it. A share stamped
+    with a `subject` (the learning note the learner last had open) waits for
+    the conversation teaching that subject, so a side chat cannot take it.
+    """
+    folder = runtime / "runner"
+    try:
+        share = json.loads((folder / "shared.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return ""
+    if share.get("subject") and share["subject"] != state.get("subject"):
+        return ""
+    share_id = str(share.get("id", ""))
+    delivered = folder / "delivered"
+    sent = parse_time(share.get("sent_at"))
+    if (not share_id or not sent
+            or (delivered.exists() and delivered.read_text() == share_id)
+            or (datetime.now(timezone.utc) - sent).total_seconds() > SHARE_MAX_AGE):
+        return ""
+    atomic_write(delivered, share_id)
+    body = share_body(share)
+    shared = state.setdefault("shared", [])
+    shared.append(entry("code-" + share_id, CODE_ROLE, body, sent.isoformat()))
+    del shared[:-NOTICE_KEEP]
+    return ("The learner sent this from the Code runner pane in Obsidian. It is "
+            "their own work, already shown in log.md, so do not paste it back:\n\n" + body)
 
 
 # A dot is allowed so "14.8" is read as a word; command_slug turns it into the hyphen slugs use.
@@ -487,13 +620,15 @@ def subject_segments(vault, state):
 NODE_HEADING = re.compile(r"\*\*(?:Node\s+)?(n\d+)\s*[—–:-]\s*([^*\n]+?)\*\*")
 
 
-def callout(text, kind, title):
+def callout(text, kind, title, fold=""):
     """Wrap a message in an Obsidian callout, one '>' per line.
+
+    `fold` is "+" (foldable, open) or "-" (foldable, closed).
 
     Fenced code survives this: Obsidian renders a code block inside a callout as
     long as every line carries the marker.
     """
-    lines = ["> [!" + kind + "] " + title]
+    lines = ["> [!" + kind + "]" + fold + " " + title]
     for line in text.splitlines():
         lines.append("> " + line if line.strip() else ">")
     return lines
@@ -533,7 +668,7 @@ def entry_lines(items):
     """
     lines, headings = [], set()
     for item in items:
-        text = (item.get("text") or "").strip()
+        text = (item.get("display") or item.get("text") or "").strip()
         if not text:
             continue
         stamp = local_clock(item.get("time"))
@@ -550,15 +685,24 @@ def entry_lines(items):
                     lines.extend([after, ""])
             else:
                 lines.extend([text, ""])
+        elif role == "Claude — thinking":
+            lines.extend(callout(text, "thinking", "Thinking (shown in the terminal)", "+") + [""])
         elif role == "Claude — questions":
             lines.extend(callout(text, "question", "Question" + suffix) + [""])
         elif role == "You — answers":
             lines.extend(callout(text, "quote", "Your answer" + suffix) + [""])
+        elif role == CODE_ROLE:
+            lines.extend(callout(text, "code", "Your code" + suffix) + [""])
         elif role == NOTICE_ROLE:
             lines.extend(callout(text, "warning", "Probe check" + suffix) + [""])
         else:
             lines.extend(callout(text, "quote", "You" + suffix) + [""])
     return lines
+
+
+def subject_theme(vault, subject):
+    """The background a subject's log is drawn with; see `vaultlib.theme_of`."""
+    return theme_of(frontmatter(vault / "learn" / "subjects" / subject / "record.md"), subject)
 
 
 def write_subject_logs(vault, runtime, state):
@@ -575,6 +719,7 @@ def write_subject_logs(vault, runtime, state):
         conversations = [json.loads(path.read_text()) for path in directory.glob("*.json")]
         conversations.sort(key=lambda conversation: (conversation["entries"][0]["time"], conversation["session_id"]))
         lines = ["---", "type: learning-chat-log", f"subject: {json.dumps(subject)}",
+                 f"cssclasses: [learning-log, lv-theme-{subject_theme(vault, subject)}]",
                  f"conversations: {len(conversations)}",
                  f"updated: {json.dumps(datetime.now().strftime('%Y-%m-%d'))}", "---", "",
                  "# Chat log", "",
@@ -704,7 +849,7 @@ def process(vault, payload, mode="hook"):
         notice = ""
         deny = ""          # set only by the PreToolUse probe guard
         clock_event = ""   # set by whichever branch below counts as a turn
-        canonical, metadata = read_transcript(transcript) if mode != "status" else ([], {})
+        canonical, metadata = read_transcript(transcript, vault) if mode != "status" else ([], {})
         superseded = metadata.pop("superseded", [])
         if superseded:
             state["current"] = [item for item in state["current"]
@@ -728,6 +873,8 @@ def process(vault, payload, mode="hook"):
                 state["streams"] = {}
             if event == "UserPromptSubmit":
                 clock_event = "prompt"
+                if mode != "status":
+                    notice = take_share(runtime, state)
                 prompt = payload.get("prompt", "")
                 # A queued subagent hand-back or task-notification can be absorbed
                 # into this same turn by the harness, arriving here as raw prompt
@@ -770,7 +917,7 @@ def process(vault, payload, mode="hook"):
         # this conversation is teaching, and the clock is keyed on that subject's
         # open note. Timing the turn any earlier reads the previous turn's subject.
         if clock_event and mode != "status":
-            notice = update_clock(vault, runtime, state, clock_event)
+            notice = "\n\n".join(part for part in (notice, update_clock(vault, runtime, state, clock_event)) if part)
         content = render(state)
         archive = vault / "Claude outputs" / "Conversations" / f"{session_id}.md"
         atomic_write(archive, content)

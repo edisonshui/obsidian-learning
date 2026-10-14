@@ -1,0 +1,106 @@
+/* Code runner pane */
+.learn-runner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  height: 100%;
+  padding: 0.6rem !important;
+}
+.learn-runner-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.learn-runner-bar .dropdown { width: auto; }
+.learn-runner-editor {
+  flex: 1 1 55%;
+  min-height: 12rem;
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background: var(--code-background);
+}
+.learn-runner-editor .cm-editor { height: 100%; font-family: var(--font-monospace); font-size: var(--code-size); }
+.learn-runner-editor .cm-editor.cm-focused { outline: none; }
+.learn-runner-editor .cm-scroller { overflow: auto; }
+.learn-runner-editor .cm-gutters {
+  background: transparent;
+  border-right: 1px solid var(--background-modifier-border);
+  color: var(--text-faint);
+}
+.learn-runner-editor .cm-activeLine,
+.learn-runner-editor .cm-activeLineGutter { background: var(--background-modifier-hover); }
+.learn-runner-editor .cm-matchingBracket { background: var(--background-modifier-active-hover); outline: 1px solid var(--interactive-accent); }
+.learn-runner-plain {
+  width: 100%;
+  height: 100%;
+  resize: none;
+  border: none;
+  font-family: var(--font-monospace);
+  background: transparent;
+}
+
+/* Syntax colours from the theme's own code palette. main.js marks each token
+   with lv-tok-<name>, the name streamMode gave it. */
+.learn-runner-editor .lv-tok-keyword { color: var(--code-keyword); }
+.learn-runner-editor .lv-tok-string { color: var(--code-string); }
+.learn-runner-editor .lv-tok-comment { color: var(--code-comment); font-style: italic; }
+.learn-runner-editor .lv-tok-number,
+.learn-runner-editor .lv-tok-atom { color: var(--code-value); }
+.learn-runner-editor .lv-tok-typeName { color: var(--code-tag); }
+.learn-runner-editor .lv-tok-def { color: var(--code-function); }
+.learn-runner-editor .lv-tok-meta { color: var(--code-important); }
+.learn-runner-editor .lv-tok-operator { color: var(--code-operator); }
+
+.learn-runner-target { font-size: var(--font-ui-smaller); color: var(--text-faint); margin-top: -0.2rem; }
+
+.learn-runner-stdin summary { cursor: pointer; color: var(--text-muted); font-size: var(--font-ui-small); }
+.learn-runner-stdin textarea { width: 100%; margin-top: 0.3rem; font-family: var(--font-monospace); font-size: var(--code-size); }
+
+.learn-runner-output { flex: 0 1 40%; display: flex; flex-direction: column; min-height: 6rem; }
+.learn-runner-status { font-size: var(--font-ui-small); color: var(--text-muted); margin-bottom: 0.3rem; }
+.learn-runner-status.is-error { color: var(--text-error); }
+.learn-runner-out {
+  flex: 1;
+  margin: 0;
+  overflow: auto;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-s);
+  background: var(--code-background);
+  font-family: var(--font-monospace);
+  font-size: var(--code-size);
+  white-space: pre-wrap;
+  user-select: text;
+}
+.learn-runner-stderr { color: var(--text-error); }
+.learn-runner-quiet { color: var(--text-faint); }
+
+/* Run on fenced code in Reading view: drawn like Obsidian's copy button
+   (muted icon, no fill, shown on hover) and placed just left of it. */
+.markdown-rendered pre:has(> .learn-run-block) { position: relative; }
+.markdown-rendered button.learn-run-block {
+  position: absolute;
+  top: 0;
+  inset-inline-end: 2.4rem;
+  margin: 6px;
+  padding: 6px 8px;
+  height: auto;
+  background-color: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+}
+.markdown-rendered button.learn-run-block:hover { background-color: var(--background-modifier-hover); color: var(--text-accent); }
+.markdown-rendered pre:not(:hover) > button.learn-run-block { display: none; }
+
+/* Follow mode */
+.learn-follow-host { position: relative; }
+.learn-follow-pill {
+  position: absolute;
+  bottom: 1.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  box-shadow: var(--shadow-s);
+  transition: opacity 150ms ease;
+}
+.learn-follow-pill.is-hidden { opacity: 0; pointer-events: none; }
