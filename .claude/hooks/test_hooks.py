@@ -1692,7 +1692,7 @@ eq("most recent last_session first, then slug; a passed deadline sinks below eve
    kinds(found), [("Resume", "new"), ("Resume", "a"), ("Resume", "b"), ("Resume", "past"), ("Start", None)])
 eq("every node proven reads as a wrap-up, not a lesson to continue",
    (found[0]["reason"], found[0]["welcome"]),
-   ("every planned node is proven, so this is a wrap-up", "wrap up New, where every planned node is proven"))
+   ("every planned topic is passed, so this is a wrap-up", "wrap up New, where every planned topic is passed"))
 eq("no planned node but one still being learned reads continue the plan",
    status.rank([rsubject("mid", [rnode("n1", "introduced")])], [], DUE_DAY)[0]["reason"], "continue the plan")
 eq("an open note is named as closed out first",
@@ -2484,9 +2484,9 @@ eq("the other candidates are folded, one line each with the bare command",
 eq("the fold counts them", "> [!note|options]- Other options (2)" in body, True)
 eq("section order: card, options, earned, milestone, counts, footer",
    [body.index(mark) for mark in ("[!question|welcome]", "Other options", "## Recently earned", "Next up:",
-                                  "nodes proven", "*Rewards are on.")] == sorted(
+                                  "topics passed", "*Rewards are on.")] == sorted(
        body.index(mark) for mark in ("[!question|welcome]", "Other options", "## Recently earned", "Next up:",
-                                     "nodes proven", "*Rewards are on.")), True)
+                                     "topics passed", "*Rewards are on.")), True)
 eq("recently earned cards: one HTML row, newest first, one per subject, date, and kind",
    re.findall(r'data-kind="(\w+)"><span class="lv-label">([^<]+)</span> <strong>([^<]+)</strong>',
               next(line for line in body.splitlines() if line.startswith('<div class="lv-cards">'))),
@@ -2499,16 +2499,16 @@ eq("a card escapes its title and names, and a goal card lists no names",
     '<strong>A&amp;B</strong> <span>x &lt; y &amp; z</span></div><div class="lv-card" data-kind="abstract">'
     '<span class="lv-label">Goal met · 19 Sep</span> <strong>B</strong></div></div>', ""])
 eq("the next milestone names the checked nodes", "Next up: *SRP* is one passed check from solid." in body, True)
-eq("the count tiles hold nodes proven, goals met, and the live streak, then the Dashboard link",
-   [re.findall(r"<b>(\w+)</b> <span>([^<]+)</span>", line) for line in body.splitlines() if "nodes proven" in line]
+eq("the count tiles hold topics passed, goals reached, and the live streak, then the Dashboard link",
+   [re.findall(r"<b>(\w+)</b> <span>([^<]+)</span>", line) for line in body.splitlines() if "topics passed" in line]
    + [line for line in body.splitlines() if "learn/Dashboard" in line],
-   [[("3", "nodes proven"), ("1", "goal met"), ("2", "week review streak")],
+   [[("3", "topics passed"), ("1", "goal reached"), ("2", "week review streak")],
     "[[learn/Dashboard|All subjects and badges →]]"])
 eq("the footer names the setting and how to change it",
    ("*Rewards are on. Turn them off with `rewards: off` in [[learn/me/preferences|preferences]].*" in body,
     body.rstrip().endswith("*Generated from the records; edits are overwritten.*")), (True, True))
 eq("with rewards off: no earned cards, no milestone, no counts, and only the link",
-   ("## Recently earned" in home_off, "Next up:" in home_off, "nodes proven" in home_off,
+   ("## Recently earned" in home_off, "Next up:" in home_off, "topics passed" in home_off,
     "\n[[learn/Dashboard|All subjects and badges →]]\n" in home_off,
     "*Rewards are off. Turn them on with `rewards: on` in [[learn/me/preferences|preferences]].*" in home_off),
    (False, False, False, True, True))
@@ -2518,7 +2518,7 @@ QUIET = [rsubject("fin", [rnode("n1", "solid", "2026-09-22", name="Leaves"),
 quiet = status.home(status.rank(QUIET, [], HOME_DAY), QUIET, status.rewards(QUIET, HOME_DAY), True, HOME_DAY)
 eq("nothing pending: the card says so and names the next review",
    quiet.split("\n---\n", 1)[1].lstrip("\n").splitlines()[:5],
-   ["> [!question|welcome] Thursday, 24 September", "> Everything you've proven is up to date.",
+   ["> [!question|welcome] Thursday, 24 September", "> Nothing you've passed is due for review.",
     "> The next review is *Roots* on 26 Sep.", ">", "> Curious about something new? `learn-start`"])
 eq("with nothing proven the next-review line is left out, and there are no other options",
    [line for line in status.home(status.rank([rsubject("x", [], status="done")], [], HOME_DAY),
@@ -2593,10 +2593,10 @@ eq("badges are folded, this subject's only, newest first",
    callout_body(page_on, "abstract]- 2 badges"),
    ["> - Solid: Classes, 2026-09-22", "> - Solid: Aliasing, 2026-09-17"])
 eq("the count tiles are one SVG with the streak tile only while it is alive",
-   ("skills proven" in page_on, "checks passed later" in page_on, "best streak" in page_on,
+   ("<span>topics passed</span>" in page_on, "<span>remembered on a later day</span>" in page_on, "best streak" in page_on,
     "review streak" in page_on), (True, True, True, p_state["streak"]["alive"]))
 eq("with rewards off: no tiles and no badges; can-do callouts and the tree stay",
-   ("skills proven" in page_off, "badges" in page_off, "You can now" in page_off, "skill tree" in page_off),
+   ("<span>topics passed</span>" in page_off, "badges" in page_off, "You can now" in page_off, "skill tree" in page_off),
    (False, False, True, True))
 eq("the node table, strands, and sessions sit under Details, folded, with plain status labels",
    ("## Details\n\n> [!note]- Nodes\n> | Id | Node | Status | Last checked |" in page_on,
@@ -2689,11 +2689,11 @@ eq("Active, then Done, alphabetical by title; an empty Paused is left out",
 eq("a line holds the meter, proven count, last session, and a deadline ahead as a chip",
    re.sub(r"<svg.*?</svg>", "<svg/>", next(line for line in board.splitlines() if "|Zeta]]" in line)),
    '- [[learn/subjects/zeta/progress|Zeta]] <span class="lv-row"><svg/> <span class="lv-num">100%</span> '
-   '1/1 proven · last 23 Sep<span class="lv-sep"> · </span><span class="lv-tag" data-tone="deadline">'
+   '1/1 passed · last 23 Sep<span class="lv-sep"> · </span><span class="lv-tag" data-tone="deadline">'
    'deadline in 4 days</span></span>')
 eq("the meter: proven solid, taught faint, over a full track, with the count in its label",
    status.meter(1, 1, 4, width=100),
-   '<svg class="lv-meter" width="100" height="6" viewBox="0 0 100 6" role="img" aria-label="1 of 4 proven">'
+   '<svg class="lv-meter" width="100" height="6" viewBox="0 0 100 6" role="img" aria-label="1 of 4 passed">'
    '<rect width="100" height="6" rx="3" style="fill: var(--background-modifier-border)"/>'
    '<rect width="50" height="6" rx="3" style="fill: var(--color-green); fill-opacity: 0.35"/>'
    '<rect width="25" height="6" rx="3" style="fill: var(--color-green)"/></svg> <span class="lv-num">25%</span>')
@@ -2960,7 +2960,7 @@ eq("Codex gets $ commands in the block and in the open-note mechanics",
    ("`$learn-resume ptr`" in codex, "`/learn-" in codex, "`$learn-resume`" in codex), (True, False, True))
 eq("nothing pending: the Home wording on one line",
    status.startup_block(QUIET, [], True, HOME_DAY)[1],
-   "**Recommended:** Everything you've proven is up to date. The next review is *Roots* on 26 Sep. "
+   "**Recommended:** Nothing you've passed is due for review. The next review is *Roots* on 26 Sep. "
    "Curious about something new? `/learn-start`")
 eq("the live streak shows with rewards on, and not with rewards off",
    (status.startup_block(HOME_SUBJECTS, [], True, HOME_DAY)[2], "Review streak" in "".join(
