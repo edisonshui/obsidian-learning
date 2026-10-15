@@ -20,7 +20,7 @@ Do not ask the learner what was covered last time. The records answer that; aski
 
 ## 2. Recap
 
-At most eight lines: where we are in the plan, what is `solid`, what is `checked` but not yet `solid`, open misconceptions, what today covers, and anything listed under *Adjustments to make* in `resume.md`.
+At most eight lines: where we are in the plan, what was remembered on a later day (`solid`), what passed but has not been re-checked on a later day (`checked`), open misconceptions, what today covers, and anything listed under *Adjustments to make* in `resume.md`. Edison reads the recap, so use those plain names for the statuses, the same ones the reward lines and the dashboard use, and leave out the backticked record terms. Never "secure", "shaky", or "proven".
 
 ## 3. Open the session note
 

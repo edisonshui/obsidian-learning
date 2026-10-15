@@ -65,7 +65,7 @@ In this order:
 ## Phase 5 — Resume (`/learn-resume`)
 
 1. Read, in order: `resume.md`, `record.md`, `plan.md`, the most recent session note. Read them in full; do not skim.
-2. Give a recap of at most eight lines: where we are in the plan, what is solid, what is shaky, what the open misconceptions are, what today covers.
+2. Give a recap of at most eight lines: where we are in the plan, what was remembered on a later day, what passed but has not been re-checked on a later day, what the open misconceptions are, and what today covers.
 3. Run a **decay check**: one retrieval question on each of the last 1–2 checked nodes before teaching anything new, asking the learner to re-derive the node from its unconditional truth rather than recall it (a generation check, `tutor.md`, *Checks and quizzes*), logged with the generation tag `[gen]`, right after the colon that ends the date and source, or untagged as ordinary retrieval when the node has no unconditional truth. Pass moves the node to `solid`; fail marks it `decayed`, and you re-establish it briefly before continuing.
 4. Open a new session note and continue the teach loop from the plan.
 

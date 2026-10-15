@@ -521,8 +521,8 @@ def resume(slug, title, nodes, fields, open_stem, today):
     elif nodes and all(entry["status"] in COVERED for entry in nodes.values()):
         # Nothing left to teach: "continue the plan" promised a lesson that
         # does not exist. Its due nodes are already under Review.
-        reason = "every planned node is proven, so this is a wrap-up"
-        welcome = "wrap up %s, where every planned node is proven" % title
+        reason = "every planned topic is passed, so this is a wrap-up"
+        welcome = "wrap up %s, where every planned topic is passed" % title
     else:
         reason, welcome = "continue the plan", "continue %s" % title
     extra = []
@@ -1194,7 +1194,7 @@ def meter(done, partial, total, width=112):
     if proven:
         rects.append('<rect width="%d" height="6" rx="3" style="fill: var(--color-green)"/>' % proven)
     percent = int(round(100.0 * done / total)) if total else 0
-    return ('<svg class="lv-meter" width="%d" height="6" viewBox="0 0 %d 6" role="img" aria-label="%d of %d proven">'
+    return ('<svg class="lv-meter" width="%d" height="6" viewBox="0 0 %d 6" role="img" aria-label="%d of %d passed">'
             '%s</svg> <span class="lv-num">%d%%</span>' % (width, width, done, total, "".join(rects), percent))
 
 
@@ -1340,7 +1340,7 @@ def home(ranked, subjects, state, rewards_on, today):
            "> [!question|welcome] %s" % long_date(today)]
     top, others = ranked[0], ranked[1:]
     if top["kind"] == "Start":
-        out.append("> Everything you've proven is up to date.")
+        out.append("> Nothing you've passed is due for review.")
         upcoming = next_review(subjects)
         if upcoming:
             out.append("> The next review is *%s* on %s." % (upcoming[0], short_date(upcoming[1])))
@@ -1361,8 +1361,8 @@ def home(ranked, subjects, state, rewards_on, today):
             out += [line, ""]
     counts = state["counts"]
     if rewards_on:
-        tiles = [(counts["nodes_proven"], "node proven" if counts["nodes_proven"] == 1 else "nodes proven"),
-                 (counts["goals_met"], "goal met" if counts["goals_met"] == 1 else "goals met")]
+        tiles = [(counts["nodes_proven"], "topic passed" if counts["nodes_proven"] == 1 else "topics passed"),
+                 (counts["goals_met"], "goal reached" if counts["goals_met"] == 1 else "goals reached")]
         if state["streak"]["alive"]:
             tiles.append((counts["current_streak"], "week review streak"))  # "4 week review streak"
         out += [stat_tiles(tiles), ""]
@@ -1713,9 +1713,9 @@ def stat_tiles(tiles):
 
 
 def count_tiles(slug, counts, streak):
-    """Four tiles: skills proven, checks passed later, the review streak while
+    """Four tiles: topics passed, topics remembered on a later day, the review streak while
     it is alive, and the best streak."""
-    tiles = [(counts["nodes_proven"], "skills proven"), (counts["checks_passed"], "checks passed later")]
+    tiles = [(counts["nodes_proven"], "topics passed"), (counts["checks_passed"], "remembered on a later day")]
     if streak["alive"]:
         tiles.append((streak["current"], "week review streak"))
     tiles.append((streak["best"], "week best streak"))
@@ -1761,7 +1761,7 @@ def progress_note(slug, folder, fields, nodes, record_text, sessions, today, eve
            'updated: "%s"' % today.isoformat(), "generated: true",
            "cssclasses: [learning-note, learning-themed, lv-theme-%s]" % theme_of(fields, slug), "---", "",
            "# %s — progress" % title, "", GENERATED, "",
-           ("**%d of %d nodes proven** %s" % (done, total, meter(done, partial, total)) if total
+           ("**%d of %d topics passed** %s" % (done, total, meter(done, partial, total)) if total
             else "**No plan yet**") + " · %s session%s · status **%s**"
            % (fields.get("sessions", "0"), "" if fields.get("sessions") == "1" else "s",
               fields.get("status", "unknown")), "",
@@ -1853,7 +1853,7 @@ def startup_block(subjects, notes, rewards_on, today, selected=None, host="claud
         top = ranked[0]
         if top["kind"] == "Start":
             upcoming = next_review(subjects)
-            out.append("**Recommended:** Everything you've proven is up to date.%s Curious about "
+            out.append("**Recommended:** Nothing you've passed is due for review.%s Curious about "
                        "something new? `%s`" % (" The next review is *%s* on %s." % (
                            upcoming[0], short_date(upcoming[1])) if upcoming else "",
                            command_form("learn-start", host)))
@@ -1923,7 +1923,7 @@ def dashboard(subjects, today, warnings, openings, state=None, rewards_on=True):
             # The title, then one quiet line: meter, counts, and status chips.
             line = '- [[learn/subjects/%s/progress|%s]] <span class="lv-row">%s · last %s' % (
                 s["slug"], fields.get("title", s["slug"]),
-                "%s %d/%d proven" % (meter(proven_count(nodes), partial, len(nodes)), proven_count(nodes),
+                "%s %d/%d passed" % (meter(proven_count(nodes), partial, len(nodes)), proven_count(nodes),
                                      len(nodes)) if nodes else "no plan yet",
                 short_date(last) if last else "never")
             line += "".join(tag(part) for part in (deadline_words(fields.get("deadline"), today),
@@ -1954,7 +1954,7 @@ def dashboard(subjects, today, warnings, openings, state=None, rewards_on=True):
                 "> [!warning] A session note has no `end:`",
                 "> A note stays open until `learn-resume` finalizes it "
                 "(`learn/system/records.md`, *Closing an open note*). While it is open its "
-                "nodes stay unproven and the next session can orphan it."]
+                "topics don't count as passed and the next session can orphan it."]
         out += ["> - " + report for report in openings]
         out += [""]
     # Past MC checks whose answer slot did not rotate cannot be fixed by editing

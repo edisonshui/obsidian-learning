@@ -102,12 +102,12 @@ A step that was skipped, blocked by a permission prompt, or not applicable is re
 
 ## 8. Hand-off
 
-After every write and the verification pass are complete, send exactly one closing block. Edison reads it, so it is plain English, not the record's terms: say "topic", not "node", and leave out `n` numbers, strand numbers (S1, S4), and the words checked, solid, decayed, strand, candidate, and decay-check, unless the same sentence says what they mean. It contains, in order:
+After every write and the verification pass are complete, send exactly one closing block. Edison reads it, so it is plain English, not the record's terms: say "topic", not "node", and leave out `n` numbers, strand numbers (S1, S4), and the words checked, solid, decayed, strand, candidate, and decay-check, unless the same sentence says what they mean. Name a status with the words the reward lines and the dashboard use: *passed* for `checked`, *remembered on a later day* for `solid`, and *slipped* for `decayed`. Never "secure", "shaky", or "proven". It contains, in order:
 
 1. **What was saved, in one line** when the step 7 checklist and `compare` agree: "Saved and checked: session note, record, plan, resume, preferences, Home, Dashboard, progress." Any file that is claimed but absent, present but unclaimed, skipped, or blocked by a permission prompt gets its own line saying what happened, followed by the two limits from step 7.
 2. **The preference result** from step 5, in one line.
 3. **The reward lines** from step 6b, verbatim, if any.
-4. **Where you are**, at most five short lines: what this session covered, what is secure, what to watch, and what comes next. Draw it from `resume.md`, but do not paste the file: `resume.md` stays in the record's terms because the next session reads it cold.
+4. **Where you are**, at most five short lines: what this session covered, what was remembered on a later day, what passed today but has not been re-checked on a later day, what slipped or is still wrong, and what comes next. Leave out a line with nothing in it. Draw it from `resume.md`, but do not paste the file: `resume.md` stays in the record's terms because the next session reads it cold.
 5. **One handoff line.** For `break`, it is "Back after break. Reopen this note with `/learn-resume <slug>`." Otherwise, use the one-line next step.
 
 ```
@@ -120,8 +120,8 @@ This week's review isn't done yet: 63 older topics are due for a re-check
 
 **Where you are**
 - Covered today: copy constructors, a class that tracks running state, and the CS People questions.
-- Secure: 13 of 14 topics for Quiz 7.
-- Watch: writing `equals` (you wrote it as `static`), and calling a static method from another class.
+- Passed today, not yet re-checked on a later day: copy constructors and the running-state class. 13 of 14 Quiz 7 topics have passed.
+- Slipped or still wrong: writing `equals` (you wrote it as `static`), and calling a static method from another class.
 - Next: ask how Quiz 7 went, then rewrite a running-state class with no hints.
 
 Next: take PQ7, then Quiz 7 at 14:00.
