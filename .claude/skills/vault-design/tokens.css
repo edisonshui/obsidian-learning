@@ -39,6 +39,15 @@
   --heat-3: #3FA27D;
   --heat-4: #17865F;
 
+  /* Proof objects, from the guideline's source HTML. The same in night mode, like gold. */
+  --coin-gold: radial-gradient(circle at 35% 30%, #FFF3C4 0, #F6CF5F 45%, #E7B53C 100%);
+  --coin-gold-lip: #C9962A;
+  --coin-green: radial-gradient(circle at 35% 30%, #4FB58C 0, #17865F 60%, #11704F 100%);
+  --coin-green-lip: #0E5F43;
+  --foil-gold: conic-gradient(from 210deg, #FFE7A6, #FDC090, #F6CF5F, #FFF3C4, #EAC56A, #FFE7A6);
+  --foil-mint: conic-gradient(from 210deg, #CFEFE3, #9FDCC3, #D3E5E8, #E8F7F0, #8CCAB0, #CFEFE3);
+  --foil-goal: conic-gradient(from 200deg, #FDC090, #FACAAF, #EACAD9, #CFE3F7, #CFEFE3, #FFE7A6, #FDC090);
+
   /* Subject colors, shown only as a dot, an icon tint, or a 6% wash. The same in night mode. */
   --subject-code: #4A6FA5;
   --subject-math: #267C88;

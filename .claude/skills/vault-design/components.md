@@ -75,14 +75,14 @@ A disc is 44pt on phone and 36 to 56 on desktop. Its icon is a drawn stroke, nev
 
 | State | Look | Meaning |
 |---|---|---|
-| Solid | Gold coin. Radial gradient from #FFF3C4 through #F6CF5F to #E7B53C, a 3pt lip in #C9962A, a `0 6 12` drop shadow in Gold deep at 22%, and an Ink star. | Passed again later. |
-| Checked | Green coin. Radial gradient from #4FB58C through #17865F to #11704F, a 3pt lip in #0E5F43, a drop shadow in Green at 22%, and a white check. | Passed a check. "You can now." |
+| Solid | Gold coin. The `--coin-gold` gradient, a 3pt lip in `--coin-gold-lip`, a `0 6 12` drop shadow in Gold deep at 22%, and an Ink star. | Passed again later. |
+| Checked | Green coin. The `--coin-green` gradient, a 3pt lip in `--coin-green-lip`, a drop shadow in Green at 22%, and a white check. | Passed a check. "You can now." |
 | Worth a refresh | Keeps its color and adds a small white refresh badge at the top right | Decayed. The app never takes progress away. |
 | Up next | Surface fill, a 3pt Ember ring, and a 6pt Ember soft halo | The one node to do next. One per subject. |
 | Learning | Surface fill and a 3pt Ink 3 ring | Introduced, not yet checked. |
 | Not yet | Transparent, with a 2pt dashed Untaught outline | Not taught. No padlock, because nothing is locked. |
 
-The gradient and lip values come from the source HTML, not the token table.
+The gradient and lip values come from the source HTML, not the token table. They look the same in night mode.
 
 When a node becomes Solid, the disc fills from the bottom and the star settles in `--duration-proof` (320ms) with `--ease-out`. This fill is the app's one signature motion. With reduced motion on, the fill becomes a cross-fade.
 
@@ -104,8 +104,8 @@ A badge is a 64pt octagon with a conic foil sheen and a white highlight over its
 
 | Badge | Foil | Icon |
 |---|---|---|
-| Solid: <skill> | Gold: #FFE7A6, #FDC090, #F6CF5F, #FFF3C4, #EAC56A | Star |
-| Recovered: <skill> | Mint: #CFEFE3, #9FDCC3, #D3E5E8, #E8F7F0, #8CCAB0 | Refresh |
-| Goal met: <subject> | Peach through lilac to mint: #FDC090, #FACAAF, #EACAD9, #CFE3F7, #CFEFE3, #FFE7A6 | Flag |
+| Solid: <skill> | Gold, `--foil-gold` | Star |
+| Recovered: <skill> | Mint, `--foil-mint` | Refresh |
+| Goal met: <subject> | Peach through lilac to mint, `--foil-goal` | Flag |
 
 Foil appears only on earned badges. When the learner turns rewards off in Settings, the app hides every badge.

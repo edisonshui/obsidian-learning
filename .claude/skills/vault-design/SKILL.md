@@ -9,6 +9,8 @@ The Vault app is mostly near-neutral paper, white cards, and warm ink text. Colo
 
 The source is "Vault brand guideline v0.1" (16 Oct 2026) at `.scratch/vault-brand/brand-guideline.pdf`. The PDF is built from `brand-guideline.html` in the same folder. That file's CSS holds a few values that the PDF's token table leaves out. The PDF mockups are the visual target.
 
+To change a color, font, size, rule, or component, use the brand-guideline skill's change flow.
+
 Use the vault's words in designs and copy: subject, node, skill, check, review, session, record, plan, and can-do line.
 
 ## Design a screen
