@@ -19,7 +19,7 @@ Use the vault's words in designs and copy: subject, node, skill, check, review, 
 2. Name the one next step. Give it the screen's only Ink button. On Home, the one next step is the recommended action. Fold every other option into a plain list or a row of chips.
 3. Give every color one job from the color table below. If a color is only decoration, remove it.
 4. Build from the pieces in [components.md](components.md). Take every color, font, size, radius, shadow, and duration from [tokens.css](tokens.css). A raw hex value in a component is a bug.
-5. Design every state. Each control needs hover, focus, disabled, and loading states. Each screen needs a light and a night version. On desktop, give every action a keyboard shortcut and show it.
+5. Design every state. Each control needs hover, focus, disabled, and loading states. Each screen needs a light and a night version. On desktop, give every action a keyboard shortcut, and show it in the control's hover tip and the command palette. Never print a key chip beside a button.
 6. Write the copy by the voice rules below.
 7. Run the checklist at the end of this file. The screen is done when every line passes.
 
@@ -30,7 +30,7 @@ When two rules conflict, follow the one higher in this list.
 1. **One next step.** A screen has at most one Ink button.
 2. **Proof, not points.** Gold, green, and badges come only from passed checks. The app has no XP, leagues, or confetti.
 3. **Color has a job.** Each color means one thing everywhere in the app.
-4. **Calm by default, warm when earned.** Surfaces are neutral and words are plain. Warm color appears only in the gold wash, the coin discs, and the foil badges.
+4. **Calm by default, warm when earned.** Surfaces are neutral and words are plain and few. Warm color appears only in the gold wash, the coin discs, and the foil badges.
 
 ## Color
 
@@ -55,7 +55,7 @@ When two rules conflict, follow the one higher in this list.
 Follow these color rules:
 
 - Use status colors (gold, green, and ember) only on skill discs, count tiles, the heatmap, and badges, and only where the record put them. Home has two exceptions, both from the page 7 mockup and approved by Edison on 16 Oct 2026: the deadline line on the recommended action ("Deadline in 4 days") is Ember text, and the streak row's icon is Ember.
-- Show a subject color only as an 8px dot, an icon tint, or a 6% wash behind a subject header. Each subject takes the color of its `theme:` in `record.md`: Code #4A6FA5, Math #267C88, Circuits #8E4FA0, Literature #B5505F, Design #66762E, or Calm #7A746A. Subject colors are the same in night mode.
+- Show a subject color only as an 8px dot, an icon tint, or a 6% wash behind a subject header. The All skills map is the one exception, approved by Edison on 17 Oct 2026: there the domain color also runs along its branches and constellation lines and glows behind each subject. Subject colors measure 3.3 to 4.0:1 on graphite, so they never color text. Each subject takes the color of its `theme:` in `record.md`: Code #4A6FA5, Math #267C88, Circuits #8E4FA0, Literature #B5505F, Design #66762E, or Calm #7A746A. Subject colors are the same in night mode.
 - Build hierarchy from size and weight. Keep body text in Ink, Ink 2, or Ink 3, because color carries meaning.
 - Leave a wrong answer neutral and make "Not yet" grey. The app has no red.
 - Aim for about 60% paper, 22% surface, 12% ink, 4% status color, and 2% indigo. If a screen looks colorful, look for a status color outside its job.
@@ -116,12 +116,21 @@ Most of the app is flat paper and hairlines. A texture marks something special, 
 | Gold wash | A vertical fade from Gold soft to Paper | The top of the Map, and the cover of a goal-met moment |
 | Coin and lip | A highlight at the top left, a 2 to 3pt darker lip below, and a soft drop shadow | Skill discs and count tiles |
 | Foil | A conic sheen in peach, gold, lilac, and mint, inside an octagon | Earned badges |
-| Dot grid | A graphite background with dots 14 to 18pt apart | The skill map and the lesson graph |
+| Dot grid | A graphite background with dots 14 to 18pt apart | The skill map, the All skills map, and the lesson graph |
 | Organic shapes | Large soft blobs in Ink, Ember soft (called blush here), and Indigo soft | Focus mode |
+| Subject glow | A radial fade of the subject color from `--glow-subject` to clear, reaching `--glow-reach` past the subject; in Ink at `--glow-you` behind You | The All skills map |
 
-Resting things, such as cards and panels, get a 1px Line border and no shadow. Floating things (the input dock, the command palette, menus, and popovers) get `shadow-float`. Proof objects get the lip. The only blur is the scrim behind the command palette. The only gradients are the gold wash and the proof objects.
+Resting things, such as cards and panels, get a 1px Line border and no shadow. Floating things (the input dock, the command palette, menus, and popovers) get `shadow-float`. Proof objects get the lip. The only blur is the scrim behind the command palette. The only gradients are the subject glow on the All skills map, the gold wash, and the proof objects.
 
-Hover and press take 140ms, and panels and sheets take 220ms, all on `ease-out`. The app's one signature motion is a disc that becomes Solid, in 320ms. [components.md](components.md#skill-discs) describes it.
+Hover and press take 140ms, and panels, sheets, and the cross-fade between screens take 220ms, all on `ease-out`. The app's one signature motion is a disc that becomes Solid, in 320ms. [components.md](components.md#skill-discs) describes it. With Reduce motion on, nothing animates.
+
+Never move what the learner is looking at. Edison asked for this on 17 Oct 2026 ("buttery"):
+
+- A refresh that changes nothing repaints nothing. A refresh that changes something keeps the scroll position.
+- A control repaints only its own region. A tab switch in the right panel leaves the chat alone.
+- A new screen opens at the top. Coming back to a screen returns to where the learner was.
+- Load what the learner is about to open: hovering a subject starts loading its session.
+- Load heavy pieces (the math and diagram renderers) only on the screen that needs them.
 
 ## Icons
 
@@ -137,6 +146,10 @@ To show an icon, use the drawn one when it fits. When the set has no icon for th
 ## Voice
 
 App copy reads like an entry in the learning record: a fact, a date, or the next step.
+
+Text is there only when the learner needs it. Each line carries a fact they need or names an action. Cut any caption that explains how to read the screen ("Each column is a week"), any label that repeats what is already on screen, and any count or date nobody acts on. A hover tip can hold the detail instead. The Home greeting ("Good afternoon, Edison") stays, because it is the one line there to make the app feel personal. Edison set this rule on 17 Oct 2026.
+
+Keep the tutor's internal words out of app copy: diagnosis, probe, strand, gate, and Jev. Say what happens instead. "A few more questions to find where you start", not "Finish the diagnosis, then build the plan".
 
 | Do | Don't |
 |---|---|
@@ -176,11 +189,12 @@ Run this checklist on every new or changed screen. Report each line as pass or f
 - [ ] The screen has at most one Ink button.
 - [ ] Indigo appears only on selection, links, citations, and focus.
 - [ ] Gold, green, and ember appear only where the record put them.
-- [ ] Subject color appears only as a dot, an icon tint, or a 6% wash, and never on a button.
+- [ ] Subject color appears only as a dot, an icon tint, or a 6% wash (or, on All skills, a branch, line, or glow), and never on a button or text.
 - [ ] Each texture is in its one place, and only floating things have a shadow.
 - [ ] Text uses only the three faces, the type scale, sentence case, and tabular numbers.
 - [ ] Every value is a token with a night value, or the report names the gap.
 - [ ] Every control has hover, focus, disabled, and loading states.
-- [ ] On desktop, every action has a keyboard shortcut and the shortcut is shown.
+- [ ] On desktop, every action has a keyboard shortcut, shown in its hover tip and the command palette.
+- [ ] Every piece of text carries a needed fact or names an action. Nothing explains how to read the screen or repeats what is already on it.
 - [ ] The copy passes the voice rules: no praise words, no exclamation marks, and no loss language.
 - [ ] The screen respects reduced motion, larger text, and high contrast.

@@ -17,9 +17,9 @@ Every control has hover, focus, disabled, and loading states. Focus is always `-
 | Answer option | Surface, 1px Line, radius 12. A radio circle on the left and the number key on the right in Ink 3 Mono. | The learner answers with number keys. |
 | Selected option | 2px Indigo border, radio filled Indigo | Before grading. |
 | Right option | 2px Green border, radio filled Green. The explanation is text directly under the option. | After grading. Wrong answers stay neutral, with no red fill. |
-| Key chip | Surface, 1px Line strong border with a 2px bottom edge, radius 5, Mono 600 10.5 to 11, Ink 2 | Shows a keyboard shortcut. On desktop, every action has one. |
+| Key chip | Surface, 1px Line strong border with a 2px bottom edge, radius 5, Mono 600 10.5 to 11, Ink 2 | Shows a keyboard shortcut inside hover tips, menus, and the command palette. Never printed beside a button. |
 | Citation chip | Indigo soft fill, Indigo Mono text, radius 6 | Links a claim to the record line or file behind it, such as `record.md:42`. It is Indigo because it is a link. |
-| Input dock | Surface pill with `--shadow-float`, floating at the bottom of the tutor column | The one floating piece in the tutor view. Shortcut chips sit below it: Hint, Check me, and Break. |
+| Input dock | Surface pill with `--shadow-float`, floating at the bottom of the tutor column | The one floating piece in the tutor view. Text buttons sit below it: Hint, Check me, Break, and End. Their keys are in their hover tips. The placeholder is one word: "Reply". |
 | Sidebar row | 28 tall, 13pt text, count or date right-aligned | The selected row is Surface on Paper 2, never Indigo. |
 | Card | Surface, 1px Line, radius 20 on phone and 10 on desktop | Cards rest on the page, so they get no shadow. |
 | Popover, menu, and command palette | Surface with `--shadow-float` | Only floating pieces get a shadow. |
@@ -92,7 +92,7 @@ A count tile is Surface with a 1px Line strong border, radius 14, and a 2pt Line
 
 ### Weekly streak
 
-The weekly streak is a row on Surface. It shows the count in Ember text, the words "weeks of reviews", and one Ember disc with a check for each week. The streak counts weeks, not days. A week with nothing due shows a dashed disc and does not break the streak. The streak forgives one missed week in four, and the row says so.
+The weekly streak is a row on Surface. It shows the count in Ember text, the words "weeks of reviews", and one Ember disc with a check for each week. The streak counts weeks, not days. A week with nothing due shows a dashed disc and does not break the streak. The streak forgives one missed week in four. The row does not explain that rule.
 
 ### Heatmap
 

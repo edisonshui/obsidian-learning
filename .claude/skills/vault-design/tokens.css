@@ -48,7 +48,8 @@
   --foil-mint: conic-gradient(from 210deg, #CFEFE3, #9FDCC3, #D3E5E8, #E8F7F0, #8CCAB0, #CFEFE3);
   --foil-goal: conic-gradient(from 200deg, #FDC090, #FACAAF, #EACAD9, #CFE3F7, #CFEFE3, #FFE7A6, #FDC090);
 
-  /* Subject colors, shown only as a dot, an icon tint, or a 6% wash. The same in night mode. */
+  /* Subject colors, shown as a dot, an icon tint, or a 6% wash, and on the All skills map as its branches,
+     constellation lines, and glow. The same in night mode. */
   --subject-code: #4A6FA5;
   --subject-math: #267C88;
   --subject-circuits: #8E4FA0;
@@ -88,6 +89,11 @@
   --shadow-float: 0 14px 34px rgba(27, 26, 23, 0.12), 0 2px 6px rgba(27, 26, 23, 0.06);
   --focus-ring: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--color-indigo);
   --scrim: rgba(27, 26, 23, 0.28); /* plus a 6px blur; command palette only */
+  /* Subject glow, All skills only (Edison, 17 Oct 2026): a radial fade of the subject colour
+     from this opacity at the centre to 0, behind each subject and, in ink, behind You. */
+  --glow-subject: 0.55;
+  --glow-you: 0.28;
+  --glow-reach: 26;              /* px past the subject's ring */
 
   /* Motion */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
