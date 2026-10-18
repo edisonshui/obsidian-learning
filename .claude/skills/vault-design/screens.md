@@ -1,6 +1,6 @@
 # Vault screens and layouts
 
-Each screen copies one idea from a Mobbin reference that Edison picked. It copies the idea only, never the reference's colors, fonts, or styling. Token names refer to [tokens.css](tokens.css). The source is guideline pages 7 to 9 and 13 to 15, and the mockups on those pages are the visual target.
+Each screen copies one idea from a Mobbin reference that Edison picked. The Holo light column comes from guideline v0.2 (18 Oct 2026); the rest from v0.1. It copies the idea only, never the reference's colors, fonts, or styling. Token names refer to [tokens.css](tokens.css). The source is guideline pages 7 to 9 and 13 to 15, and the mockups on those pages are the visual target.
 
 ## Phone shell (iOS)
 
@@ -22,6 +22,7 @@ The desktop app puts Dropbox Dash's shell around Fibery's workspace, on a 4px gr
 
 | Screen | Reference | Layout | Hard rule |
 |---|---|---|---|
+| Holo light, every screen | v0.2: Natural AI, Langdock, MLS, Clay, QUITTR, ChatGPT | Home: bloom (phone) or wash (desktop). Every other screen: the ambient light at 40%, fading to 40% Paper at the bottom. Progress adds a lit progress card above the count tiles. Check: the waiting question card in a lit frame. Map, All skills, and Focus timer: no light (they have their own backgrounds). | The light is the subject's spectrum, or Calm for screens with no subject. |
 | Home, phone | Uxcel | The title ("Good evening"), then the recommended action as the only large card. The card holds the reason in Ember text ("Deadline in 4 days"), a heading, one line of next step, a progress bar, and the Ink button. Below the card are a small review-streak row and an "Other options" list with subject dots. | No second button. |
 | Home, desktop | Dropbox Dash | A centered greeting, the recommended action as the dock card, and the other options as chips under it (Review 12 due, Repair 2, Start a subject, More). Nothing else: no date line, no recents, no streak row. The Dashboard holds those. | One large card, as on phone. |
 | Map, phone | Liven | The path grows upward from the bottom. Each label sits beside its disc and wraps to two lines. Chapter dividers name each strand. The gold wash is at the top. | Never cut a skill name. One Up next node per subject. |
