@@ -1319,7 +1319,9 @@ def earned_cards(badges, limit=3):
 
 
 # Home and the Dashboard span every subject, so they take the neutral theme.
-SHARED_CLASSES = "learning-note, learning-themed, lv-theme-calm"
+# lv-wash: Home and the Dashboard take the full-bleed Holo wash; every other
+# learning note takes the corner glow (vault-brand.css, guideline v0.2).
+SHARED_CLASSES = "learning-note, learning-themed, lv-theme-calm, lv-wash"
 
 
 def long_date(when):
@@ -1346,7 +1348,10 @@ def home(ranked, subjects, state, rewards_on, today):
             out.append("> The next review is *%s* on %s." % (upcoming[0], short_date(upcoming[1])))
         out += [">", "> Curious about something new? `learn-start`"]
     else:
-        out += ["> Ready when you are. A good next step is to %s." % top["welcome"], ">",
+        # A Deadline welcome is a whole clause ("Calc's deadline is ..."); the
+        # rest start with a verb and finish "A good next step is to".
+        lead = "" if top["kind"] == "Deadline" else "A good next step is to "
+        out += ["> Ready when you are. %s%s." % (lead, top["welcome"]), ">",
                 "> `%s`" % top["command"]]
     out.append("")
     if others:

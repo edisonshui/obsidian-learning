@@ -109,3 +109,64 @@ A badge is a 64pt octagon with a conic foil sheen and a white highlight over its
 | Goal met: <subject> | Peach through lilac to mint, `--foil-goal` | Flag |
 
 Foil appears only on earned badges. When the learner turns rewards off in Settings, the app hides every badge.
+
+## Holo light pieces
+
+These come from guideline v0.2 (18 Oct 2026). Each subject passes its spectrum in as `--s`, for example `style="--s: var(--holo-math)"`.
+
+| Piece | Look | Rule |
+|---|---|---|
+| Ambient | `--s` behind the whole page at `--holo-ambient-strength`, fading to 40% Paper at the bottom; it stays put while the content scrolls | Every screen except Home, the maps, and Focus. Replaced the corner glow on 18 Oct 2026. The input dock's backdrop fades to 55% Paper, so the light reaches the bottom. |
+| Wash | `--s` over the whole content area at `--holo-wash-strength`, fading to Paper at the bottom | Desktop Home only. The recommended action sits on a Surface card on top of it. |
+| Bloom | A blurred circle of `--s`, 200 wide on phone, turning once every `--duration-holo` | Phone Home only. Still with Reduce motion. |
+| Lit card | Surface card, 1px Line, the light blurred inside it, Ink text only | The progress card (a plain Surface strip for the facts along the bottom) and the check frame (the question card inside, inset 18). |
+
+```css
+.holo-ambient {
+  position: absolute;          /* in a scroll container: sticky, top 0, height 100%, margin-bottom -100% */
+  inset: 0;
+  background: var(--s);
+  opacity: var(--holo-ambient-strength);
+  pointer-events: none;
+}
+.holo-ambient::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--color-paper) 40%, transparent));
+}
+.holo-wash {
+  position: absolute;
+  inset: 0;
+  background: var(--s);
+  opacity: var(--holo-wash-strength);
+  pointer-events: none;
+}
+.holo-wash::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 120%, var(--color-paper) 10%, transparent 60%);
+}
+.lit-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: calc(var(--holo-card-radius-desktop) * 1px);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+.lit-card::before {
+  content: "";
+  position: absolute;
+  inset: -50px;
+  background: var(--s);
+  opacity: var(--holo-glow-strength);
+  filter: blur(36px);
+}
+.lit-card > * { position: relative; }
+@media (prefers-reduced-motion: no-preference) {
+  .holo-bloom { animation: holo-turn var(--duration-holo) linear infinite; }
+}
+@keyframes holo-turn { to { rotate: 1turn; } }
+```

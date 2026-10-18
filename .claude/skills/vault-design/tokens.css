@@ -15,7 +15,9 @@
   --color-line-strong: #CFCBC2;  /* inputs, tile lips, dividers. Never text. */
   --color-ink: #1B1A17;          /* text and the Ink button. 17.4:1 on white */
   --color-ink-2: #4A4741;        /* secondary text. 9.3:1 on white */
-  --color-ink-3: #6E6A62;        /* captions, placeholders. Lightest text allowed. 5.4:1 white, 4.9:1 paper */
+  --color-ink-3: #646059;        /* captions, placeholders. Lightest text allowed. 6.3:1 white, 5.7:1 paper,
+                                    4.56:1 on the ambient light at its strongest. Was #6E6A62 until 18 Oct 2026,
+                                    which measured 3.9:1 on the ambient light (Claude's call, flagged to Edison). */
 
   /* Interaction. Indigo means "you are interacting here" and nothing else. */
   --color-indigo: #4D3EE2;       /* selection, links, citations, focus */
@@ -136,4 +138,47 @@
   background-color: #141416;
   background-image: radial-gradient(#34343A 1.3px, transparent 1.4px);
   background-size: 14px 14px;    /* 14 to 18 */
+}
+
+/*
+ * Holo light, from "Vault brand guideline v0.2: Holo light" (18 Oct 2026),
+ * .scratch/vault-brand/holo-guideline.html. Built from the Holo mood board picks
+ * (Natural AI, MLS, QUITTR, ChatGPT, Langdock, Clay). Edison approved its six
+ * decisions on 18 Oct 2026; the skill text adopts it in stage 3.
+ * The gradient is light: each screen has at most one light source, and text sits
+ * on Paper or Surface, never on the light itself (the check frame and the progress
+ * card are the two exceptions, and only Ink text goes on them).
+ * Each subject's light takes the stops of its `theme:` in record.md, the same
+ * stops the Obsidian notes used on 13 Oct.
+ */
+:root {
+  --holo-code: conic-gradient(from 210deg, #fda4af, #fde68a, #86efac, #67e8f9, #c4b5fd, #fda4af);
+  --holo-math: conic-gradient(from 150deg, #93c5fd, #67e8f9, #5eead4, #c4b5fd, #a5b4fc, #93c5fd);
+  --holo-circuits: conic-gradient(from 60deg, #bef264, #86efac, #67e8f9, #fde68a, #a7f3d0, #bef264);
+  --holo-literature: conic-gradient(from 300deg, #fdba74, #fda4af, #fde68a, #f9a8d4, #fcd34d, #fdba74);
+  --holo-design: conic-gradient(from 210deg, #f9a8d4, #fdba74, #fde68a, #c4b5fd, #fda4af, #f9a8d4);
+  --holo-calm: conic-gradient(from 210deg, #c4b5fd, #a5b4fc, #bae6fd, #f5d0fe, #ddd6fe, #c4b5fd);
+
+  --holo-bloom-size: 280;        /* px, desktop Home bloom; phone 200 */
+  --holo-bloom-blur: 48;         /* px */
+  --holo-ambient-strength: 0.4;  /* the ambient light behind every page but Home (option A, Edison 18 Oct 2026) */
+  --holo-ambient-floor: 0.4;     /* Paper's share at the bottom of the ambient light, so color reaches the dock */
+  --holo-glow-strength: 0.55;    /* opacity of the light inside a lit card */
+  --holo-wash-strength: 0.48;    /* opacity of the full-bleed wash, desktop Home only */
+  --holo-card-radius-desktop: 14;
+  --holo-card-radius-phone: 24;
+  --duration-holo: 12s;          /* one slow turn of the bloom; Reduce motion: still */
+}
+
+/* Night: the light becomes the Aurora glows on graphite, as in MLS. */
+[data-theme="night"] {
+  --holo-code: conic-gradient(from 210deg, #8b5cf6, #06b6d4, #ec4899, #8b5cf6);
+  --holo-math: conic-gradient(from 150deg, #3b82f6, #14b8a6, #8b5cf6, #3b82f6);
+  --holo-circuits: conic-gradient(from 60deg, #22c55e, #06b6d4, #84cc16, #22c55e);
+  --holo-literature: conic-gradient(from 300deg, #f97316, #e11d48, #d946ef, #f97316);
+  --holo-design: conic-gradient(from 210deg, #ec4899, #f97316, #a855f7, #ec4899);
+  --holo-calm: conic-gradient(from 210deg, #8b5cf6, #6366f1, #0ea5e9, #8b5cf6);
+  --holo-glow-strength: 0.38;
+  --holo-wash-strength: 0.32;
+  --holo-ambient-strength: 0.38;
 }

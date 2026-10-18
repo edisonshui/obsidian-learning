@@ -1,0 +1,332 @@
+/* The Vault app's brand on the Obsidian learning notes, until the app exists
+   (18 Oct 2026). Values come from .claude/skills/vault-design/tokens.css
+   ("Vault brand guideline v0.1", 16 Oct 2026). It loads after
+   learning-notes.css and overrides it; turn it off in Settings > Appearance >
+   CSS snippets to get the Holo and Aurora look back.
+
+   What it changes, by the brand's four principles:
+   - Holo light (v0.2, 18 Oct 2026): the subject's ambient light on reading
+     pages (option A) and the full Holo wash on Home and the Dashboard; white Surface cards with a 1px
+     Line border instead of frosted glass.
+   - Type: Atkinson Hyperlegible Next for reading, Bricolage Grotesque for
+     headings and counts, Atkinson Hyperlegible Mono for code (vault-fonts.css).
+     Atkinson's slashed zero read as the empty set in math, so prose zeros
+     fall back to Helvetica Neue; see .scratch/vault-brand/build-obsidian-fonts.py.
+     Sentence case: no all-caps labels.
+   - Color has a job: Indigo for links and the question you answer, Gold for
+     Solid, Green for Checked, Ember for a deadline. Chips for "due" are neutral,
+     and nothing is red.
+   - One next step: Home's command is the page's one Ink button.
+
+   Judgment calls made without Edison (he was at the gym): applying the brand
+   to Obsidian at all, which the vault-design skill scopes to the app; dropping
+   the gradients he picked on 13 Oct; the learner's messages as Paper 2
+   bubbles; Claude's questions as cards with an Indigo icon. */
+
+body {
+  --vb-paper: #F6F5F2;
+  --vb-paper-2: #EEECE7;
+  --vb-surface: #FFFFFF;
+  --vb-line: #E4E1DA;
+  --vb-line-strong: #CFCBC2;
+  --vb-ink: #1B1A17;
+  --vb-ink-2: #4A4741;
+  --vb-ink-3: #646059;
+  --vb-indigo: #4D3EE2;
+  --vb-indigo-soft: #ECEAFD;
+  --vb-gold: #F6CF5F;
+  --vb-gold-deep: #8A600A;
+  --vb-gold-soft: #FCF1CF;
+  --vb-green: #17865F;
+  --vb-green-soft: #DDF1E8;
+  --vb-ember: #E5603A;
+  --vb-ember-text: #C2482A;
+  --vb-ember-soft: #FCE4DB;
+  --vb-display: "Bricolage", "Bricolage Grotesque", "Helvetica Neue", sans-serif;
+  --vb-sans: "Atkinson Next", "Atkinson Hyperlegible Next", "Helvetica Neue", sans-serif;
+  --vb-mono: "Atkinson Mono", "Atkinson Hyperlegible Mono", Menlo, monospace;
+}
+body.theme-dark {
+  --vb-paper: #141416;
+  --vb-paper-2: #0E0E10;
+  --vb-surface: #1C1C1F;
+  --vb-line: #303035;
+  --vb-line-strong: #46464C;
+  --vb-ink: #F2F1EE;
+  --vb-ink-2: #B9B7B1;
+  --vb-ink-3: #8F8D87;
+  --vb-indigo: #9890FF;
+  --vb-indigo-soft: #302F43;
+  --vb-gold-deep: #F6CF5F;
+  --vb-gold-soft: #3A3220;
+  --vb-green: #3FB98A;
+  --vb-green-soft: #1D3A2F;
+  --vb-ember: #F07A52;
+  --vb-ember-text: #F07A52;
+  --vb-ember-soft: #3D2620;
+}
+
+/* ---- Page: Paper, warm ink, the brand's faces. Set on every surface a
+   learning note can wear its classes on: the view itself (cssclasses) and the
+   pane (learn-live's .learning-themed and .lv-generated). */
+body :is(.markdown-preview-view, .markdown-source-view):is(.learning-note, .learning-log, .learning-themed),
+body :is(.learning-themed, .lv-generated) :is(.markdown-preview-view, .markdown-source-view) {
+  --background-primary: var(--vb-paper);
+  --text-normal: var(--vb-ink);
+  --text-muted: var(--vb-ink-2);
+  --text-faint: var(--vb-ink-3);
+  --text-accent: var(--vb-indigo);
+  --text-accent-hover: var(--vb-indigo);
+  --link-color: var(--vb-indigo);
+  --link-color-hover: var(--vb-indigo);
+  --link-unresolved-color: var(--vb-ink-3);
+  --lv-ink-head: var(--vb-ink);
+  --h1-color: var(--vb-ink);
+  --h2-color: var(--vb-ink);
+  --h3-color: var(--vb-ink);
+  --h4-color: var(--vb-ink);
+  --bold-color: var(--vb-ink);
+  --bold-weight: 700;
+  --inline-title-color: var(--vb-ink);
+  --code-background: var(--vb-paper-2);
+  --font-text: var(--vb-sans);
+  --font-monospace: var(--vb-mono);
+  --callout-blend-mode: normal;
+  --file-line-width: 720px;
+  --font-text-size: 16px;
+  --line-height-normal: 1.625;
+  font-family: var(--vb-sans);
+}
+/* ---- Holo light (guideline v0.2). Since 18 Oct 2026 (Edison picked option A,
+   "ambient"): every reading page (logs, record, plan, resume, sessions,
+   progress) sits in its subject's light at 40%, the --holo-ambient-strength
+   token, fading to 40% Paper at the bottom (--holo-ambient-floor) so the color
+   reaches the end of the page. Home and the Dashboard carry lv-wash
+   (learn-status.py) and keep learning-notes.css's full Holo sweep. Night uses
+   the Aurora glows at 38%. Cards stay solid Surface. */
+body :is(.markdown-preview-view, .markdown-source-view .cm-scroller):is(.learning-note, .learning-log, .learning-themed):not(.lv-wash),
+body .markdown-source-view:is(.learning-note, .learning-log, .learning-themed):not(.lv-wash) .cm-scroller,
+body :is(.learning-themed, .lv-generated) :is(.markdown-reading-view > .markdown-preview-view, .markdown-source-view > .cm-editor > .cm-scroller):not(.lv-wash) {
+  --vb-amb: 40%;
+  background-color: var(--vb-paper) !important;
+  background-image:
+    linear-gradient(to bottom, transparent, color-mix(in srgb, var(--vb-paper) 40%, transparent)),
+    conic-gradient(from var(--lv-turn, 210deg) at var(--lv-at, 70% 20%),
+      color-mix(in srgb, var(--lv-a, #c4b5fd) var(--vb-amb), transparent),
+      color-mix(in srgb, var(--lv-b, #a5b4fc) var(--vb-amb), transparent),
+      color-mix(in srgb, var(--lv-c, #bae6fd) var(--vb-amb), transparent),
+      color-mix(in srgb, var(--lv-d, #f5d0fe) var(--vb-amb), transparent),
+      color-mix(in srgb, var(--lv-e, #ddd6fe) var(--vb-amb), transparent),
+      color-mix(in srgb, var(--lv-a, #c4b5fd) var(--vb-amb), transparent)) !important;
+  /* Pinned to the pane, not the text, so a long log shows the whole spectrum
+     at every scroll position (a scrolling light showed one pink slice). */
+  background-attachment: scroll !important;
+  background-repeat: no-repeat !important;
+}
+body.theme-dark :is(.markdown-preview-view, .markdown-source-view .cm-scroller):is(.learning-note, .learning-log, .learning-themed):not(.lv-wash),
+body.theme-dark .markdown-source-view:is(.learning-note, .learning-log, .learning-themed):not(.lv-wash) .cm-scroller,
+body.theme-dark :is(.learning-themed, .lv-generated) :is(.markdown-reading-view > .markdown-preview-view, .markdown-source-view > .cm-editor > .cm-scroller):not(.lv-wash) {
+  --vb-amb: 38%;
+  background-image:
+    radial-gradient(60rem 40rem at 100% 0%, color-mix(in srgb, var(--lv-glow-1, #8b5cf6) var(--vb-amb), transparent), transparent 70%),
+    radial-gradient(50rem 36rem at 0% 45%, color-mix(in srgb, var(--lv-glow-2, #6366f1) var(--vb-amb), transparent), transparent 70%),
+    radial-gradient(56rem 40rem at 85% 100%, color-mix(in srgb, var(--lv-glow-3, #0ea5e9) var(--vb-amb), transparent), transparent 70%) !important;
+}
+/* The pane's header bar matches the page under it. */
+body :is(.learning-themed, .lv-generated) > .view-header {
+  background-color: var(--vb-paper);
+  border-bottom: 1px solid var(--vb-line);
+}
+
+/* ---- Type */
+body :is(.learning-note, .learning-log, .learning-themed) :is(h1, h2, h3, .inline-title) {
+  font-family: var(--vb-display);
+  color: var(--vb-ink);
+  text-transform: none;
+}
+body :is(.learning-note, .learning-log, .learning-themed) :is(h1, .inline-title) {
+  font-size: 36px;
+  line-height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+body :is(.learning-note, .learning-log, .learning-themed) h2,
+body .markdown-preview-view.learning-note h2 {
+  margin: 2.5rem 0 0.75rem;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--vb-ink);
+}
+body :is(.learning-note, .learning-log, .learning-themed) h3 { font-size: 17px; line-height: 24px; font-weight: 600; }
+body :is(.learning-note, .learning-log, .learning-themed) :is(code, pre, pre code) { font-family: var(--vb-mono); }
+body :is(.learning-note, .learning-log, .learning-themed) code { background: var(--vb-paper-2); }
+body :is(.learning-note, .learning-log, .learning-themed) :is(.internal-link, a) { color: var(--vb-indigo); }
+body :is(.learning-note, .learning-log, .learning-themed) hr { border-color: var(--vb-line); }
+
+/* Long display math scrolls sideways instead of running off the column. */
+body :is(.learning-note, .learning-log, .learning-themed) mjx-container[display="true"] {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.25rem;
+}
+
+/* ---- Cards: white Surface, 1px Line, no glass, no shadow. */
+body :is(.learning-note, .learning-log, .learning-themed) :is(.callout, pre),
+body :is(.lv-card, .lv-stat),
+body .learning-note ul:has(> li > .lv-row) {
+  background-color: var(--vb-surface);
+  background-image: none;
+  backdrop-filter: none;
+  border: 1px solid var(--vb-line);
+  border-radius: 10px;
+  box-shadow: none;
+  mix-blend-mode: normal;
+}
+body :is(.learning-note, .learning-log, .learning-themed) pre { background-color: var(--vb-paper-2); border-color: transparent; }
+body :is(.learning-note, .learning-log, .learning-themed) .callout pre { background-color: var(--vb-paper-2); }
+
+/* Callout titles: a caption in sentence case, the kind's colour on the icon only. */
+body :is(.learning-note, .learning-log, .learning-themed) .callout-title {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--vb-ink-3);
+}
+body :is(.learning-note, .learning-log, .learning-themed) .callout-content { color: var(--vb-ink); }
+
+/* Colour has a job. Each callout kind's icon takes the colour of its meaning. */
+body :is(.learning-note, .learning-log, .learning-themed) .callout[data-callout="question"] { --callout-color: var(--vb-indigo); }
+body :is(.learning-note, .learning-log, .learning-themed) .callout[data-callout="success"] { --callout-color: var(--vb-green); }
+body :is(.learning-note, .learning-log, .learning-themed) .callout[data-callout="abstract"] { --callout-color: var(--vb-gold-deep); }
+body :is(.learning-note, .learning-log, .learning-themed) .callout:is([data-callout="info"], [data-callout="tip"], [data-callout="note"], [data-callout="quote"], [data-callout="thinking"]) { --callout-color: var(--vb-ink-3); }
+body :is(.learning-note, .learning-log, .learning-themed) .callout:is([data-callout="todo"], [data-callout="warning"]) { --callout-color: var(--vb-ember); }
+
+/* ---- The live log reads as a chat. Your messages are Paper 2 bubbles set in
+   from the left; Claude's replies are plain text on the page; a question Claude
+   asks you is a card. Thinking stays quiet and flat. */
+body .learning-log .callout[data-callout="quote"],
+body :is(.learning-themed, .lv-generated) .callout[data-callout="quote"] {
+  margin-inline-start: 3rem;
+  background-color: var(--vb-paper-2);
+  border-color: transparent;
+  border-radius: 16px 16px 4px 16px;
+}
+body :is(.learning-log, .learning-themed, .lv-generated) .callout[data-callout="question"] { border-color: var(--vb-line-strong); }
+body :is(.learning-log, .learning-themed, .lv-generated) .callout[data-callout="thinking"] {
+  background-color: transparent;
+  border: 1px dashed var(--vb-line);
+  color: var(--vb-ink-3);
+}
+/* The conversation heading's model line: a caption, sentence case. */
+body .learning-log h2 + p > em:only-child,
+body .lv-generated h2 + p > em:only-child {
+  font-style: normal;
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--vb-ink-3);
+}
+
+/* ---- Home */
+/* The welcome card's title (the date) is the page's title. */
+body .learning-note .callout[data-callout-metadata="welcome"] {
+  padding: 1.5rem 1.5rem 1.6rem;
+  border-radius: 12px;
+}
+body .learning-note .callout[data-callout-metadata="welcome"] .callout-icon { display: none; }
+body .learning-note .callout[data-callout-metadata="welcome"] .callout-title {
+  font-family: var(--vb-display);
+  font-size: 30px;
+  line-height: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--vb-ink);
+}
+body .learning-note .callout[data-callout-metadata="welcome"] .callout-content {
+  font-size: 17px;
+  line-height: 27px;
+  color: var(--vb-ink-2);
+}
+/* The one Ink button. */
+body .learning-note .callout[data-callout-metadata="welcome"] .callout-content code {
+  margin-top: 0.4rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  background: var(--vb-ink);
+  color: var(--vb-paper);
+  font-family: var(--vb-mono);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: none;
+}
+/* Other options: the kind chip in sentence case, the command quiet. */
+body .learning-note .callout[data-callout-metadata="options"] li > strong:first-of-type {
+  background: var(--vb-paper-2);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--vb-ink-2);
+}
+body .learning-note .callout[data-callout-metadata="options"] li { border-color: var(--vb-line); }
+body .learning-note .callout[data-callout-metadata="options"] li > code:last-child { background: var(--vb-paper-2); color: var(--vb-ink-2); }
+
+/* Earned cards and count tiles. Solid is Gold, Goal met is the foil, Checked is Green. */
+body :is(.lv-label, .lv-stat > span) {
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--vb-ink-3);
+}
+body .lv-card { --lv-kind: var(--vb-gold); }
+body .lv-card[data-kind="success"] { --lv-kind: var(--vb-gold); }
+body .lv-card[data-kind="tip"] { --lv-kind: var(--vb-green); }
+body .lv-card .lv-label::before { box-shadow: none; }
+body .lv-card[data-kind="abstract"] .lv-label::before {
+  background: conic-gradient(from 200deg, #FDC090, #FACAAF, #EACAD9, #CFE3F7, #CFEFE3, #FFE7A6, #FDC090);
+}
+body .lv-card > span:not(.lv-label) { color: var(--vb-ink-2); }
+body .lv-stat {
+  border-radius: 14px;
+  box-shadow: inset 0 -2px 0 var(--vb-line-strong);
+}
+body .lv-stat b {
+  font-family: var(--vb-display);
+  font-size: 28px;
+  line-height: 30px;
+  font-weight: 700;
+  color: var(--vb-ink);
+}
+
+/* ---- Dashboard rows */
+body .learning-note li:has(> .lv-row) + li { border-color: var(--vb-line); }
+body .learning-note li:has(> .lv-row) > .internal-link { color: var(--vb-ink); }
+body .learning-note li:has(> .lv-row) > .internal-link:hover { color: var(--vb-indigo); }
+body .lv-row { font-size: 13px; color: var(--vb-ink-3); }
+body .lv-num { color: var(--vb-ink); }
+body .lv-meter rect:first-child { fill: var(--vb-line) !important; }
+body .lv-meter rect:not(:first-child) { fill: var(--vb-green) !important; }
+/* Status chips: due is neutral, a deadline is Ember, nothing is red. */
+body .lv-tag {
+  background: var(--vb-paper-2);
+  color: var(--vb-ink-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+/* Ember text on the Surface row, outlined: Ember text on Ember soft was 4.06:1. */
+body .lv-tag[data-tone="deadline"] { background: transparent; box-shadow: inset 0 0 0 1px var(--vb-ember); color: var(--vb-ember-text); }
+body .lv-tag[data-tone="repair"] { background: var(--vb-paper-2); color: var(--vb-ink); }
+body .learning-note th { background: var(--vb-paper-2); }
+
+/* ---- Mermaid on Paper: Surface nodes with a Line rim, no glass. */
+body :is(.learning-log, .learning-themed) .mermaid {
+  --lv-glass: var(--vb-surface);
+  --lv-rim: var(--vb-line-strong);
+  --lv-shadow: none;
+  --lv-key: var(--vb-surface);
+  --lv-key-rim: var(--vb-ink);
+  --lv-wire: var(--vb-ink-3);
+}

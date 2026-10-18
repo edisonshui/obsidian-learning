@@ -10,7 +10,7 @@ Module._load = function (req, ...rest) {
   return orig.call(this, req, ...rest);
 };
 const plugin = require(require("path").join(__dirname, "main.js"));
-const { prepareJava, runCode, formatCode, paneTheme } = plugin;
+const { prepareJava, runCode, formatCode, paneTheme, opensInReading } = plugin;
 let fails = 0;
 const eq = (label, got, want) => { const ok = JSON.stringify(got) === JSON.stringify(want); if (!ok) fails++; console.log((ok ? "  pass  " : "  FAIL  ") + label + (ok ? "" : "\n     got  " + JSON.stringify(got) + "\n     want " + JSON.stringify(want))); };
 
@@ -80,6 +80,14 @@ function themeChecks() {
   eq("theme: notes outside a subject folder get none",
      [paneTheme("learn/Home.md", classesOf), paneTheme("learn/system/tutor.md", classesOf), paneTheme(null, classesOf)],
      [null, null, null]);
+  eq("reading view: live logs and generated notes open in it, hand-written notes do not",
+     [opensInReading("learn/subjects/q7/log.md", { type: "learning-chat-log" }),
+      opensInReading("learn/subjects/q7/log.md", null),
+      opensInReading("learn/Home.md", { type: "learning-home", generated: true }),
+      opensInReading("learn/subjects/q7/progress.md", { type: "learning-progress" }),
+      opensInReading("learn/subjects/q7/record.md", { type: "learning-record" }),
+      opensInReading("learn/system/tutor.md", null)],
+     [true, true, true, true, false, false]);
 }
 
 (async () => {

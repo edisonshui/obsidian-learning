@@ -16,7 +16,13 @@
    3. Theme. A subject's record, plan, resume, and session notes wear the
       background its log and progress page do. Those two carry the theme in
       their cssclasses; hand-written notes carry none, so the plugin puts the
-      same classes on the pane showing one (.obsidian/snippets/learning-notes.css). */
+      same classes on the pane showing one (.obsidian/snippets/learning-notes.css).
+
+   4. Reading view. Home, the Dashboard, progress pages, and live logs are
+      written by the hooks, so an edit to one is overwritten. They open in
+      Reading view, where the Run buttons are; the pencil still switches.
+      Their pane gets .lv-generated, which hides the properties block and the
+      file-name title ("log", "progress") above the note's own heading. */
 
 const obsidian = require("obsidian");
 const { Plugin, ItemView, MarkdownView, Notice, Scope } = obsidian;
@@ -29,6 +35,7 @@ const RUNNER_VIEW = "learn-code-runner";
 const LIVE_FILE = /^(learn\/subjects\/[^/]+\/(log|codex-log)\.md|Claude outputs\/Current conversation\.md)$/;
 const SUBJECT_NOTE = /^learn\/subjects\/([^/]+)\//;
 const THEME_CLASS = /^lv-theme-[a-z][a-z0-9-]*$/;
+const GENERATED_TYPES = new Set(["learning-home", "learning-dashboard", "learning-progress", "learning-chat-log"]);
 const AT_BOTTOM_PX = 140;          // this close to the bottom still counts as following
 const USER_INPUT_MS = 800;         // scrolls this soon after wheel/key/touch are the learner's
 const OUTPUT_LIMIT = 64 * 1024;    // per stream, so a runaway print cannot freeze the pane
@@ -659,6 +666,13 @@ function paneTheme(notePath, classesOf) {
   return themeIn(folder + "progress.md") || themeIn(folder + "log.md") || "lv-theme-calm";
 }
 
+// Whether a note opens in Reading view: a live log, or a note whose
+// frontmatter says the hooks generate it.
+function opensInReading(notePath, frontmatter) {
+  if (LIVE_FILE.test(notePath || "")) return true;
+  return Boolean(frontmatter && (frontmatter.generated === true || GENERATED_TYPES.has(frontmatter.type)));
+}
+
 /* ------------------------------------------------------------ plugin */
 
 class LearnLivePlugin extends Plugin {
@@ -695,6 +709,7 @@ class LearnLivePlugin extends Plugin {
 
     this.registerEvent(this.app.workspace.on("layout-change", () => this.themePanes()));
     this.registerEvent(this.app.workspace.on("file-open", () => this.themePanes()));
+    this.registerEvent(this.app.workspace.on("file-open", (file) => this.readGenerated(file)));
     this.registerEvent(this.app.metadataCache.on("changed", () => this.themePanes()));
     this.registerEvent(this.app.metadataCache.on("resolved", () => this.themePanes()));
     this.app.workspace.onLayoutReady(() => this.themePanes());
@@ -710,7 +725,10 @@ class LearnLivePlugin extends Plugin {
     for (const view of this.logViews()) {
       view.contentEl.querySelectorAll(".learn-follow-pill").forEach((pill) => pill.remove());
     }
-    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) this.setPaneTheme(leaf.view.containerEl, null);
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      this.setPaneTheme(leaf.view.containerEl, null);
+      leaf.view.containerEl.removeClass("lv-generated");
+    }
   }
 
   async saveSettings() { await this.saveData(this.settings); }
@@ -829,6 +847,8 @@ class LearnLivePlugin extends Plugin {
       const view = leaf.view;
       if (!(view instanceof MarkdownView)) continue;
       this.setPaneTheme(view.containerEl, view.file && paneTheme(view.file.path, (p) => this.classesOf(p)));
+      const cache = view.file && this.app.metadataCache.getFileCache(view.file);
+      view.containerEl.toggleClass("lv-generated", Boolean(view.file) && opensInReading(view.file.path, cache && cache.frontmatter));
     }
   }
 
@@ -838,6 +858,19 @@ class LearnLivePlugin extends Plugin {
     if (have.sort().join(" ") === want.sort().join(" ")) return;
     element.removeClass(...have);
     if (want.length) element.addClass(...want);
+  }
+
+  /* ---- reading view */
+
+  // Only on open: switching to Live Preview with the pencil afterwards sticks.
+  readGenerated(file) {
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!file || !view || view.file !== file || view.getMode() === "preview") return;
+    const cache = this.app.metadataCache.getFileCache(file);
+    if (!opensInReading(file.path, cache && cache.frontmatter)) return;
+    const state = view.leaf.getViewState();
+    view.leaf.setViewState(Object.assign({}, state, { state: Object.assign({}, state.state, { mode: "preview" }) }))
+      .catch((error) => log("switching to Reading view failed", error));
   }
 
   /* ---- runner */
@@ -920,4 +953,5 @@ module.exports.formatCode = formatCode;
 module.exports.runCode = runCode;
 module.exports.streamMode = streamMode;
 module.exports.paneTheme = paneTheme;
+module.exports.opensInReading = opensInReading;
 module.exports.RunnerView = RunnerView;

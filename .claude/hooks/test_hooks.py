@@ -2471,13 +2471,19 @@ home_off = status.home(home_ranked, HOME_SUBJECTS, home_state, False, HOME_DAY)
 eq("frontmatter marks Home as a generated learning note",
    home_on.split("\n---\n", 1)[0].splitlines(),
    ["---", "type: learning-home", 'updated: "2026-09-24"', "generated: true",
-    "cssclasses: [learning-note, learning-themed, lv-theme-calm]"])
+    "cssclasses: [learning-note, learning-themed, lv-theme-calm, lv-wash]"])
 body = home_on.split("\n---\n", 1)[1].lstrip("\n")
 eq("no H1, and the welcome card leads with the date and the top candidate's welcome and bare command",
    body.splitlines()[:4],
    ["> [!question|welcome] Thursday, 24 September",
     "> Ready when you are. A good next step is to bring back *Aliasing* in Pointers. It slipped on 23 Sep, "
     "and one short session puts it back.", ">", "> `learn-resume ptr`"])
+deadline_home = status.home(status.rank([rsubject("calc", [rnode("n1", "planned", name="Limits")], title="Calc",
+                                                  deadline="2026-09-26", last_session="2026-09-22")], [], HOME_DAY),
+                            [], home_state, False, HOME_DAY)
+eq("a Deadline welcome is its own sentence, not glued after 'A good next step is to'",
+   [line for line in deadline_home.splitlines() if line.startswith("> Ready")],
+   ["> Ready when you are. Calc's deadline is in 2 days, so continue Calc, where *Limits* is next."])
 eq("the other candidates are folded, one line each with the bare command",
    [line for line in body.splitlines() if line.startswith("> - **")],
    ["> - **Resume** OOP: *LSP* is next. `learn-resume oop`", "> - **Start** something new. `learn-start`"])
