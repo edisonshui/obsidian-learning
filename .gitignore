@@ -55,3 +55,6 @@ CONTEXT.md
 # Local tool state: agent worktrees and the Impeccable detector cache.
 .claude/worktrees/
 .impeccable/
+
+# Vault app fonts inlined for Obsidian; rebuilt from .scratch/vault-brand/fonts.
+.obsidian/snippets/vault-fonts.css

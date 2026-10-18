@@ -1,6 +1,8 @@
 {
   "enabledCssSnippets": [
-    "learning-notes"
+    "learning-notes",
+    "vault-fonts",
+    "vault-brand"
   ],
   "theme": "system"
 }

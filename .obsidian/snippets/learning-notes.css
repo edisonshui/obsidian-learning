@@ -502,3 +502,10 @@ body {
   letter-spacing: 0.1em;
   color: var(--text-muted);
 }
+
+/* Generated notes (Home, the Dashboard, progress pages, live logs): the
+   learn-live plugin marks their pane .lv-generated. Their properties block and
+   the file-name title ("log", "progress") filled the first screen; each note
+   has its own heading, and its frontmatter is for the hooks. */
+.lv-generated { --metadata-display-reading: none; --metadata-display-editing: none; }
+.lv-generated .inline-title { display: none; }
