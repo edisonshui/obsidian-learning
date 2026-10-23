@@ -39,7 +39,7 @@ Claude Code writes each subject's `log.md`. Codex writes `codex-log.md` through 
 
 The Codex hook keeps its runtime state under `learn/.codex-runtime/`. `$learn-end` reads the clock with `python3 .codex/hooks/learning.py clock --subject <slug>`. If hooks are unavailable or not trusted, report `unknown` for the minute fields and continue maintaining the learning records.
 
-Obsidian renders mermaid and LaTeX. Follow `learn/system/diagrams.md` and use full-root wikilinks such as `[[learn/subjects/oop/record|OOP record]]`.
+Obsidian renders mermaid, LaTeX, and embedded SVG figures. Follow `learn/system/diagrams.md` and use full-root wikilinks such as `[[learn/subjects/oop/record|OOP record]]`.
 
 For probes, put any code, data, or diagram inside the question itself. If a picker cannot display a long snippet, show it in chat, confirm Edison can see it, then ask. If he cannot see something, resend it before grading.
 

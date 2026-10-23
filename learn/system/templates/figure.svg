@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 470" font-family="Atkinson Hyperlegible Next, Helvetica Neue, Helvetica, sans-serif">
+  <!-- Template for a math figure. Rules: learn/system/diagrams.md, "Math pictures as SVG figures".
+       Replace the title, draw between the markers below, and keep every label inside the 760 x 470 box. -->
+  <title>One line saying what the figure shows</title>
+  <defs>
+    <marker id="ah-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#17865F"/></marker>
+    <marker id="ah-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4A4741"/></marker>
+    <marker id="ah-ember" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#E5603A"/></marker>
+    <marker id="ah-indigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4D3EE2"/></marker>
+  </defs>
+  <rect width="760" height="470" fill="#F6F5F2"/>
+
+  <!-- Background lines: stroke #CFCBC2, width 1.5. Main object: stroke #4A4741, width 2 to 2.5. -->
+  <!-- Accent, the thing the reply is about: stroke #17865F, width 3, marker-end="url(#ah-green)". -->
+  <!-- A wrong or rejected option: stroke #E5603A, width 2, stroke-dasharray="6 5", label fill #C2482A. -->
+  <!-- Labels: font-size 14 to 17, fill #1B1A17, secondary fill #646059. -->
+
+  <text x="380" y="452" font-size="15" fill="#4A4741" text-anchor="middle">One caption line stating the idea in words</text>
+</svg>
