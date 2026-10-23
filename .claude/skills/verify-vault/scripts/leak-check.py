@@ -4,7 +4,7 @@ Flags learner-visible tutor text that carries the tutor's working notes or the
 record's internal terms (tutor.md, *Reply shape*). Reads claude -p stream-json:
 every top-level assistant text block, including the ones written between tool
 calls, because the learner sees those as they stream. Fenced code is skipped
-(mermaid sources name nodes by design), and so are lines pointing at log.md.
+(mermaid sources name nodes by design), and so are links to a subject's log.md.
 Prints one line per hit and exits 1 if there were any, 0 if none.
 """
 import json
@@ -14,13 +14,16 @@ from pathlib import Path
 
 PATTERNS = [
     ("working note", re.compile(r"^(Now|Next),? (the )?(record|plan|resume|session note|preferences)\b", re.I)),
-    ("working note", re.compile(r"\b(Mirror nodes|from the templates?|plan reorder|State loaded|Both reviews are back|Applying (those|their) fixes|Trimming the resume|resume summary|200-word)\b", re.I)),
+    ("working note", re.compile(r"\b(Mirror nodes|from the templates?|plan reorder|State loaded|Both reviews are back|Applying (those|their) fixes|Trimming the resume|resume summary (is|ran)|200-word)\b", re.I)),
+    ("working note", re.compile(r"^Step \d+[,:.] ")),
+    ("session label", re.compile(r"\b[Ss]ession( note)? s\d+\b")),
     ("node label", re.compile(r"(?<![\w./-])n\d+[a-z]?\b")),
     ("record term", re.compile(r"\b(strands?|two-sighting|decay[- ]check|floor and ceiling)\b", re.I)),
     ("helper name", re.compile(r"\b(fact-checker|plan[- ]reviewer|reviewers|the checker|mc-preflight|write-check|learn-status)\b", re.I)),
     ("file name", re.compile(r"\b(record|plan|resume|preferences|progress|Home|Dashboard)\.md\b")),
 ]
 FENCE = re.compile(r"^\s*(```|~~~)")
+LOG_LINK = re.compile(r"\[\[[^\]]*log(\|[^\]]*)?\]\]|`?[\w./-]*log\.md`?")
 
 
 def visible_text(stream: Path):
@@ -44,8 +47,9 @@ def scan(stream: Path, label: str) -> int:
             if FENCE.match(line):
                 in_fence = not in_fence
                 continue
-            if in_fence or "log.md" in line or "/log]]" in line:
+            if in_fence:
                 continue
+            line = LOG_LINK.sub("", line)
             for kind, pat in PATTERNS:
                 m = pat.search(line)
                 if m:
