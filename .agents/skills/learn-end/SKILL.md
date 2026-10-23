@@ -9,6 +9,8 @@ Work in this order so that nothing depends on a file not yet updated. Do every s
 
 If the learner's last message answers a check, grade it first, as reply text before any tool call (`tutor.md`, *Feedback*), and log it in step 1. The learner may be walking away, and the grade is the part they read.
 
+Then write "Saving your progress." and nothing else until the step 8 closing block. Text between tool calls reaches the learner as it streams (`tutor.md`, *Reply shape*), so track steps 1–7 in thinking.
+
 ## 1. Session note
 
 Before any write, run `python3 .claude/hooks/write-check.py snapshot <slug>-s<NN>` (this session's number, e.g. `oop-s05`). Step 7 compares against it, so a snapshot taken after a write would hide that write.
