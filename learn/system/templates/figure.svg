@@ -10,8 +10,8 @@
   </defs>
   <rect width="760" height="470" fill="#F6F5F2"/>
 
-  <!-- Background lines: stroke #CFCBC2, width 1.5. Main object: stroke #4A4741, width 2 to 2.5. -->
-  <!-- Accent, the thing the reply is about: stroke #17865F, width 3, marker-end="url(#ah-green)". -->
+  <!-- Other lines: stroke #8C887F, width 1.5. Main object: stroke #4A4741, width 2 to 2.5. -->
+  <!-- Accent, the thing the reply is about: stroke #17865F, width 3, marker-end="url(#ah-green)". Its label text: fill #13744F. -->
   <!-- A wrong or rejected option: stroke #E5603A, width 2, stroke-dasharray="6 5", label fill #C2482A. -->
   <!-- Labels: font-size 14 to 17, fill #1B1A17, secondary fill #646059. -->
 
