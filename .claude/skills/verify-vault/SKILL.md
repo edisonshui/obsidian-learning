@@ -72,6 +72,7 @@ Proof standards:
 - Drive the real entry point: the hook script with a realistic payload, or the slash command through `claude -p`. Do not call Python functions or hand-write `.claude/obsidian-live/*.json` state.
 - Capture the action and the resulting files, not only the reply. `diff.txt` is the ground truth. Check what a skill reports against `diff.txt`, never against git, because `learn/subjects/` is gitignored and invisible to `git status`.
 - A claim in the model's reply with no matching line in `diff.txt` is a failure, and so is a `diff.txt` line the reply never mentions.
+- Run `leak-check.py "$EVIDENCE"` after any drive that teaches. A hit is a failure of `tutor.md` *Reply shape*: the learner saw it, including text written between tool calls.
 - Jev is the only network boundary in the hooks. The sandbox has no key, so every Jev check runs its documented offline fallback. Saying a Jev verdict was verified this way is false. Say "offline fallback verified".
 
 ## Cleanup
@@ -94,6 +95,7 @@ All in `scripts/`, all executable, usage in each file's header comment.
 | `claude-turn.sh <sandbox> <name> "<prompt>" [sid]` | one `claude -p` turn through `step.sh` |
 | `snapshot.py take <sandbox> <out>` / `diff <a> <b>` | used by `step.sh` |
 | `cleanup.sh <sandbox>` | delete sandbox and its transcripts, keep evidence |
+| `leak-check.py <step or run dir>` | flag tutor working notes and record terms in learner-visible text; exit 1 on any |
 
 ## Feature map
 

@@ -23,7 +23,7 @@ Ask at most three questions in one round (use AskUserQuestion if available). Cov
 
 - Name 3–6 strands the goal depends on and write them to the Strands table with empty floor and ceiling.
 - Before probing, check other subjects' records (`learn/subjects/*/record.md`) for strands already demonstrated elsewhere; reuse that evidence rather than re-probing.
-- Probe each strand by binary search (see *Checks and quizzes* in `tutor.md`). Budget 10–15 minutes, about 12–20 questions total. Multiple choice via AskUserQuestion for speed; free-response in chat where a choice would give the answer away.
+- Probe each strand by binary search (see *Checks and quizzes* in `tutor.md`). Budget 5–10 minutes, about 6–10 questions total, so the first lesson starts inside this session. Batch multiple-choice probes, up to four per AskUserQuestion call; free-response in chat where a choice would give the answer away. A floor left rough is refined by the first check of the node that needs it (`tutor.md`, *Pacing*). If the learner asks to shorten or skip diagnosis, do so and note it in *Review notes*.
 - After every answer, append an evidence line to `record.md`. When a strand's floor and ceiling are both known, fill its row.
 - Tell the learner when diagnosis is done and summarize the edge in three lines.
 
@@ -34,12 +34,16 @@ Ask at most three questions in one round (use AskUserQuestion if available). Cov
 
 ## 5. Review
 
-- Run the `fact-checker` subagent with the list of factual claims the plan rests on (definitions, rules, API facts, numbers). Fix what it marks wrong; list what it marks uncertain under *Review notes*.
-- Run the `plan-reviewer` subagent with the paths of `plan.md`, `record.md`, and `learn/me/preferences.md`. Apply its fixes or say in *Review notes* why not.
+Start both reviewers in one message, in the background, then go straight to step 6 so the learner reads the plan while they run:
+
+- `fact-checker` with the list of factual claims the plan rests on (definitions, rules, API facts, numbers). Fix what it marks wrong; list what it marks uncertain under *Review notes*.
+- `plan-reviewer` with the paths of `plan.md`, `record.md`, and `learn/me/preferences.md`. Apply its fixes or say in *Review notes* why not.
 
 ## 6. Present and approve
 
-Show the graph and the five-line summary (what they have, first session, last node, session count, what they can do at the end). Wait for approval. On approval set `approved: true` in `plan.md` and `status: active` in `record.md`.
+Show the graph and the five-line summary (what they have, first session, last node, session count, what they can do at the end), and say in one line that a fact check and a pacing check are still running and may adjust it. Wait for approval. On approval set `approved: true` in `plan.md` and `status: active` in `record.md`.
+
+Teaching waits for the `fact-checker` result (`tutor.md`, *Reliability rules*). The `plan-reviewer` result may land after teaching starts: apply it to nodes not yet taught, and tell the learner in one line only when it changes something they approved.
 
 ## 7. Begin
 
