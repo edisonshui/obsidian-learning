@@ -161,7 +161,7 @@ body .markdown-preview-view.learning-note h2 {
 }
 body :is(.learning-note, .learning-log, .learning-themed) h3 { font-size: 17px; line-height: 24px; font-weight: 600; }
 body :is(.learning-note, .learning-log, .learning-themed) :is(code, pre, pre code) { font-family: var(--vb-mono); }
-body :is(.learning-note, .learning-log, .learning-themed) code { background: var(--vb-paper-2); }
+body :is(.learning-note, .learning-log, .learning-themed) :not(pre) > code { background: var(--vb-paper-2); }
 body :is(.learning-note, .learning-log, .learning-themed) :is(.internal-link, a) { color: var(--vb-indigo); }
 body :is(.learning-note, .learning-log, .learning-themed) hr { border-color: var(--vb-line); }
 

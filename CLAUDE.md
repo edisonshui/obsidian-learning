@@ -19,7 +19,7 @@ The SessionStart hook prints the date, a *Show the learner* block (the recommend
 - **`learn/me/preferences.md`:** append to *Observed* only, with evidence. Never edit *Stated*.
 - **Reliability rules in `tutor.md` are non-negotiable.** Verify before the learner builds on a claim.
 - **A retrieval check is a gate.** Never open a fourth consecutive new node without a logged mixed retrieval check. If one is skipped, the reason goes under *Retrieval checks* in the session note; that section is never left empty.
-- **Every node logs a `**Diagram.**` line** — the mermaid block, or one sentence on why the idea has no shape worth drawing. A decision that leaves no trace gets skipped by default.
+- **Every node logs a `**Diagram.**` line** — the mermaid block or SVG figure embed, or one sentence on why the idea has no shape worth drawing. A decision that leaves no trace gets skipped by default.
 - **Never claim a write you did not make.** `/learn-end` re-reads every file it touched and reports what actually changed. If a write was skipped or a permission prompt was declined, say so.
 - Skills describe the file mechanics: `/learn-start`, `/learn-resume`, `/learn-check`, `/learn-end`, `/learn-review`. A review is the only one that is not a session of a single subject: it writes evidence into several `record.md` files and its narrative into `learn/reviews/`, and it changes no subject's `sessions:` or `last_session`. Record schema is in `learn/system/records.md`; read it before writing any record.
 
@@ -53,7 +53,7 @@ learn/Queries.md   Dataview views over frontmatter                       (author
 
 **Generated files are never hand-edited.** `Home.md`, `Dashboard.md`, every `progress.md`, and every `log.md` are rewritten from the records; a correction belongs in `record.md` or `plan.md`. `learn-status.py` also reports where `record.md` and `plan.md` contradict each other, on the dashboard under *Record inconsistencies* — it reports and never repairs, because a generator that silently fixed its source would hide the drift it exists to surface.
 
-Obsidian renders mermaid and LaTeX; write diagrams and math per `learn/system/diagrams.md`. Use `[[wikilinks]]` with full paths from the vault root, e.g. `[[learn/subjects/oop/record|OOP record]]`.
+Obsidian renders mermaid, LaTeX, and embedded SVG figures; write diagrams, figures, and math per `learn/system/diagrams.md`. Use `[[wikilinks]]` with full paths from the vault root, e.g. `[[learn/subjects/oop/record|OOP record]]`.
 
 ## Reading the live conversation in Obsidian
 

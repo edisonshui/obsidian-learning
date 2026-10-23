@@ -28,7 +28,7 @@ nodes: []
 
 **Connect.**
 
-**Diagram.** *(The mermaid block as drawn, or one sentence on why this idea has no shape worth drawing. Required — never leave blank.)*
+**Diagram.** *(The mermaid block as drawn, the SVG figure's `![[...svg]]` embed, or one sentence on why this idea has no shape worth drawing. Required — never leave blank.)*
 
 **Check.** Q: … / A: … / Verdict: … *(multiple choice: append `key: <slot>/<count> — options: <opt1> / <opt2> / <opt3>` — the slot the correct option landed in, out of how many, then every option verbatim in slot order. The rotation rule is in `.claude/hooks/slot_rotation.py`; G4 reads the slot, `--semantic` reads the options)*
 
