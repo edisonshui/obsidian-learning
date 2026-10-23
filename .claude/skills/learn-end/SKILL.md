@@ -2,7 +2,7 @@
 name: learn-end
 description: End or checkpoint the current learning session — finalize the session note, update the learner record and plan, rewrite the resume summary, and print a plain-English summary. Use at the end of a session, before a break, or whenever Edison says stop, pause, checkpoint, or break.
 argument-hint: [break]
-allowed-tools: Read, Write, Edit, Glob, Bash(date *), Bash(python3 .claude/hooks/learn-status.py*), Bash(python3 .claude/hooks/obsidian-live.py clock*), Bash(python3 .claude/hooks/jev.py*), Bash(python3 .claude/hooks/write-check.py*)
+allowed-tools: Read, Write, Edit, Glob, Agent, Bash(date *), Bash(python3 .claude/hooks/learn-status.py*), Bash(python3 .claude/hooks/obsidian-live.py clock*), Bash(python3 .claude/hooks/jev.py*), Bash(python3 .claude/hooks/write-check.py*)
 ---
 
 End or checkpoint the current session. Argument: `$ARGUMENTS` (`break` means the learner is coming back today; otherwise treat this as the end of the session). Follow Phase 4 of `learn/system/workflow.md` and the update rules in `learn/system/records.md`.
@@ -31,7 +31,7 @@ Run `date`. Fill `nodes:` in the frontmatter. Fill `active_minutes:` and `idle_m
 
 ## 3. `plan.md`
 
-Node statuses to match `record.md`. If pace differed from the estimate, regroup the remaining sessions. If a check exposed a missing prerequisite, insert the node and update the graph. Set `updated`.
+Node statuses to match `record.md`. If pace differed from the estimate, regroup the remaining sessions. If a check exposed a missing prerequisite, insert the node and update the graph. If the plan is provisional (sketched nodes under *Where the learner starts*), write them into the Nodes table and the graph now, mirror them into `record.md`, run the `fact-checker` on their claims, and put one line in the closing block saying the plan is complete, with its node count and last node. Set `updated`.
 
 ## 4. `resume.md`
 
