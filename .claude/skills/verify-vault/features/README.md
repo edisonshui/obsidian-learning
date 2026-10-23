@@ -32,7 +32,7 @@ Each feature file starts with an H1 title and one paragraph describing the user-
 ## Features
 
 - [Session start block](./session-start.md) covers the SessionStart hook output on startup and on resume with a selected subject. **Proven 2026-10-07.**
-- [/learn-start](./learn-start.md) covers folder setup from templates, the goal round, and the s01 session note. Recipe only, not yet driven.
+- [/learn-start](./learn-start.md) covers folder setup from templates, the goal round, the attempt-first diagnosis, the provisional plan, and the s01 session note. **Driven 2026-10-23 through s01; the guard is a recipe only.**
 - [/learn-end](./learn-end.md) covers finalizing an open note, the clock read, the change checklist, and honest reporting. **Real two-turn path and one-turn path proven 2026-10-07.** Blocked-write and break paths are recipes only.
 - [Live log mirroring](./live-log.md) covers per-subject `log.md` routing and content from prompts and transcripts. **Hook-only routing and the `claude -p` reply path proven 2026-10-07; thinking, image, theme, and runner share proven hook-only 2026-10-13.**
 - [Status views](./learn-status.md) covers `learn-status.py` regenerating `Home.md`, `Dashboard.md`, and `progress.md`, and its read-only modes. **Proven 2026-10-07.**

@@ -7,6 +7,10 @@ End or checkpoint the current session. If the user asks for a break, treat it as
 
 Work in this order so that nothing depends on a file not yet updated. Do every step even for a `break`; the only difference is step 8.
 
+If the learner's last message answers a check, grade it first, as reply text before any tool call (`tutor.md`, *Feedback*), and log it in step 1. The learner may be walking away, and the grade is the part they read.
+
+Then write "Saving your progress." and nothing else until the step 8 closing block. Text between tool calls reaches the learner as it streams (`tutor.md`, *Reply shape*), so track steps 1–7 in thinking.
+
 ## 1. Session note
 
 Before any write, run `python3 .claude/hooks/write-check.py snapshot <slug>-s<NN>` (this session's number, e.g. `oop-s05`). Step 7 compares against it, so a snapshot taken after a write would hide that write.
@@ -25,7 +29,7 @@ Run `date`. Fill `nodes:` in the frontmatter. Fill `active_minutes:` and `idle_m
 
 ## 3. `plan.md`
 
-Node statuses to match `record.md`. If pace differed from the estimate, regroup the remaining sessions. If a check exposed a missing prerequisite, insert the node and update the graph. Set `updated`.
+Node statuses to match `record.md`. If pace differed from the estimate, regroup the remaining sessions. If a check exposed a missing prerequisite, insert the node and update the graph. If the plan is provisional (sketched nodes under *Where the learner starts*), write them into the Nodes table and the graph now, mirror them into `record.md`, run the `fact-checker` on their claims, and put one line in the closing block saying the plan is complete, with its node count and last node. Set `updated`.
 
 ## 4. `resume.md`
 
