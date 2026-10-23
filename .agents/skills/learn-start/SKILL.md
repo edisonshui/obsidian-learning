@@ -23,7 +23,9 @@ Ask at most three questions in one round (use a question picker if available). C
 
 - Name 3–6 strands the goal depends on and write them to the Strands table with empty floor and ceiling.
 - Before probing, check other subjects' records (`learn/subjects/*/record.md`) for strands already demonstrated elsewhere; reuse that evidence rather than re-probing.
-- Probe each strand by binary search (see *Checks and quizzes* in `tutor.md`). Budget 5–10 minutes, about 6–10 questions total, so the first lesson starts inside this session. Batch multiple-choice probes in a question picker when available, up to four at a time; free-response in chat where a choice would give the answer away. A floor left rough is refined by the first check of the node that needs it (`tutor.md`, *Pacing*). If the learner asks to shorten or skip diagnosis, do so and note it in *Review notes*.
+- Open with one attempt problem that represents the goal: ask the learner to work it out loud and say where it gets fuzzy (see *Checks and quizzes* in `tutor.md`). If they cannot start it, ask what they already know about the topic in their own words.
+- Then probe by binary search only the strands the attempt left unclear. Budget 5–10 minutes, one attempt plus at most 5 probes, so the first lesson starts inside this session. Batch multiple-choice probes in a question picker when available, up to four at a time; free-response in chat where a choice would give the answer away.
+- "I don't know", or a blank attempt, ends the probing on that strand: record that level as its ceiling and move on. If two strands come back blank, end the diagnosis and go to step 4 with a provisional plan. A floor left rough is refined by the first check of the node that needs it (`tutor.md`, *Pacing*). If the learner asks to shorten or skip diagnosis, do so and note it in *Review notes*.
 - After every answer, append an evidence line to `record.md`. When a strand's floor and ceiling are both known, fill its row.
 - Tell the learner when diagnosis is done and summarize the edge in three lines.
 
@@ -31,6 +33,7 @@ Ask at most three questions in one round (use a question picker if available). C
 
 - Write `plan.md`: nodes from each strand's floor to the goal, one concept each, 10–20 minutes each. Fill every column of the Nodes table. The `Can do` column holds one can-do statement per node (`records.md`, *Plan table*). Mark demonstrated nodes `skipped`. Draw the dependency graph per `learn/system/diagrams.md`. Group into 45–60 minute sessions.
 - Mirror the node list into the Nodes table of `record.md` with status `planned` or `skipped`.
+- **Provisional plan.** If the diagnosis ended early on blank strands, write only the first one or two nodes in full, starting at the lowest blank strand, and sketch the rest as plain bullets under *Where the learner starts*. Steps 5 and 6 then cover the written nodes only, and the five-line summary says "provisional". `$learn-end` finishes the plan (`workflow.md`, Phase 4, step 3).
 
 ## 5. Review
 

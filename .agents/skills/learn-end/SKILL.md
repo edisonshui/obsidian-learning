@@ -29,7 +29,7 @@ Run `date`. Fill `nodes:` in the frontmatter. Fill `active_minutes:` and `idle_m
 
 ## 3. `plan.md`
 
-Node statuses to match `record.md`. If pace differed from the estimate, regroup the remaining sessions. If a check exposed a missing prerequisite, insert the node and update the graph. Set `updated`.
+Node statuses to match `record.md`. If pace differed from the estimate, regroup the remaining sessions. If a check exposed a missing prerequisite, insert the node and update the graph. If the plan is provisional (sketched nodes under *Where the learner starts*), write them into the Nodes table and the graph now, mirror them into `record.md`, run the `fact-checker` on their claims, and put one line in the closing block saying the plan is complete, with its node count and last node. Set `updated`.
 
 ## 4. `resume.md`
 
