@@ -41,10 +41,10 @@ STATUSES = ["decayed", "planned", "introduced", "checked", "solid", "skipped"]
 COVERED = {"checked", "solid", "skipped"}
 PARTIAL = {"introduced"}
 
-NODE_ID = re.compile(r"\bn\d+\b")
+NODE_ID = re.compile(r"\bn\d+[a-z]?\b")
 MERMAID = re.compile(r"```mermaid\n(.*?)```", re.S)
 CELL_BREAK = re.compile(r"(?<!\\)\|")
-EDGE = re.compile(r"\b(n\d+)\b[^\n]*?-->[^\n]*?\b(n\d+)\b")
+EDGE = re.compile(r"\b(n\d+[a-z]?)\b[^\n]*?-->[^\n]*?\b(n\d+[a-z]?)\b")
 
 
 # --------------------------------------------------------------------- reading
@@ -175,7 +175,7 @@ def note_inputs(subjects):
 # reached solid, how often it lapsed -- is read from the `→ nN <status>` endings
 # on evidence lines (spec section 1, `CONTEXT.md`, *Transition marker*).
 
-MARKER = re.compile(r"(n\d+) (%s)" % "|".join(STATUSES))
+MARKER = re.compile(r"(n\d+[a-z]?) (%s)" % "|".join(STATUSES))
 EVIDENCE_LINE = re.compile(r"^- (\d{4}-\d{2}-\d{2})\b\W*([sr]\d+\b)?")
 NOTE_STEM = re.compile(r"^(\d{4}-\d{2}-\d{2})-([sr]\d+)$")
 
@@ -707,7 +707,7 @@ def rewards(subjects, today):
                        for node, date in sorted(lapsed.items(), key=lambda item: sort_key(item[0]))]
     # Newest first; on one date a goal, then a recovery, then a solid (spec section 8).
     badges.sort(key=lambda found: (BADGE_ORDER.index(found["kind"]), found["title"],
-                                   sort_key(found["node"]) if found["node"] else 0))
+                                   sort_key(found["node"]) if found["node"] else (0, "")))
     badges.sort(key=lambda found: found["date"], reverse=True)
     streak = review_streak(subjects, today)
     counts.update(current_streak=streak["current"], best_streak=streak["best"])
@@ -1179,7 +1179,9 @@ def consistency(nodes, plan_text, subject, fields, sessions, folder):
 # --------------------------------------------------------------------- rendering
 
 def sort_key(node):
-    return int(node[1:])
+    """n8 < n8a < n8b < n9: number first, then the letter of a split node."""
+    match = re.match(r"n(\d+)([a-z]?)$", node)
+    return (int(match.group(1)), match.group(2))
 
 
 def meter(done, partial, total, width=112):

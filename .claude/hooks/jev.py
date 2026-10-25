@@ -771,7 +771,7 @@ def shaky_gap(body, ask_fn=None, vault=VAULT):
 # note that never mentions a node cannot be saying where each node stands, so its
 # absence is a real finding, while its presence proves nothing. G1 already owns
 # the word count and the frontmatter, so this does not repeat them.
-NODE_MENTION = re.compile(r"\bn\d+\b")
+NODE_MENTION = re.compile(r"\bn\d+[a-z]?\b")
 
 
 def resume_spec():

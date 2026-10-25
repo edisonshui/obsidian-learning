@@ -112,10 +112,13 @@ def questions_text(questions):
 
 def answers_text(result):
     if isinstance(result, dict) and isinstance(result.get("answers"), dict):
-        return "\n\n".join(
-            emphasize(question) + "\n\n" + str(answer)
-            for question, answer in result["answers"].items()
-        )
+        # The learner's typed note on a pick is the reasoning behind it, so it is logged with the answer.
+        annotations = result.get("annotations") if isinstance(result.get("annotations"), dict) else {}
+        parts = []
+        for question, answer in result["answers"].items():
+            note = annotations.get(question, {}).get("notes") if isinstance(annotations.get(question), dict) else None
+            parts.append(emphasize(question) + "\n\n" + str(answer) + ("\n\nNote: " + note if note else ""))
+        return "\n\n".join(parts)
     return ""
 
 
@@ -617,7 +620,7 @@ def subject_segments(vault, state):
     return segments, subject
 
 
-NODE_HEADING = re.compile(r"\*\*(?:Node\s+)?(n\d+)\s*[—–:-]\s*([^*\n]+?)\*\*")
+NODE_HEADING = re.compile(r"\*\*(?:Node\s+)?(n\d+[a-z]?)\s*[—–:-]\s*([^*\n]+?)\*\*")
 
 
 def callout(text, kind, title, fold=""):

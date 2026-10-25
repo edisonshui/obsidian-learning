@@ -24,6 +24,8 @@ nodes: []
 
 **Motivate.**
 
+**Prediction.** *(What the learner guessed before each step was taught, in their words, or the reason it was skipped. Never evidence.)*
+
 **Establish.**
 
 **Connect.**

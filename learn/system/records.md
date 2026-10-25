@@ -22,9 +22,9 @@ Session numbers `sNN` are per subject and never reused. Two sessions on one day 
 | Status | Meaning | Set when |
 | --- | --- | --- |
 | `planned` | Not yet taught | Plan written |
-| `skipped` | Diagnosis showed the learner already has it | Diagnosis |
+| `skipped` | Diagnosis showed the learner already has it, by a free-response answer or two right probes worded differently. One right pick does not skip a node | Diagnosis |
 | `introduced` | Taught, no check passed yet | After *establish* |
-| `checked` | Passed a check in the session it was taught | After *check* |
+| `checked` | Passed a check in the session it was taught, unaided, on an item the teaching did not show. A pass after a hint keeps the node `introduced` until a fresh item passes without one | After *check* |
 | `solid` | Passed a retrieval check in a later session | Decay check on resume |
 | `decayed` | Failed a retrieval check in a later session | Decay check on resume; re-teach briefly, then back to `checked` |
 
