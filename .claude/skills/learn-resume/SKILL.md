@@ -2,17 +2,17 @@
 name: learn-resume
 description: Resume an existing learning project from its saved records — recap, decay-check the last nodes, then continue teaching from the plan. Use when Edison wants to continue a subject, or after a break.
 argument-hint: <subject-slug>
-allowed-tools: Read, Write, Edit, Glob, Bash(xmllint *), Bash(date *), Bash(python3 .claude/hooks/mc-preflight.py*), AskUserQuestion, Agent, WebSearch, WebFetch
+allowed-tools: Read, Write, Edit, Glob, Bash(xmllint *), Bash(date *), Bash(python3 .claude/hooks/mc-preflight.py*), Bash(python3 .claude/hooks/learn-status.py*), AskUserQuestion, Agent, WebSearch, WebFetch
 ---
 
 Resume the learning project `$0`. Follow Phase 5 of `learn/system/workflow.md`.
 
-## 1. Load state (read fully, in this order)
+## 1. Load state
 
-1. `learn/subjects/$0/resume.md`
-2. `learn/subjects/$0/record.md`
-3. `learn/subjects/$0/plan.md`
-4. The most recent file in `learn/subjects/$0/sessions/`
+1. `learn/subjects/$0/resume.md`, in full.
+2. The resume brief: `python3 .claude/hooks/learn-status.py --brief --subject $0`. It carries the state, the nodes this session works on with their plan rows and recent evidence, open misconceptions, cross-subject prerequisites, and the latest note's hand-off.
+
+The brief replaces reading `record.md`, `plan.md`, and the latest session note in full (Edison, 2026-10-25). Open a full file only when a step needs it: finalizing an open note (step 3), re-teaching a node (read its *Lesson* entry in the note that taught it), or a brief line that does not make sense on its own. To update `record.md` frontmatter, read only its first 15 lines before editing them.
 
 If `record.md` does not exist, stop: the right command is `/learn-start $0`. If `record.md` says `status: not-started` or `diagnosing`, say so and continue with the corresponding step of `/learn-start` instead.
 
@@ -24,7 +24,7 @@ At most eight lines: where we are in the plan, what was remembered on a later da
 
 ## 3. Open the session note
 
-Run `date`. Then look at the most recent session note and take exactly one of these branches. The rule is in `learn/system/records.md`, under *Closing an open note*; it is repeated here because this is the only place that acts on it.
+Run `date`. Then take the most recent session note's `date`, `start`, `end`, and `paused` from the brief's *Latest session note* section and take exactly one of these branches. The rule is in `learn/system/records.md`, under *Closing an open note*; it is repeated here because this is the only place that acts on it.
 
 **If `end:` is already filled** — the last session ended cleanly. Go to *Open a new note* below.
 

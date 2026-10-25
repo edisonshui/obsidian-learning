@@ -76,6 +76,12 @@ def pipe_rows(text):
     return rows
 
 
+# A prerequisite in another subject, written `<slug>/nN` in the Prereqs cell
+# (`records.md`, *Plan table*). Read before NODE_ID so its node id is not taken
+# for one of this subject's own.
+CROSS_PREREQ = re.compile(r"\b([a-z0-9][a-z0-9-]*[a-z0-9])/(n\d+[a-z]?)\b")
+
+
 def read_nodes(record_text, plan_text):
     """Merge the node tables from record.md and plan.md, keyed by node id.
 
@@ -98,6 +104,7 @@ def read_nodes(record_text, plan_text):
             "checked": cells[2].strip() if len(cells) > 2 else "",
             "evidence": cells[3].strip() if len(cells) > 3 else "",
             "prereqs": [],
+            "cross_prereqs": [],
             "plan_status": "",
         }
     for row in table_by_header(section(plan_text, "Nodes")):
@@ -108,14 +115,16 @@ def read_nodes(record_text, plan_text):
             continue  # the template's empty row: a plan still being diagnosed toward
         entry = nodes.setdefault(node, {"id": node, "name": row.get("Node", ""),
                                         "status": "", "checked": "", "evidence": "",
-                                        "prereqs": [], "plan_status": ""})
+                                        "prereqs": [], "cross_prereqs": [], "plan_status": ""})
         if not entry["name"]:
             entry["name"] = row.get("Node", "")
         entry["can_do"] = row.get("Can do", "")
         # The header is "Rests on (unconditional truth)" in every live plan;
         # matching the prefix keeps a reworded parenthesis from losing the column.
         entry["truth"] = next((cell for key, cell in row.items() if key.startswith("Rests on")), None)
-        entry["prereqs"] = NODE_ID.findall(row.get("Prereqs", ""))
+        cell = row.get("Prereqs", "")
+        entry["cross_prereqs"] = CROSS_PREREQ.findall(cell)
+        entry["prereqs"] = NODE_ID.findall(CROSS_PREREQ.sub(" ", cell))
         entry["plan_status"] = row.get("Status", "").lower()
     # A prereq naming the node itself or an id not in the table is no edge.
     # It is dropped here and kept aside for consistency() to report.
@@ -1907,6 +1916,136 @@ def startup_block(subjects, notes, rewards_on, today, selected=None, host="claud
 
 # ------------------------------------------------------------ the dashboard
 
+def cross_prereqs(subjects, slug=None):
+    """Every `<slug>/nN` prerequisite, with the other node's state and a concern.
+
+    The concern is None when the other node is `checked` or `solid` and its
+    latest evidence names no help; otherwise it says what is wrong. Lagrange's
+    plan once assumed the directional derivative because Exam 2 had it
+    `checked`, though its meaning there needed a pointer (2026-10-23). A status
+    alone hid that, so the evidence cell is read too.
+    """
+    by_slug = {s["slug"]: s for s in subjects}
+    found = []
+    for s in subjects:
+        if slug is not None and s["slug"] != slug:
+            continue
+        for node in sorted(s["nodes"], key=sort_key):
+            for other, other_node in s["nodes"][node].get("cross_prereqs", []):
+                target = by_slug.get(other, {}).get("nodes", {}).get(other_node)
+                row = {"subject": s["slug"], "title": s["fields"].get("title", s["slug"]),
+                       "node": node, "other": other, "other_node": other_node,
+                       "other_title": by_slug.get(other, {}).get("fields", {}).get("title", other),
+                       "status": target["status"] if target else "",
+                       "evidence": target["evidence"] if target else ""}
+                if not target:
+                    row["concern"] = "not found"
+                elif target["status"] not in ("checked", "solid"):
+                    row["concern"] = "it is %s" % (target["status"] or "missing a status")
+                elif HELPED_VERDICT.search(target["evidence"]):
+                    row["concern"] = "its last check needed help"
+                else:
+                    row["concern"] = None
+                found.append(row)
+    return found
+
+
+def cross_line(row):
+    return "%s %s depends on %s %s: %s%s" % (
+        row["title"], row["node"], row["other_title"], row["other_node"],
+        row["concern"] or row["status"],
+        " (%s)" % row["evidence"] if row["evidence"] else "")
+
+
+BRIEF_PLAN_COLUMNS = ("Rests on", "Discovery question", "Check type", "Can do", "Prereqs")
+BRIEF_PER_NODE, BRIEF_TAIL = 4, 10  # evidence lines kept per focus node, and from the end of the log
+
+
+def brief_focus(fields, nodes):
+    """The nodes a resume works on: those `next:` names, every `introduced` or
+    `decayed` node, the two most recently checked (the decay check, `/learn-resume`
+    step 4; the two most recent `solid` if none are `checked`), and the next three
+    `planned` nodes in plan order."""
+    focus = set(NODE_ID.findall(fields.get("next", "")))
+    focus |= {node for node, entry in nodes.items() if entry["status"] in ("introduced", "decayed")}
+    for status in ("checked", "solid"):
+        dated = sorted((to_date(entry["checked"]) or datetime.min.date(), sort_key(node), node)
+                       for node, entry in nodes.items() if entry["status"] == status)
+        if dated:
+            focus |= {node for _, _, node in dated[-2:]}
+            break
+    focus |= set([node for node in sorted(nodes, key=sort_key) if nodes[node]["status"] == "planned"][:3])
+    return sorted((node for node in focus if node in nodes), key=sort_key)
+
+
+def brief(subject, subjects, today):
+    """What `/learn-resume` loads in place of the four full files (Edison,
+    2026-10-25): the state, the nodes this session works on, their evidence,
+    and the latest note's hand-off. Read-only. A full file is read only when a
+    step needs it, so this leaves out what no resume step reads."""
+    fields, nodes = subject["fields"], subject["nodes"]
+    record, plan = subject["record_text"], subject["plan_text"]
+    focus = brief_focus(fields, nodes)
+    out = ["# Resume brief: %s (%s)" % (fields.get("title", subject["slug"]), subject["slug"]), "",
+           "Generated by `learn-status.py --brief` on %s from `record.md`, `plan.md`, and the latest "
+           "session note. Open a full file when a step needs it." % today.isoformat(), "",
+           "## State", ""]
+    out += ["- %s: %s" % (key, fields[key]) for key in
+            ("status", "sessions", "last_session", "next", "deadline", "budget") if fields.get(key)]
+    for title, text in (("Goal", section(record, "Goal")),
+                        ("Success criteria", section(record, "Success criteria")),
+                        ("Materials", section(record, "Materials"))):
+        if text:
+            out += ["", "## " + title, "", text]
+    misconceptions = [line for line in section(record, "Misconceptions").splitlines()
+                      if line.startswith("- ") and "resolved" not in line.lower()]
+    out += ["", "## Open misconceptions", ""] + (misconceptions or ["None open."])
+    works = section(record, "What works")
+    if works:
+        out += ["", "## What works for this learner here", "", works]
+    out += ["", "## Nodes", ""]
+    out += ["- %s %s · %s%s" % (node, nodes[node]["name"], nodes[node]["status"] or "no status",
+                                " · checked %s" % nodes[node]["checked"] if nodes[node]["checked"]
+                                and nodes[node]["checked"] not in ("-", "\u2014") else "")
+            for node in sorted(nodes, key=sort_key)]
+    rows = {row.get("Id", ""): row for row in table_by_header(section(plan, "Nodes"))}
+    out += ["", "## Focus nodes", "",
+            "The decay check, open work, and what comes next. Their plan rows:", ""]
+    for node in focus:
+        row = rows.get(node, {})
+        out.append("- **%s %s** (%s)" % (node, nodes[node]["name"], nodes[node]["status"]))
+        for column in BRIEF_PLAN_COLUMNS:
+            cell = next((value for key, value in row.items() if key.startswith(column)), "")
+            if cell:
+                out.append("  - %s: %s" % (column, cell))
+    for title in ("Chains", "Session groups"):
+        text = section(plan, title)
+        if text:
+            out += ["", "## " + title, "", text]
+    crossing = cross_prereqs(subjects, slug=subject["slug"])
+    if crossing:
+        out += ["", "## Cross-subject prerequisites", ""] + ["- " + cross_line(row) for row in crossing]
+    bullets = [line for line in section(record, "Evidence log").splitlines() if line.startswith("- ")]
+    kept = set(range(max(0, len(bullets) - BRIEF_TAIL), len(bullets)))
+    for node in focus:
+        naming = [index for index, line in enumerate(bullets) if node in NODE_ID.findall(line)]
+        kept |= set(naming[-BRIEF_PER_NODE:])
+    out += ["", "## Evidence", "",
+            "The latest %d lines naming each focus node and the last %d lines, in log order "
+            "(%d of %d; the rest are in `record.md`)." % (BRIEF_PER_NODE, BRIEF_TAIL, len(kept), len(bullets)),
+            ""] + [bullets[index] for index in sorted(kept)]
+    notes = subject["notes"]
+    if notes:
+        note = notes[-1]
+        out += ["", "## Latest session note: %s (%s)" % (note.name, note.status), "",
+                " · ".join("%s: %s" % (key, note.fields.get(key) or "empty")
+                           for key in ("date", "start", "end", "paused")), ""]
+        for title in ("Next step", "Misconception candidates", "What worked"):
+            text = section(note.body, title)
+            out += ["### " + title, "", text or "Empty.", ""]
+    return "\n".join(out).rstrip() + "\n"
+
+
 def dashboard(subjects, today, warnings, openings, state=None, rewards_on=True):
     """`learn/Dashboard.md`: a one-screen index of every subject (spec section 9).
     `subjects` is `load_subjects()`'s list and `state` the vault's `rewards()`."""
@@ -1957,6 +2096,12 @@ def dashboard(subjects, today, warnings, openings, state=None, rewards_on=True):
         out += ["> [!question]- %s recall-only" % plural(total, "node"),
                 "> Passed checks, but no generation check yet (`learn/system/records.md`, *Evidence rule*)."]
         out += ["> - " + line for line in shallow] + [""]
+    concerns = [row for row in cross_prereqs(subjects) if row["concern"]]
+    if concerns:
+        out += ["> [!warning]- %s to look at" % plural(len(concerns), "cross-subject prerequisite"),
+                "> A plan rests on a topic from another subject that slipped, is not yet passed, "
+                "or needed help when it last passed (`learn/system/records.md`, *Plan table*)."]
+        out += ["> - " + cross_line(row) for row in concerns] + [""]
     if openings:
         out += ["## Open session notes", "",
                 "> [!warning] A session note has no `end:`",
@@ -2077,6 +2222,9 @@ def main():
                         help="with --due, mark each node that is recall-only and rests on an "
                              "unconditional truth: the candidates for a review's one "
                              "generation question, stalest first")
+    parser.add_argument("--brief", action="store_true",
+                        help="with --subject, print the resume brief /learn-resume loads in "
+                             "place of the full files, and write nothing (read-only)")
     parser.add_argument("--semantic", action="store_true",
                         help="also run Jev-backed semantic checks (Phase 4). Off by "
                              "default: session start must stay offline, fast, and "
@@ -2086,6 +2234,8 @@ def main():
         parser.error("--rewards needs --subject and --session, or --review")
     if args.gen and not args.due:
         parser.error("--gen only applies to --due")
+    if args.brief and not args.subject:
+        parser.error("--brief needs --subject")
 
     vault = args.vault.resolve()
     stamp = datetime.now()
@@ -2113,6 +2263,14 @@ def main():
         candidates = frozenset((s["slug"], node) for s in loaded
                                for node in recall_only(s["nodes"], s["events"])) if args.gen else frozenset()
         print(due_report(rows, undated, candidates))
+        return 0
+
+    if args.brief:
+        chosen = next((s for s in loaded if s["slug"] == args.subject), None)
+        if chosen is None:
+            print("learn-status: no subject %s" % args.subject, file=sys.stderr)
+            return 1
+        print(brief(chosen, loaded, stamp.date()), end="")
         return 0
 
     if args.next_action:

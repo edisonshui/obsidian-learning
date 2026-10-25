@@ -40,7 +40,7 @@ Before posing on a target, read its evidence lines and the subject's misconcepti
 
 On one target, go recall, then tell apart, then combine. Each kind needs the one before it: a learner who cannot recall an idea cannot pick it over a look-alike, and cannot chain steps they cannot recall. When a later kind fails, go back one kind on that target, because the earlier result overstated what the learner has.
 
-Look-alike pairs come from the record's misconceptions, this subject's misconception candidates, and plan nodes whose problems look the same on the surface.
+Combine problems follow the plan's *Chains*: a chain is a set of nodes a real final problem uses together. Look-alike pairs come from the record's misconceptions, this subject's misconception candidates, and plan nodes whose problems look the same on the surface.
 
 ## Two dials
 

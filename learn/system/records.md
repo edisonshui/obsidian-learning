@@ -34,6 +34,8 @@ Session numbers `sNN` are per subject and never reused. Two sessions on one day 
 
 **Plan table** (in `plan.md`): the plan's node table has a `Can do` column right after `Check type`: one can-do statement per node, a bare verb phrase that reads after "You can now", with no node id, testable by the node's check. `/learn-start` writes it; it changes only when the node's scope changes. A missing one falls back to the node name.
 
+The *Prereqs* cell names this subject's nodes by id, and a node in another subject as `<slug>/nN`. `learn-status.py` keeps a cross-subject prerequisite out of the graph check and lists it on the Dashboard when that node slipped, is not yet passed, or needed help when it last passed. It is not drawn in the mermaid graph. The plan's *Chains* section lists, for each final check, the nodes it runs through in order. *Session groups* splits into *Core*, the nodes the chains need, and *If time*, the rest.
+
 ## Evidence rule
 
 An evidence line is `YYYY-MM-DD sNN: <what was asked> → <what they answered> → <verdict>`, or `YYYY-MM-DD rNN: …` when the check came from a cross-subject review (see *Reviews* below). Only answers to diagnostic probes, check questions, practice tasks, practice problems, decay checks, and review checks produce evidence lines. Statements like "makes sense" or "I already know this" are recorded, if at all, as claims, never as evidence.
@@ -86,6 +88,7 @@ last_session: YYYY-MM-DD
 sessions: <count>
 next: <one line: the first thing the next session does>
 deadline: YYYY-MM-DD   # optional: the exam or quiz this subject prepares for
+budget: <minutes>      # optional: the time the learner has for this subject; the plan's core fits it
 goal_met: YYYY-MM-DD   # set by /learn-end when status becomes done; never cleared
 ---
 ```
