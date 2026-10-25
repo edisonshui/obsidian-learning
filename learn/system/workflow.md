@@ -81,6 +81,14 @@ A review is not one of the phases. It opens no session note, teaches nothing, an
 
 A node that fails a review is `decayed`, which is the signal to run `/learn-resume` on that subject. A review never re-teaches it.
 
+## Practicing a subject (`/learn-practice`)
+
+Lesson checks ask about an idea that is still in mind. Practice asks for taught ideas from problems that do not name them, so the learner has to bring the idea to mind from what the problem shows. The method is `learn/system/practice.md`.
+
+1. **A session of one subject.** It opens a practice note from `templates/practice-note.md` with the next `sNN`, so the clock, `log.md`, and `/learn-end` work as for a lesson.
+2. **Problems, one at a time.** Free response, solved by the tutor before posing, hints one rung at a time, and the next problem only when the learner says next.
+3. **Evidence without status.** Each problem gets a `[practice]` evidence line with no transition marker (`records.md`, *Evidence rule*). No node status, *Last checked* date, or `plan.md` row changes. Every miss is retested in a new setting before the session ends.
+
 ## Changing subject
 
 Run `/learn-start <new-subject>`. Nothing in `learn/system/` or `learn/me/` changes. If the new subject shares prerequisites with an existing one, read that subject's record during diagnosis instead of re-probing.

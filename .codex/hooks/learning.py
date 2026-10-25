@@ -25,7 +25,7 @@ shared = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(shared)
 
 SLUG = re.compile(r"[a-z0-9][a-z0-9-]{0,63}$")
-SKILL_SUBJECT = re.compile(r"(?:^|\s)(?:\$|/)?learn-(?:start|resume)\s+([a-z0-9][a-z0-9-]{0,63})(?=\s|$)", re.I)
+SKILL_SUBJECT = re.compile(r"(?:^|\s)(?:\$|/)?learn-(?:start|resume|practice)\s+([a-z0-9][a-z0-9-]{0,63})(?=\s|$)", re.I)
 
 
 def stamp():

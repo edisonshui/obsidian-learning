@@ -543,6 +543,22 @@ eq("the explanation that lived only in thinking is in log.md",
 eq("an empty thinking block adds nothing",
    subject_log("oop").count("[!thinking]"), 1)
 
+section("mirror — practice routes to the log and folds thinking closed (practice.md)")
+fresh(); subject("oop")
+stop(transcript(
+    ("user", "/learn-practice oop"),
+    ("assistant", [{"type": "thinking", "thinking": "Worked solution: x = 3."},
+                   {"type": "text", "text": "Problem 1. Solve for x."}]),
+    ("user", "/learn-resume oop"),
+    ("assistant", [{"type": "thinking", "thinking": "Next is n12."},
+                   {"type": "text", "text": "Back to the lesson."}])))
+log = subject_log("oop")
+eq("a /learn-practice turn reaches the subject's log", "Problem 1. Solve for x." in log, True)
+eq("thinking during practice is folded closed",
+   "> [!thinking]- Thinking (shown in the terminal)\n> Worked solution: x = 3." in log, True)
+eq("thinking in a lesson after it stays open",
+   "> [!thinking]+ Thinking (shown in the terminal)\n> Next is n12." in log, True)
+
 section("mirror — a pasted screenshot is embedded where [Image #N] was")
 import base64, hashlib  # noqa: E401
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==")
@@ -754,6 +770,23 @@ warnings = status.g2_session_notes("fx", G2 / "learn/subjects/fx/sessions")
 eq("the written gate-violated line satisfies the gate",
    not any("s04" in w and "Retrieval checks" in w for w in warnings), True)
 
+practice = NOTE_HEAD % ("fx", "n1, n2") + """# note
+
+## Practice
+
+### p1 -- a problem
+
+**Target.** n1 + n2 · combine · new surface
+
+## Retrieval checks
+
+None: a practice session runs no mixed checks.
+"""
+sess(G2, "fx", "s09", practice)
+eq("a practice note's nodes: may come from its Practice section",
+   [w for w in status.g2_session_notes("fx", G2 / "learn/subjects/fx/sessions") if "s09" in w], [])
+(G2 / "learn/subjects/fx/sessions/s09.md").unlink()
+
 mismatch = NOTE_HEAD % ("fx", "n1, n2") + """# note
 
 ## Lesson
@@ -936,7 +969,7 @@ eq("G5's blank Last-checked on a checked node is folded in",
 # ------------------------------------------------------------------ skill drift (PLAN-2026-09-22.md Phase 2)
 
 VAULT_ROOT = HOOKS.parents[1]
-SKILL_NAMES = ["learn-start", "learn-resume", "learn-check", "learn-end", "learn-review"]
+SKILL_NAMES = ["learn-start", "learn-resume", "learn-check", "learn-end", "learn-review", "learn-practice"]
 
 # Each pair differs on purpose in exactly these ways (PLAN-2026-09-22.md, "One
 # instruction, two copies"): `$0`/`$ARGUMENTS` against prose argument parsing,

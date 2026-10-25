@@ -1047,7 +1047,8 @@ def g2_session_notes(slug, folder):
     """G2: per session note, every taught node has its Diagram/Check lines, a
     fourth consecutive new node never opens without a logged retrieval check,
     frontmatter `nodes:` matches the union of Lesson entries and node ids
-    named in *Retrieval checks* (`records.md:82`, decided 2026-09-22 after
+    named in *Retrieval checks* or, in a practice note, *Practice*
+    (`records.md:82`, decided 2026-09-22 after
     cs124-quiz4 s01 and math241-exam1-review s02 both had nodes with evidence
     that lived only in *Retrieval checks*, not a `### nN` header), and no node
     entry is filed outside *Lesson* or *Retrieval checks* (records.md:97).
@@ -1069,10 +1070,10 @@ def g2_session_notes(slug, folder):
         if len(note.entries) >= 4 and not note.retrieval:
             warnings.append("%s: %d new nodes opened with *Retrieval checks* left empty "
                             "(workflow.md, the gate)" % (label, len(note.entries)))
-        touched = {entry.node for entry in note.entries} | set(note.retrieval_nodes)
+        touched = {entry.node for entry in note.entries} | set(note.retrieval_nodes) | set(note.practice_nodes)
         declared = set(note.declared_nodes)
         if declared != touched:
-            warnings.append("%s: frontmatter nodes: %s does not match Lesson + Retrieval-checks nodes %s "
+            warnings.append("%s: frontmatter nodes: %s does not match Lesson + Retrieval-checks + Practice nodes %s "
                             "(records.md:82)" % (label, sorted(declared, key=sort_key) or "none",
                                                  sorted(touched, key=sort_key) or "none"))
     return warnings

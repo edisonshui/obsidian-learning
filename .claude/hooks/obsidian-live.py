@@ -559,12 +559,12 @@ def take_share(runtime, state):
 
 
 # A dot is allowed so "14.8" is read as a word; command_slug turns it into the hyphen slugs use.
-LEARN_COMMAND = re.compile(r"^\s*/learn-(?:start|resume)\s+([A-Za-z0-9][A-Za-z0-9_.-]{0,63})(?:\s|$)")
+LEARN_COMMAND = re.compile(r"^\s*/learn-(start|resume|practice)\s+([A-Za-z0-9][A-Za-z0-9_.-]{0,63})(?:\s|$)")
 LEARN_END = re.compile(r"^\s*/learn-end(?:\s|$)")
 
 
 def command_slug(match):
-    return match[1].rstrip(".").replace(".", "-")
+    return match[2].rstrip(".").replace(".", "-")
 
 
 def known_subjects(vault):
@@ -587,17 +587,21 @@ def subject_segments(vault, state):
     /learn-end closes the route. Its own turn, the wrap-up and any questions it
     asks, still lands in the log; the next prompt does not, and neither does
     anything after it until another /learn-start or /learn-resume.
+
+    /learn-practice routes like /learn-resume, and every turn it routes is
+    marked `practice`: the tutor solves each problem in thinking before posing
+    it, so the log folds that thinking closed (`learn/system/practice.md`).
     """
     known = known_subjects(vault)
     before = state.setdefault("subjects_at_command", {})
-    segments, subject, held, held_command, ended = {}, None, [], None, False
+    segments, subject, held, held_command, ended, practice = {}, None, [], None, False, False
     for item in all_entries(state):
         if item["role"] == "You":
             command = LEARN_COMMAND.match(item["text"])
             if not command and ended:
-                subject, ended = None, False
+                subject, ended, practice = None, False, False
             if command:
-                ended = False
+                ended, practice = False, command[1] == "practice"
             elif subject and LEARN_END.match(item["text"]):
                 ended = True
             if command and command_slug(command) in known:
@@ -614,6 +618,8 @@ def subject_segments(vault, state):
                 segments.setdefault(subject, []).extend(held)
                 held, held_command = [], None
         if subject:
+            if practice:
+                item["practice"] = True
             segments.setdefault(subject, []).append(item)
         elif held_command:
             held.append(item)
@@ -689,7 +695,9 @@ def entry_lines(items):
             else:
                 lines.extend([text, ""])
         elif role == "Claude — thinking":
-            lines.extend(callout(text, "thinking", "Thinking (shown in the terminal)", "+") + [""])
+            # Folded closed in practice: it holds the solution worked out before the problem was posed.
+            lines.extend(callout(text, "thinking", "Thinking (shown in the terminal)",
+                                 "-" if item.get("practice") else "+") + [""])
         elif role == "Claude — questions":
             lines.extend(callout(text, "question", "Question" + suffix) + [""])
         elif role == "You — answers":

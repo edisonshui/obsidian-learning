@@ -30,7 +30,7 @@ Run `date`. Then look at the most recent session note and take exactly one of th
 
 **If `end:` is empty**, work out how long the note has been open. Combine the note's `date:` with its `paused:` time (or, with no `paused:`, its `start:`) into a single timestamp, and subtract it from the time `date` just printed. Do this as elapsed hours across dates — not "is this the same calendar day", which gets a 23:50→00:10 break wrong in one direction and an 08:00→23:00 abandonment wrong in the other.
 
-- **`paused:` set, under 6 hours ago** → a live break. Keep using that note, clear `paused:`, and **skip the decay check** in step 4. Do not increment `sessions` in `record.md`; this is the same session.
+- **`paused:` set, under 6 hours ago** → a live break. Keep using that note, clear `paused:`, and **skip the decay check** in step 4. Do not increment `sessions` in `record.md`; this is the same session. A paused practice note (`kind: practice`) is not a lesson to continue: finalize it instead and open a new note.
 - **`paused:` set, 6 hours or more ago** → a stale pause. The learner did not come back. Finalize the note (below), say in one line that s`<NN>` was paused at `<time>` and never reopened, then go to *Open a new note*.
 - **No `paused:`** → the session was cut off without `/learn-end`. Finalize the note (below), say so, then go to *Open a new note*.
 
