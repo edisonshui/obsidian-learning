@@ -11,7 +11,7 @@ Follow Phase 1 of `learn/system/workflow.md`. Read `learn/system/records.md` bef
 
 ## 1. Set up the subject folder
 
-- Slug: lowercase, hyphens, taken from `$0`. If `learn/subjects/<slug>/record.md` already exists, stop and say so; the right command is `/learn-resume <slug>`.
+- Slug: `<course>-<topic>`, lowercase with hyphens, so the sidebar groups subjects by course: `math241-lagrange`, `cs124-quiz9`. The course is the class code with no space, matching the prefix that course's folders in `learn/subjects/` already use; a subject that is not for a class uses `personal`. Build it from `$0` and the goal hint. If it already has that form, use it. Otherwise propose one, confirm it with the learner in one line, then continue. If `learn/subjects/<slug>/record.md` already exists, stop and say so; the right command is `/learn-resume <slug>`.
 - Create `learn/subjects/<slug>/` and `learn/subjects/<slug>/sessions/`.
 - Copy `learn/system/templates/record.md`, `plan.md`, `resume.md` into it in full, with placeholders filled (`{{slug}}`, `{{Title}}`, today's date from `date`) and the italic template hints left in place until real content replaces them. Set `status: diagnosing`.
 

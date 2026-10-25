@@ -53,7 +53,7 @@ flowchart LR
 
 Edison picked SVG figures over text sketches on 2026-10-23. A text sketch of a geometric idea (an arrow made of `↑` and `|`, a contour made of dashes) reads as crude and hides the angle or shape it is about.
 
-- **File.** Write the figure to `learn/subjects/<slug>/figures/<slug>-<topic>.svg`, starting from `learn/system/templates/figure.svg`. Name it by topic, never by node number: `lagrange-multipliers-14-8-gradient-perpendicular.svg`. Obsidian finds an embed by file name across the whole vault, so the subject slug keeps names unique.
+- **File.** Write the figure to `learn/subjects/<slug>/figures/<slug>-<topic>.svg`, starting from `learn/system/templates/figure.svg`. Name it by topic, never by node number: `math241-lagrange-gradient-perpendicular.svg`. Obsidian finds an embed by file name across the whole vault, so the subject slug keeps names unique.
 - **Embed.** Put `![[<file name>.svg]]` on its own line in the reply and in the session note's `**Diagram.**` line. The terminal shows that one line, and the subject's `log.md` shows the picture. Reuse a figure that already exists before drawing a new one.
 - **Check.** Run `xmllint --noout <file>` after writing. A malformed SVG renders as a broken image.
 - **Geometry.** Compute coordinates from the math instead of placing them by eye. Take each point from the curve's formula, check a right angle with a dot product, and write the formula in an XML comment next to the shape it draws. SVG's y-axis points down, so flip the sign of y.

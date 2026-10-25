@@ -53,11 +53,11 @@ learn/Queries.md   Dataview views over frontmatter                       (author
 
 **Generated files are never hand-edited.** `Home.md`, `Dashboard.md`, every `progress.md`, and every `log.md` are rewritten from the records; a correction belongs in `record.md` or `plan.md`. `learn-status.py` also reports where `record.md` and `plan.md` contradict each other, on the dashboard under *Record inconsistencies* — it reports and never repairs, because a generator that silently fixed its source would hide the drift it exists to surface.
 
-Obsidian renders mermaid, LaTeX, and embedded SVG figures; write diagrams, figures, and math per `learn/system/diagrams.md`. Use `[[wikilinks]]` with full paths from the vault root, e.g. `[[learn/subjects/oop/record|OOP record]]`.
+Obsidian renders mermaid, LaTeX, and embedded SVG figures; write diagrams, figures, and math per `learn/system/diagrams.md`. Use `[[wikilinks]]` with full paths from the vault root, e.g. `[[learn/subjects/personal-oop/record|OOP record]]`.
 
 ## Reading the live conversation in Obsidian
 
-- Each subject has its own live Markdown chat file: `learn/subjects/<subject>/log.md`. For OOP, tell Edison to open `[[learn/subjects/oop/log]]` in Obsidian and keep it open while chatting. `/learn-start <subject>` and `/learn-resume <subject>` select which log receives the conversation. Replies stay in the terminal, typed or spoken.
+- Each subject has its own live Markdown chat file: `learn/subjects/<subject>/log.md`. For OOP, tell Edison to open `[[learn/subjects/personal-oop/log]]` in Obsidian and keep it open while chatting. `/learn-start <subject>` and `/learn-resume <subject>` select which log receives the conversation. Replies stay in the terminal, typed or spoken.
 - The subject's `log.md` updates as responses stream, before Claude finishes the message. It includes submitted replies and question-picker prompts and answers, and retains previous conversations about that subject.
 - The live note updates while responses stream and includes question-picker prompts and answers. The hooks write it automatically; do not manually edit or re-copy the transcript. Continue maintaining the learning records and session notes separately.
 - **A probe must stand alone.** Any code, data, or diagram a question depends on goes *inside the question text itself*, fenced with its language. Never leave it only in a preceding chat message, and never write "this", "the following", or "the code below" pointing at something outside the question. If a snippet is too long for the picker, post it in chat, ask the learner to confirm they can see it, and only then ask. Use normal chat for open-ended reasoning questions and wait for the reply.
