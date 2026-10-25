@@ -2,7 +2,7 @@
 # Usage: step.sh <sandbox> <step-name> [--stdin <file>] -- <command> [args...]
 # Runs one command inside the sandbox (cwd = sandbox, CLAUDE_PROJECT_DIR = sandbox,
 # no Jev key) and records, under $EVIDENCE/<step-name>/:
-#   cmd.txt  stdout.txt  stderr.txt  exit.txt  before.json  after.json
+#   cmd.txt  stdin.txt (with --stdin)  stdout.txt  stderr.txt  exit.txt  before.json  after.json
 #   diff.txt   added/changed/removed files, read from disk
 #   files/     a copy of every added or changed file, so proof survives cleanup
 # Exits with the command's exit code.
@@ -18,6 +18,7 @@ out="$EVIDENCE/$name"
 [ -e "$out" ] && die "evidence for step '$name' already exists: $out (pick a new name)"
 mkdir -p "$out/files"
 printf '%q ' "$@" > "$out/cmd.txt"; echo >> "$out/cmd.txt"
+[ "$stdin" != /dev/null ] && cp "$stdin" "$out/stdin.txt"
 
 python3 "$SKILL_DIR/scripts/snapshot.py" take "$SANDBOX" "$out/before.json"
 set +e

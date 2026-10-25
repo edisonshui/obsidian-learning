@@ -16,9 +16,11 @@ PATTERNS = [
     ("working note", re.compile(r"^(Now|Next),? (the )?(record|plan|resume|session note|preferences)\b", re.I)),
     ("working note", re.compile(r"\b(Mirror nodes|from the templates?|plan reorder|State loaded|Both reviews are back|Applying (those|their) fixes|Trimming the resume|resume summary (is|ran)|200-word)\b", re.I)),
     ("working note", re.compile(r"^Step \d+[,:.] ")),
-    ("session label", re.compile(r"\b[Ss]ession( note)? s\d+\b")),
+    ("working note", re.compile(r"\b(Logged|I logged|I've logged|Logging)\b.*\b(note|record|evidence)\b|\bSetting up (today's |the )?(practice |session )?note\b|\bneeded approval\b", re.I)),
+    ("session label", re.compile(r"\b([Ss]ession|[Pp]ractice|[Ll]esson|[Rr]eview)( note)? [sr]\d+\b")),
     ("node label", re.compile(r"(?<![\w./-])n\d+[a-z]?\b")),
-    ("record term", re.compile(r"\b(strands?|two-sighting|decay[- ]check|floor and ceiling)\b", re.I)),
+    ("record term", re.compile(r"\b(strands?|two-sighting|decay[- ]check|floor and ceiling|evidence log|transition marker)\b", re.I)),
+    ("record term", re.compile(r"\bchanges? (its |a |the )?status\b|\bstatus (doesn't|does not|won't|will not) change\b", re.I)),
     ("helper name", re.compile(r"\b(fact-checker|plan[- ]reviewer|reviewers|the checker|mc-preflight|write-check|learn-status)\b", re.I)),
     ("file name", re.compile(r"\b(record|plan|resume|preferences|progress|Home|Dashboard)\.md\b")),
 ]
