@@ -1051,7 +1051,9 @@ for host in (".claude", ".agents"):
 for path in (".claude/agents/plan-reviewer.md", ".codex/agents/plan-reviewer.toml"):
     text = (VAULT_ROOT / path).read_text()
     eq("%s has check 8 and lists it under REVISE" % path,
-       ("8. **Can-do statements.**" in text, "checks 1, 4, 5, 7, or 8 exists" in text), (True, True))
+       ("8. **Can-do statements.**" in text, "checks 1, 4, 5, 7, 8, 9, or 11 exists" in text), (True, True))
+    eq("%s has the budget, starting-point, and reuse checks" % path,
+       ("9. **Budget.**" in text, "10. **Starting points.**" in text, "11. **Reuse.**" in text), (True, True, True))
 for plan in sorted((VAULT_ROOT / "learn/subjects").glob("*/plan.md")):
     rows = status.table_by_header(vaultlib.section(plan.read_text(), "Nodes"))
     # Only node rows count: a plan can hold a second table under *Nodes* (a
@@ -3045,6 +3047,141 @@ except ValueError:
     eq("a snapshot id cannot leave .write-check/", True, True)
 shutil.rmtree(WC)
 
+
+# ------------------------------------------------------------------ cross-subject prerequisites and the resume brief
+
+section("cross-subject prerequisites: <slug>/nN in Prereqs (records.md, Plan table)")
+XV = Path(tempfile.mkdtemp(prefix="crosstest-"))
+write(XV / "learn/subjects/calc-a/record.md", """---
+subject: calc-a
+title: Calc A
+status: active
+---
+
+## Nodes
+
+| Node | Status | Last checked | Evidence (latest) |
+| --- | --- | --- | --- |
+| n8a Directional derivative | checked | 2026-10-20 | value unaided; meaning after a pointer |
+| n9 Gradient | solid | 2026-10-21 | correct |
+""")
+write(XV / "learn/subjects/calc-b/record.md", """---
+subject: calc-b
+title: Calc B
+status: active
+next: re-teach n1, then n2
+budget: 90
+---
+
+## Goal
+
+Pass the quiz.
+
+## Misconceptions
+
+- [ ] gradient points along the curve -- surfaced 2026-10-23 s01; open
+- [x] old one -- resolved 2026-10-01
+
+## Nodes
+
+| Node | Status | Last checked | Evidence (latest) |
+| --- | --- | --- | --- |
+| n1 Perpendicular | introduced | - | - |
+| n2 Tangency | planned | - | - |
+| n3 Cases | checked | 2026-10-23 | correct |
+| n4 Three variables | planned | - | - |
+| n5 Disk | planned | - | - |
+| n6 Extra | planned | - | - |
+
+## Evidence log
+
+- 2026-10-23 s01: what does D_u f measure -> "I don't know" -> not yet -> n1 introduced
+- 2026-10-23 s01: solve x(1-L)=0 by cases -> both cases -> correct -> n3 checked
+""")
+write(XV / "learn/subjects/calc-b/plan.md", """---
+subject: calc-b
+updated: 2026-10-23
+---
+
+## Chains
+
+- `n1 -> n2 -> n3`: find candidates, solve by cases, compare values.
+
+## Nodes
+
+| Id | Node | Rests on (unconditional truth) | Discovery question | Check type | Can do | Est. min | Prereqs | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| n1 | Perpendicular | f is constant along a level curve | Walk a contour: how fast does height change? | free response | explain why | 15 | calc-a/n8a | introduced |
+| n2 | Tangency | crossing means not extreme | How do you know you're at the top? | free response | find tangency | 15 | n1, calc-a/n9 | planned |
+| n3 | Cases | ab=0 means a=0 or b=0 | What if x=0? | free response | solve by cases | 15 | n2 | checked |
+| n4 | Three variables | four equations | How many unknowns? | free response | set up | 15 | n3 | planned |
+| n5 | Disk | extreme value theorem | Where can the max be? | free response | check boundary | 15 | n4, calc-z/n1 | planned |
+| n6 | Extra | none | x | x | x | 10 | n5 | planned |
+
+## Session groups
+
+- Core: n1, n2, n3
+- If time: n4, n5, n6
+""")
+write(XV / "learn/subjects/calc-b/sessions/2026-10-23-s01.md", """---
+subject: calc-b
+session: "01"
+date: "2026-10-23"
+start: "10:00"
+end: "10:45"
+nodes: [n1, n3]
+---
+
+## Next step
+
+Re-teach n1 from what D_u f measures.
+
+## What worked / what didn't
+
+Numbers before formulas.
+""")
+loaded_x, _ = status.load_subjects(XV, datetime(2026, 10, 25, 9))
+calc_b = next(x for x in loaded_x if x["slug"] == "calc-b")
+eq("a cross prerequisite is read apart from the subject's own",
+   (calc_b["nodes"]["n1"]["cross_prereqs"], calc_b["nodes"]["n1"]["prereqs"]), ([("calc-a", "n8a")], []))
+eq("a cell mixing both keeps each in its place",
+   (calc_b["nodes"]["n2"]["cross_prereqs"], calc_b["nodes"]["n2"]["prereqs"]), ([("calc-a", "n9")], ["n1"]))
+eq("a cross prerequisite is not reported as missing from the node table",
+   calc_b["nodes"]["n1"]["bad_prereqs"], [])
+concerns = {(row["node"], row["concern"]) for row in status.cross_prereqs(loaded_x)}
+eq("a checked node whose last pass needed a pointer is a concern",
+   ("n1", "its last check needed help") in concerns, True)
+eq("a solid node passed clean is no concern", ("n2", None) in concerns, True)
+eq("a subject that does not exist is reported", ("n5", "not found") in concerns, True)
+board_x = status.dashboard(loaded_x, datetime(2026, 10, 25).date(), [], [])
+eq("the dashboard names the cross-subject concern",
+   "Calc B n1 depends on Calc A n8a: its last check needed help" in board_x, True)
+eq("and leaves a clean one off it", "depends on Calc A n9" in board_x, False)
+
+section("resume brief: learn-status.py --brief (learn-resume step 1)")
+text_b = status.brief(calc_b, loaded_x, datetime(2026, 10, 25).date())
+eq("focus: next: names, open work, the latest checked, and the next three planned",
+   status.brief_focus(calc_b["fields"], calc_b["nodes"]), ["n1", "n2", "n3", "n4", "n5"])
+eq("the budget is in the state", "- budget: 90" in text_b, True)
+eq("an open misconception is listed and a resolved one is not",
+   ("gradient points along the curve" in text_b, "old one" in text_b), (True, False))
+eq("a focus node carries its plan row", "Walk a contour: how fast does height change?" in text_b, True)
+eq("a node outside the focus does not", "| n6 |" in text_b or "**n6 Extra**" in text_b, False)
+eq("Chains and Session groups are carried over", ("## Chains" in text_b, "- If time: n4, n5, n6" in text_b), (True, True))
+eq("the cross-subject prerequisite shows with its evidence",
+   "Calc B n1 depends on Calc A n8a: its last check needed help (value unaided; meaning after a pointer)" in text_b, True)
+eq("the latest note's next step is in it", "Re-teach n1 from what D_u f measures." in text_b, True)
+eq("the latest note's times are in it, so step 3 needs no full read",
+   "date: 2026-10-23 · start: 10:00 · end: 10:45 · paused: empty" in text_b, True)
+before = sorted(str(path) for path in XV.rglob("*"))
+run = subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(XV), "--brief",
+                      "--subject", "calc-b"], capture_output=True, text=True)
+eq("--brief runs from the command line", (run.returncode, run.stdout.startswith("# Resume brief: ")), (0, True))
+eq("--brief writes nothing", sorted(str(path) for path in XV.rglob("*")), before)
+run = subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(XV), "--brief"],
+                     capture_output=True, text=True)
+eq("--brief without --subject is refused", run.returncode, 2)
+shutil.rmtree(XV)
 
 print()
 if FAILS:

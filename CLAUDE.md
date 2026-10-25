@@ -9,7 +9,7 @@ The SessionStart hook prints the date, a *Show the learner* block (the recommend
 1. Reproduce the hook's *Show the learner* block verbatim.
 2. Ask which to do, offering the block's recommended command first and marked recommended, then `/learn-resume <subject>`, `/learn-start <subject>`, or something else.
 3. Do not teach, quiz, or plan until one is chosen.
-4. After selection, read its `resume.md`, `record.md`, `plan.md`, and latest session note in full. Read `learn/system/records.md` before writing learning state.
+4. After selection, read its `resume.md` and the resume brief, `python3 .claude/hooks/learn-status.py --brief --subject <slug>`, which stands in for `record.md`, `plan.md`, and the latest session note (`/learn-resume` step 1). Read `learn/system/records.md` before writing learning state.
 
 ## Hard rules
 
