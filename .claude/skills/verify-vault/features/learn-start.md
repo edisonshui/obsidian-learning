@@ -35,7 +35,7 @@ Preconditions:
 
 - Driven 2026-10-23 (run `20261023-143812`, subject `vfx-chain-rule`) from the first turn through `ls-s01` and one teaching turn, about 7.70 USD over 6 turns. That run predates the prediction, confidence, and reason rules (commit fb50df3), so diagnosis and `ls-s01` are not re-proven for them. Turn order: goal questions, criteria confirmation, attempt problem, answer with an "I don't know", approval.
 - 2026-10-25 `start-1` did not create `vfx-celsius/sessions/`. Its compound `mkdir -p ... && sed ...` was denied under `-p`, and the file tools wrote the three files without the folder. The reply still said the folder was set up. The `Write` of s01 later creates the folder, so this matters only for the claim.
-- The guard reply on 2026-10-25 named `record.md`, n1, and n2 to the learner. `leak-check.py` flags it.
+- The guard reply on 2026-10-25 named `record.md`, n1, and n2 to the learner. Fixed in a055047: on 2026-10-26 (run `20261026-002335`, step `start-guard`) it was one line, no file names, pointing at `/learn-resume vfx-binary-search`, 0 leaks.
 - Since 2026-10-25 the skill checks the slug's `<course>-<topic>` form. `vfx-celsius` was accepted as is. A slug the model reads as not course-shaped gets a rename question first, and doctor fails on any slug that does not start with `vfx-`.
 - The skill must stop after `ls-folder` if `record.md` exists. A test that reuses a slug from an earlier step in the same sandbox hits the guard.
 - `fact-checker` and `plan-reviewer` run as subagents. Their hooks are filtered out of the live log by design (`agent_id` in the payload).
