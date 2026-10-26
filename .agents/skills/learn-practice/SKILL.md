@@ -1,6 +1,6 @@
 ---
 name: learn-practice
-description: Run a practice session on one subject — problems on taught nodes that never name the idea they need, hints one rung at a time, a retest of every miss, and evidence logged without moving any node's status. Use when Edison wants to practice, drill, or work problems on a subject, or brings an exam or problem set to work through.
+description: Run a practice session on one subject — problems on taught nodes that never name the idea they need, hints one rung at a time, a retest of every miss, and evidence logged without moving any node's status. Use when the learner wants to practice, drill, or work problems on a subject, or brings an exam or problem set to work through.
 ---
 
 Run a practice session on the subject slug in the user's request, for example `$learn-practice math241-lagrange` or "practice Lagrange." Anything after the slug narrows it: node ids, a focus in words, or the path of a problem file or old exam. The method is `learn/system/practice.md`. Read it and `learn/system/tutor.md` before posing anything, and `learn/system/records.md` before writing any file.

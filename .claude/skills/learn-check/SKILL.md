@@ -1,6 +1,6 @@
 ---
 name: learn-check
-description: Run a mixed retrieval check on the current learning subject — recent nodes plus one older one — grade it, and log the evidence. Use every 2–3 nodes, or when Edison asks to be quizzed.
+description: Run a mixed retrieval check on the current learning subject — recent nodes plus one older one — grade it, and log the evidence. Use every 2–3 nodes, or when the learner asks to be quizzed.
 argument-hint: "[subject-slug] [node-ids...]"
 allowed-tools: Read, Write, Edit, Glob, Bash(xmllint *), Bash(date *), Bash(python3 .claude/hooks/learn-status.py*), Bash(python3 .claude/hooks/mc-preflight.py*), AskUserQuestion
 ---

@@ -81,7 +81,7 @@ def start_context(vault, subject=None, host="claude"):
         else:
             lines += ["", "Read learn/me/preferences.md before teaching; operational summary is missing."]
     else:
-        lines += ["", "Learner preferences unavailable; confirm preferences before teaching."]
+        lines += ["", "Learner preferences missing. Before teaching, copy learn/system/templates/preferences.md to learn/me/preferences.md, ask the learner to fill in *Stated*, and write the *Operational summary* from it."]
     lines += ["", "Before teaching: read learn/system/tutor.md and learn/system/workflow.md.",
               "After selection: read learn/subjects/<slug>/resume.md and run python3 .claude/hooks/learn-status.py --brief --subject <slug>, which stands in for record.md, plan.md, and the latest sessions/ note.",
               "Read learn/system/records.md before writing learning state.",

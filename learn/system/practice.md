@@ -16,7 +16,7 @@ Practice teaches nothing new and never re-teaches. When a node clearly needs tea
 
 ## What it records
 
-Practice records evidence and moves no status (Edison, 2026-10-25). Each problem gets a full entry in the practice note and one `[practice]` evidence line in `record.md` (`records.md`, *Evidence rule*). No node status, *Last checked* date, `plan.md` row, or reward changes because of practice. The record still learns from it through the evidence log, misconception candidates, and the next step `/learn-end` writes.
+Practice records evidence and moves no status (decided 2026-10-25). Each problem gets a full entry in the practice note and one `[practice]` evidence line in `record.md` (`records.md`, *Evidence rule*). No node status, *Last checked* date, `plan.md` row, or reward changes because of practice. The record still learns from it through the evidence log, misconception candidates, and the next step `/learn-end` writes.
 
 ## Picking the target
 

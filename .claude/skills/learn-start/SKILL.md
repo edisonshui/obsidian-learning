@@ -1,6 +1,6 @@
 ---
 name: learn-start
-description: Start a new learning project — capture the goal, diagnose current understanding, build and verify a lesson plan, then begin teaching. Use when Edison wants to learn a new subject or topic.
+description: Start a new learning project — capture the goal, diagnose current understanding, build and verify a lesson plan, then begin teaching. Use when the learner wants to learn a new subject or topic.
 argument-hint: <subject-slug> [goal in a few words]
 allowed-tools: Read, Write, Edit, Glob, Bash(xmllint *), Bash(date *), Bash(mkdir *), Bash(python3 .claude/hooks/learn-status.py*), Bash(python3 .claude/hooks/mc-preflight.py*), AskUserQuestion, Agent, WebSearch, WebFetch
 ---

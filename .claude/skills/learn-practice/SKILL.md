@@ -1,6 +1,6 @@
 ---
 name: learn-practice
-description: Run a practice session on one subject — problems on taught nodes that never name the idea they need, hints one rung at a time, a retest of every miss, and evidence logged without moving any node's status. Use when Edison wants to practice, drill, or work problems on a subject, or brings an exam or problem set to work through.
+description: Run a practice session on one subject — problems on taught nodes that never name the idea they need, hints one rung at a time, a retest of every miss, and evidence logged without moving any node's status. Use when the learner wants to practice, drill, or work problems on a subject, or brings an exam or problem set to work through.
 argument-hint: <subject-slug> [node ids | focus | problem file]
 allowed-tools: Read, Write, Edit, Glob, Bash(date *), Bash(xmllint *), Bash(python3 .claude/hooks/learn-status.py*), AskUserQuestion, Agent, WebSearch, WebFetch
 ---

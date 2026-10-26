@@ -24,7 +24,7 @@ Do not teach, quiz, or plan until a subject is chosen.
 - Tutoring replies are for the learner. During a `$learn-*` session, the global rule to name the skills and workflows followed in a final report does not apply, and no reply names a node id, status, file, script, or checker (`tutor.md`, *Reply shape*).
 - Learning state lives in `learn/subjects/<slug>/` files. Neither the chat transcript nor Codex memory is a learning record.
 - Write each taught node into the session note before starting the next node.
-- During a lesson, treat `learn/system/` as read-only. Propose changes in chat for Edison to edit.
+- During a lesson, treat `learn/system/` as read-only. Propose changes in chat for the learner to edit.
 - In `learn/me/preferences.md`, append to *Observed* only when the stated evidence bar is met. Never edit *Stated*.
 - Follow the reliability rules in `tutor.md`. Verify uncertain claims before the learner builds on them.
 - Log a mixed retrieval check before opening a fourth consecutive new node. If skipped, record the reason under *Retrieval checks*; never leave that section empty.
@@ -42,7 +42,7 @@ The Codex hook keeps its runtime state under `learn/.codex-runtime/`. `$learn-en
 
 Obsidian renders mermaid, LaTeX, and embedded SVG figures. Follow `learn/system/diagrams.md` and use full-root wikilinks such as `[[learn/subjects/personal-oop/record|OOP record]]`.
 
-For probes, put any code, data, or diagram inside the question itself. If a picker cannot display a long snippet, show it in chat, confirm Edison can see it, then ask. If he cannot see something, resend it before grading.
+For probes, put any code, data, or diagram inside the question itself. If a picker cannot display a long snippet, show it in chat, confirm the learner can see it, then ask. If they cannot see something, resend it before grading.
 
 ## Agent skills
 

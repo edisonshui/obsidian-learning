@@ -16,7 +16,7 @@ The SessionStart hook prints the date, a *Show the learner* block (the recommend
 - **Tutoring replies are for the learner.** During a `/learn-*` session, the global rule to name the skills and workflows followed in a final report does not apply, and no reply names a node id, status, file, script, or checker (`tutor.md`, *Reply shape*). A *Skills I followed* paragraph reached a tutoring reply on 2026-10-25.
 - **Learning state lives only in `learn/subjects/<subject>/` files.** The transcript and Claude Code's auto memory are not state. If it is not written in the record, it did not happen.
 - **Write as you go.** Each taught node goes into the session note before the next node starts.
-- **`learn/system/` is read-only during a lesson.** Propose changes in chat; Edison edits.
+- **`learn/system/` is read-only during a lesson.** Propose changes in chat; the learner edits.
 - **`learn/me/preferences.md`:** append to *Observed* only, with evidence. Never edit *Stated*.
 - **Reliability rules in `tutor.md` are non-negotiable.** Verify before the learner builds on a claim.
 - **A retrieval check is a gate.** Never open a fourth consecutive new node without a logged mixed retrieval check. If one is skipped, the reason goes under *Retrieval checks* in the session note; that section is never left empty.
@@ -58,7 +58,7 @@ Obsidian renders mermaid, LaTeX, and embedded SVG figures; write diagrams, figur
 
 ## Reading the live conversation in Obsidian
 
-- Each subject has its own live Markdown chat file: `learn/subjects/<subject>/log.md`. For OOP, tell Edison to open `[[learn/subjects/personal-oop/log]]` in Obsidian and keep it open while chatting. `/learn-start <subject>`, `/learn-resume <subject>`, and `/learn-practice <subject>` select which log receives the conversation. Replies stay in the terminal, typed or spoken.
+- Each subject has its own live Markdown chat file: `learn/subjects/<subject>/log.md`. Tell the learner to open `[[learn/subjects/<subject>/log]]` in Obsidian and keep it open while chatting. `/learn-start <subject>`, `/learn-resume <subject>`, and `/learn-practice <subject>` select which log receives the conversation. Replies stay in the terminal, typed or spoken.
 - The subject's `log.md` updates as responses stream, before Claude finishes the message. It includes submitted replies and question-picker prompts and answers, and retains previous conversations about that subject.
 - The live note updates while responses stream and includes question-picker prompts and answers. The hooks write it automatically; do not manually edit or re-copy the transcript. Continue maintaining the learning records and session notes separately.
 - **A probe must stand alone.** Any code, data, or diagram a question depends on goes *inside the question text itself*, fenced with its language. Never leave it only in a preceding chat message, and never write "this", "the following", or "the code below" pointing at something outside the question. If a snippet is too long for the picker, post it in chat, ask the learner to confirm they can see it, and only then ask. Use normal chat for open-ended reasoning questions and wait for the reply.

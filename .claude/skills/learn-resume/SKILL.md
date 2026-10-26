@@ -1,6 +1,6 @@
 ---
 name: learn-resume
-description: Resume an existing learning project from its saved records — recap, decay-check the last nodes, then continue teaching from the plan. Use when Edison wants to continue a subject, or after a break.
+description: Resume an existing learning project from its saved records — recap, decay-check the last nodes, then continue teaching from the plan. Use when the learner wants to continue a subject, or after a break.
 argument-hint: <subject-slug>
 allowed-tools: Read, Write, Edit, Glob, Bash(xmllint *), Bash(date *), Bash(python3 .claude/hooks/mc-preflight.py*), Bash(python3 .claude/hooks/learn-status.py*), AskUserQuestion, Agent, WebSearch, WebFetch
 ---
@@ -12,7 +12,7 @@ Resume the learning project `$0`. Follow Phase 5 of `learn/system/workflow.md`.
 1. `learn/subjects/$0/resume.md`, in full.
 2. The resume brief: `python3 .claude/hooks/learn-status.py --brief --subject $0`. It carries the state, the nodes this session works on with their plan rows and recent evidence, open misconceptions, cross-subject prerequisites, and the latest note's hand-off.
 
-The brief replaces reading `record.md`, `plan.md`, and the latest session note in full (Edison, 2026-10-25). Open a full file only when a step needs it: finalizing an open note (step 3), re-teaching a node (read its *Lesson* entry in the note that taught it), or a brief line that does not make sense on its own. To update `record.md` frontmatter, read only its first 15 lines before editing them.
+The brief replaces reading `record.md`, `plan.md`, and the latest session note in full (decided 2026-10-25). Open a full file only when a step needs it: finalizing an open note (step 3), re-teaching a node (read its *Lesson* entry in the note that taught it), or a brief line that does not make sense on its own. To update `record.md` frontmatter, read only its first 15 lines before editing them.
 
 If `record.md` does not exist, stop: the right command is `/learn-start $0`. If `record.md` says `status: not-started` or `diagnosing`, say so and continue with the corresponding step of `/learn-start` instead.
 
@@ -20,7 +20,7 @@ Do not ask the learner what was covered last time. The records answer that; aski
 
 ## 2. Recap
 
-At most eight lines: where we are in the plan, what was remembered on a later day (`solid`), what passed but has not been re-checked on a later day (`checked`), open misconceptions, what today covers, and anything listed under *Adjustments to make* in `resume.md`. Edison reads the recap, so use those plain names for the statuses, the same ones the reward lines and the dashboard use, and leave out the backticked record terms. Never "secure", "shaky", or "proven".
+At most eight lines: where we are in the plan, what was remembered on a later day (`solid`), what passed but has not been re-checked on a later day (`checked`), open misconceptions, what today covers, and anything listed under *Adjustments to make* in `resume.md`. The learner reads the recap, so use those plain names for the statuses, the same ones the reward lines and the dashboard use, and leave out the backticked record terms. Never "secure", "shaky", or "proven".
 
 ## 3. Open the session note
 

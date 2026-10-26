@@ -1,6 +1,6 @@
 ---
 name: learn-start
-description: Start a new learning project — capture the goal, diagnose current understanding, build and verify a lesson plan, then begin teaching. Use when Edison wants to learn a new subject or topic.
+description: Start a new learning project — capture the goal, diagnose current understanding, build and verify a lesson plan, then begin teaching. Use when the learner wants to learn a new subject or topic.
 ---
 
 Start a learning project for the subject slug in the user's request, for example `$learn-start cs100-pointers` or "start learning pointers." Treat any words after the slug as a goal hint. If the user gave a topic but no slug, make one from it following the slug rule in step 1.
