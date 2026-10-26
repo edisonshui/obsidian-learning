@@ -2257,6 +2257,9 @@ eq("a clean probe with no Jev is silent",
 section("J1 inline — the guard denies the picker and writes the notice into log.md")
 fresh(); note("oop", "s05")
 turn("/learn-resume oop")
+# Enough reply text that the turn is not thin; the thin path has its own section.
+olive.process(VAULT, {"session_id": "conv-a", "hook_event_name": "MessageDisplay", "message_id": "m0",
+                      "index": 0, "final": True, "delta": "Here is the program we traced last time. " * 6})
 jev.ask = probe_ask
 decision = pretool("toolu_x", [DANGLER])
 eq("the tool call is denied", decision["hookSpecificOutput"]["permissionDecision"], "deny")
@@ -2328,6 +2331,23 @@ eq("below the block line, a flag with only a status line on screen is still with
    decision["hookSpecificOutput"]["permissionDecision"], "deny")
 eq("and the reason says thinking does not count",
    "thinking and files are invisible" in decision["hookSpecificOutput"]["permissionDecisionReason"], True)
+eq("and does not invite an unchanged re-issue",
+   "re-issue the same question unchanged" in decision["hookSpecificOutput"]["permissionDecisionReason"], False)
+eq("re-issued unchanged while the turn is still thin, it is held a second time",
+   pretool("toolu_c1b", [CRIT])["hookSpecificOutput"]["permissionDecision"], "deny")
+eq("a third unchanged re-issue goes through, so the gate cannot loop", pretool("toolu_c1c", [CRIT]), "")
+
+# cs124-quiz9 2026-10-26: p=0.91 is past the block line on its own, and the thin
+# reason was dropped from that path, so the tutor saw only self-containment.
+jev.ask = probe_ask
+fresh(); note("calc", "s01")
+turn("/learn-resume calc")
+decision = pretool("toolu_c4", [DANGLER])
+eq("a flag already past the block line in a thin turn still names the thin turn",
+   "thinking and files are invisible" in decision["hookSpecificOutput"]["permissionDecisionReason"], True)
+eq("and is held a second time too",
+   pretool("toolu_c5", [DANGLER])["hookSpecificOutput"]["permissionDecision"], "deny")
+jev.ask = criteria_ask
 
 fresh(); note("calc", "s01")
 turn("/learn-start calc")

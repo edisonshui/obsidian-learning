@@ -46,7 +46,7 @@ Start both reviewers in one message, in the background, then go straight to step
 
 ## 6. Present and approve
 
-Show the graph and the five-line summary (what they have, first session, last node, session count, what they can do at the end, with any cuts the budget forced named in the last line), and say in one line that a fact check and a pacing check are still running and may adjust it. Wait for approval. On approval set `approved: true` in `plan.md` and `status: active` in `record.md`.
+Show the graph and the five-line summary (what they have, first session, last node, session count, what they can do at the end, with any cuts the budget forced named in the last line), and say in one line that a fact check and a pacing check are still running and may adjust it. Wait for approval, and end the turn after asking. Approval is the learner's own reply. A checker's result arriving is not approval: on cs124-quiz9 2026-10-26 the plan-reviewer landed and the tutor wrote "The plan's approved" with no learner reply. On approval set `approved: true` in `plan.md` and `status: active` in `record.md`.
 
 Teaching waits for the `fact-checker` result (`tutor.md`, *Reliability rules*). The `plan-reviewer` result may land after teaching starts: apply it to nodes not yet taught, and tell the learner in one line only when it changes something they approved.
 
