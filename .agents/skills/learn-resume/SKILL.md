@@ -1,6 +1,6 @@
 ---
 name: learn-resume
-description: Resume an existing learning project from its saved records — recap, decay-check the last nodes, then continue teaching from the plan. Use when Edison wants to continue a subject, or after a break.
+description: Resume an existing learning project from its saved records — recap, decay-check the last nodes, then continue teaching from the plan. Use when the learner wants to continue a subject, or after a break.
 ---
 
 Resume the learning project named in the user request, such as `$learn-resume oop` or "continue OOP." Follow Phase 5 of `learn/system/workflow.md`.

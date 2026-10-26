@@ -1,6 +1,6 @@
 ---
 name: learn-end
-description: End or checkpoint the current learning session — finalize the session note, update the learner record and plan, rewrite the resume summary, and print it. Use at the end of a session, before a break, or whenever Edison says stop, pause, checkpoint, or break.
+description: End or checkpoint the current learning session — finalize the session note, update the learner record and plan, rewrite the resume summary, and print it. Use at the end of a session, before a break, or whenever the learner says stop, pause, checkpoint, or break.
 ---
 
 End or checkpoint the current session. If the user asks for a break, treat it as a same-day pause; otherwise end the session. Follow Phase 4 of `learn/system/workflow.md` and the update rules in `learn/system/records.md`.
@@ -54,7 +54,7 @@ That judgement decides whether a line joins *Observed*, and until now it happene
 python3 .claude/hooks/jev.py match-candidate --kind preference --new "<the candidate, as written in the note>"
 ```
 
-It reads *Candidates* itself and prints one of four verdicts. `promote` is sighting two — do step 2. `new` is a first sighting — do step 3. `ask` means the match is in the middle band: carry the question into the closing block for Edison and default to `new` if he does not decide. `judge-yourself` means Jev could not be reached, so the rule above is yours to apply alone. For a misconception candidate, the same command with `--kind misconception --subject <slug> --skip-note <this session's note stem>`; `--skip-note` is what stops the candidate from matching the copy of itself you wrote in step 1. The command writes nothing — you do every write, and a verdict is never permission to skip the two-sighting bar.
+It reads *Candidates* itself and prints one of four verdicts. `promote` is sighting two — do step 2. `new` is a first sighting — do step 3. `ask` means the match is in the middle band: carry the question into the closing block for the learner and default to `new` if they do not decide. `judge-yourself` means Jev could not be reached, so the rule above is yours to apply alone. For a misconception candidate, the same command with `--kind misconception --subject <slug> --skip-note <this session's note stem>`; `--skip-note` is what stops the candidate from matching the copy of itself you wrote in step 1. The command writes nothing — you do every write, and a verdict is never permission to skip the two-sighting bar.
 
 If nothing meets the bar, **write nothing to *Observed* and say so** — one line in chat: "no preference observation met the two-sighting bar; N candidate(s) carried forward." Do not narrate an update you are not making. If a permission prompt blocks the edit, report that in step 7 rather than treating the step as done.
 

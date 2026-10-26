@@ -1,6 +1,6 @@
 ---
 name: learn-check
-description: Run a mixed retrieval check on the current learning subject — recent nodes plus one older one — grade it, and log the evidence. Use every 2–3 nodes, or when Edison asks to be quizzed.
+description: Run a mixed retrieval check on the current learning subject — recent nodes plus one older one — grade it, and log the evidence. Use every 2–3 nodes, or when the learner asks to be quizzed.
 ---
 
 Run a retrieval check. The user may name a subject slug and node IDs after `$learn-check`. If no subject is given, use the subject whose session note was opened in this conversation; if none was, ask which subject.

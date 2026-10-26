@@ -1,6 +1,6 @@
 ---
 name: learn-resume
-description: Resume an existing learning project from its saved records — recap, decay-check the last nodes, then continue teaching from the plan. Use when Edison wants to continue a subject, or after a break.
+description: Resume an existing learning project from its saved records — recap, decay-check the last nodes, then continue teaching from the plan. Use when the learner wants to continue a subject, or after a break.
 argument-hint: <subject-slug>
 allowed-tools: Read, Write, Edit, Glob, Bash(xmllint *), Bash(date *), Bash(python3 .claude/hooks/mc-preflight.py*), AskUserQuestion, Agent, WebSearch, WebFetch
 ---
@@ -20,7 +20,7 @@ Do not ask the learner what was covered last time. The records answer that; aski
 
 ## 2. Recap
 
-At most eight lines: where we are in the plan, what was remembered on a later day (`solid`), what passed but has not been re-checked on a later day (`checked`), open misconceptions, what today covers, and anything listed under *Adjustments to make* in `resume.md`. Edison reads the recap, so use those plain names for the statuses, the same ones the reward lines and the dashboard use, and leave out the backticked record terms. Never "secure", "shaky", or "proven".
+At most eight lines: where we are in the plan, what was remembered on a later day (`solid`), what passed but has not been re-checked on a later day (`checked`), open misconceptions, what today covers, and anything listed under *Adjustments to make* in `resume.md`. The learner reads the recap, so use those plain names for the statuses, the same ones the reward lines and the dashboard use, and leave out the backticked record terms. Never "secure", "shaky", or "proven".
 
 ## 3. Open the session note
 

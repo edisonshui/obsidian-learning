@@ -1,6 +1,6 @@
 ---
 name: learn-end
-description: End or checkpoint the current learning session — finalize the session note, update the learner record and plan, rewrite the resume summary, and print a plain-English summary. Use at the end of a session, before a break, or whenever Edison says stop, pause, checkpoint, or break.
+description: End or checkpoint the current learning session — finalize the session note, update the learner record and plan, rewrite the resume summary, and print a plain-English summary. Use at the end of a session, before a break, or whenever the learner says stop, pause, checkpoint, or break.
 argument-hint: [break]
 allowed-tools: Read, Write, Edit, Glob, Agent, Bash(date *), Bash(python3 .claude/hooks/learn-status.py*), Bash(python3 .claude/hooks/obsidian-live.py clock*), Bash(python3 .claude/hooks/jev.py*), Bash(python3 .claude/hooks/write-check.py*)
 ---
@@ -56,7 +56,7 @@ That judgement decides whether a line joins *Observed*, and until now it happene
 python3 .claude/hooks/jev.py match-candidate --kind preference --new "<the candidate, as written in the note>"
 ```
 
-It reads *Candidates* itself and prints one of four verdicts. `promote` is sighting two — do step 2. `new` is a first sighting — do step 3. `ask` means the match is in the middle band: carry the question into the closing block for Edison and default to `new` if he does not decide. `judge-yourself` means Jev could not be reached, so the rule above is yours to apply alone. For a misconception candidate, the same command with `--kind misconception --subject <slug> --skip-note <this session's note stem>`; `--skip-note` is what stops the candidate from matching the copy of itself you wrote in step 1. The command writes nothing — you do every write, and a verdict is never permission to skip the two-sighting bar.
+It reads *Candidates* itself and prints one of four verdicts. `promote` is sighting two — do step 2. `new` is a first sighting — do step 3. `ask` means the match is in the middle band: carry the question into the closing block for the learner and default to `new` if they do not decide. `judge-yourself` means Jev could not be reached, so the rule above is yours to apply alone. For a misconception candidate, the same command with `--kind misconception --subject <slug> --skip-note <this session's note stem>`; `--skip-note` is what stops the candidate from matching the copy of itself you wrote in step 1. The command writes nothing — you do every write, and a verdict is never permission to skip the two-sighting bar.
 
 If nothing meets the bar, **write nothing to *Observed* and say so** — one line in chat: "no preference observation met the two-sighting bar; N candidate(s) carried forward." Do not narrate an update you are not making. Editing this file triggers a permission prompt; if it is declined, report that in step 7 rather than treating the step as done.
 
@@ -106,7 +106,7 @@ A step that was skipped, blocked by a permission prompt, or not applicable is re
 
 ## 8. Hand-off
 
-After every write and the verification pass are complete, send exactly one closing block. Edison reads it, so it is plain English, not the record's terms: say "topic", not "node", and leave out `n` numbers, strand numbers (S1, S4), and the words checked, solid, decayed, strand, candidate, and decay-check, unless the same sentence says what they mean. Name a status with the words the reward lines and the dashboard use: *passed* for `checked`, *remembered on a later day* for `solid`, and *slipped* for `decayed`. Never "secure", "shaky", or "proven". It contains, in order:
+After every write and the verification pass are complete, send exactly one closing block. The learner reads it, so it is plain English, not the record's terms: say "topic", not "node", and leave out `n` numbers, strand numbers (S1, S4), and the words checked, solid, decayed, strand, candidate, and decay-check, unless the same sentence says what they mean. Name a status with the words the reward lines and the dashboard use: *passed* for `checked`, *remembered on a later day* for `solid`, and *slipped* for `decayed`. Never "secure", "shaky", or "proven". It contains, in order:
 
 1. **What was saved, in one line** when the step 7 checklist and `compare` agree: "Saved and checked: session note, record, plan, resume, preferences, Home, Dashboard, progress." Any file that is claimed but absent, present but unclaimed, skipped, or blocked by a permission prompt gets its own line saying what happened, followed by the two limits from step 7.
 2. **The preference result** from step 5, in one line.
