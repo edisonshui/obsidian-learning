@@ -56,7 +56,8 @@
         "zip"
       ],
       "category": "public.app-category.education",
-      "identity": null
+      "identity": "-",
+      "hardenedRuntime": false
     },
     "win": {
       "target": [

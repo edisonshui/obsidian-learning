@@ -93,12 +93,19 @@ document.addEventListener("mouseover", (e) => {
 function routeKey(r = route) { return SUBJECT_ROUTES.includes(r.name) ? `${r.name}/${r.slug}` : r.name; }
 function swap(paint) {
   const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (document.startViewTransition && !calm) document.startViewTransition(paint); else paint();
+  // A hidden or background window has nothing to animate; the transition would only throw.
+  if (!document.startViewTransition || calm || document.visibilityState !== "visible") return paint();
+  // The browser skips the update when it aborts a transition, so paint once either way.
+  let done = false;
+  const once = () => { if (!done) { done = true; paint(); } };
+  const t = document.startViewTransition(once);
+  t.ready.catch(() => {}); t.finished.catch(() => {}); t.updateCallbackDone.catch(() => {});
+  setTimeout(once, 300);
 }
 function go(name, slug) {
   if (!S && name !== "setup") return;
   if (SUBJECT_ROUTES.includes(name) && !slug) slug = route.slug || defaultSlug();
-  if (SUBJECT_ROUTES.includes(name) && !subj(slug)) return;
+  if (SUBJECT_ROUTES.includes(name) && !subj(slug) && name !== "session") return;
   const before = routeKey();
   scrolls[before] = $("screen").scrollTop;
   route = { name, slug: slug || route.slug };
@@ -229,7 +236,8 @@ let optsOpen = false;
 function paintHome() {
   const top = S.ranked[0], s = top && top.subject ? subj(top.subject) : null;
   inkAction = () => run(top);
-  const { why, line } = plain(top);
+  let { why, line } = plain(top);
+  if (top.kind === "Start") line = "Pick a topic and a goal. The tutor asks a few questions to find where you start, then builds a plan.";
   const others = S.ranked.slice(1);
   const dueN = S.subjects.reduce((n, x) => n + x.nodes.filter((y) => y.due).length, 0);
   const repairs = others.filter((x) => x.kind === "Repair");
@@ -295,8 +303,8 @@ function paintDashboard() {
   $("screen").innerHTML = `<div class="holo-content" style="padding:28px 32px 80px;max-width:1200px">
     <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
       <h1 class="t-title">All subjects</h1>
-      <button style="margin-left:auto" class="btn sec sm" data-act="start" data-tip="${key("N")}">Start a subject</button>
-      <button class="btn ink" data-act="ink" data-tip="${key("↩")}">${VERB[top.kind] || "Start"}${top.subject ? " " + esc(shortTitle(subj(top.subject))) : ""}</button>
+      ${top.kind === "Start" ? `<span style="margin-left:auto"></span>` : `<button style="margin-left:auto" class="btn sec sm" data-act="start" data-tip="${key("N")}">Start a subject</button>`}
+      <button class="btn ink" data-act="ink" data-tip="${key("↩")}">${top.kind === "Start" ? "Start a subject" : (VERB[top.kind] || "Start") + (top.subject ? " " + esc(shortTitle(subj(top.subject))) : "")}</button>
     </div>
     <div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:28px;margin-top:22px">
       <div>
@@ -734,7 +742,11 @@ async function paintSession() {
   await ensureTerm();
   fitSoon();
   if (T.running) T.term.focus();
-  if (!s) return;
+  if (!s) {
+    LOG.slug = null; LOG.keys = [];
+    LOG.data = { conversations: [], note: null };
+    return paintPanelBody(true);
+  }
   if (LOG.slug !== s.slug) {
     LOG.slug = s.slug; LOG.showAll = false; LOG.think = {}; LOG.keys = []; LOG.stick = true;
     prefetchSession(s.slug);
