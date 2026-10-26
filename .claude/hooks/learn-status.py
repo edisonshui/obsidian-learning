@@ -801,7 +801,7 @@ def is_due_on(markers, day, deadline):
 # `CONTEXT.md`, *Reward line*). It compares the reward state with and without
 # the scope's marker lines, so it can only name what that session or review
 # added. Record voice: facts, no praise, no exclamation marks, no emoji.
-# Edison reads these lines at the end of a session, so they are plain English,
+# The learner reads these lines at the end of a session, so they are plain English,
 # not the record's terms (2026-10-13): a node is a topic, a solid check is a
 # topic remembered on a later day. Home and the dashboard keep the short badge
 # names.
@@ -906,7 +906,7 @@ GEN_CANDIDATE = "  · gen candidate"
 
 
 def due_report(rows, undated, candidates=frozenset()):
-    """`--due` as the tutor and Edison read it. One node per line, stalest first.
+    """`--due` as the tutor and the learner read it. One node per line, stalest first.
 
     `candidates` holds the (subject, node) pairs `--gen` marks: recall-only and
     resting on an unconditional truth. A review asks its one generation question
@@ -1983,7 +1983,7 @@ def dashboard(subjects, today, warnings, openings, state=None, rewards_on=True):
         "[[learn/system/workflow|workflow.md]] — the phases every subject goes through",
         "[[learn/system/records|records.md]] — what the records contain and how they update",
         "[[learn/system/diagrams|diagrams.md]] — mermaid and math rules for notes",
-        "[[learn/me/preferences|preferences.md]] — how Edison learns, and what the evidence shows",
+        "[[learn/me/preferences|preferences.md]] — how you learn, and what the evidence shows",
         "[[learn/README|README]] — how the whole thing fits together"], fold="-")
     return "\n".join(out)
 

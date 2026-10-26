@@ -1,6 +1,6 @@
 ---
 name: learn-review
-description: Run a cross-subject spaced-repetition pass — pick the nodes that have gone longest without a check, quiz them, and log the evidence back to each subject. Use when Edison wants to review across subjects, or when a finished subject's nodes have gone stale.
+description: Run a cross-subject spaced-repetition pass — pick the nodes that have gone longest without a check, quiz them, and log the evidence back to each subject. Use when the learner wants to review across subjects, or when a finished subject's nodes have gone stale.
 argument-hint: "[node count] [subject-slug ...]"
 allowed-tools: Read, Write, Edit, Glob, Bash(date *), Bash(python3 .claude/hooks/learn-status.py*), Bash(python3 .claude/hooks/mc-preflight.py*), Bash(python3 .claude/hooks/write-check.py*), AskUserQuestion
 ---

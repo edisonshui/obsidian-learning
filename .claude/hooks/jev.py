@@ -490,7 +490,7 @@ def inline_probe_check(text, ask_fn=None, vault=VAULT):
 # Every line in preferences.md's *Observed* turned on that judgement, and until
 # now it happened in the tutor's head and left no trace. This does not take the
 # judgement away: it asks the same question in a form that records an answer and
-# a number, and hands the middle band back to Edison.
+# a number, and hands the middle band back to the learner.
 
 NONE_LABEL = "none_of_these"
 CANDIDATE_PROMOTE_AT = 0.80
@@ -568,7 +568,7 @@ def candidate_route(answer):
     Routes on the probability mass sitting on the best *existing* candidate, not
     on the reported confidence, so "confidently none of these" and "unsure about
     a match" cannot collapse into the same number. High promotes, low files as
-    new, and the middle band goes to Edison -- which is `learn-end` step 5's own
+    new, and the middle band goes to the learner -- which is `learn-end` step 5's own
     conservative bias ("if you are not sure they are the same claim, they are
     not") expressed as a threshold instead of a feeling.
     """
@@ -1182,7 +1182,7 @@ ACTIONS = {
         "new": ("first sighting -- append it to *Candidates* in preferences.md with today's "
                 "sighting. Write nothing to *Observed*."),
         "ask": ("middle band -- Jev is not sure these are the same claim. Carry the question "
-                "into the closing block for Edison, and default to `new` if he does not decide."),
+                "into the closing block for the learner, and default to `new` if they do not decide."),
     },
     "misconception": {
         "promote": ("this is sighting two -- promote it into record.md's *Misconceptions* with "
@@ -1190,7 +1190,7 @@ ACTIONS = {
         "new": ("first sighting -- leave it as a candidate in this session's note. It does not "
                 "go into record.md yet."),
         "ask": ("middle band -- Jev is not sure these are the same claim. Carry the question "
-                "into the closing block for Edison, and default to `new` if he does not decide."),
+                "into the closing block for the learner, and default to `new` if they do not decide."),
     },
 }
 

@@ -145,6 +145,6 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "python3 /Users/edisonhui/Desktop/vault/.claude/hooks/obsidian-live.py status"
+    "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/obsidian-live.py\" status"
   }
 }

@@ -1188,7 +1188,7 @@ eq("a strong match promotes",
    jev.candidate_route(choice({"cand1": 0.88, "cand2": 0.05, jev.NONE_LABEL: 0.07}))[0], "promote")
 eq("a weak best match files as new, per the file's own conservative bias",
    jev.candidate_route(choice({"cand1": 0.20, jev.NONE_LABEL: 0.80}))[0], "new")
-eq("the middle band goes to Edison rather than being decided quietly",
+eq("the middle band goes to the learner rather than being decided quietly",
    jev.candidate_route(choice({"cand1": 0.65, jev.NONE_LABEL: 0.35}))[0], "ask")
 eq("a promote names which candidate matched",
    jev.candidate_route(choice({"cand1": 0.88, "cand2": 0.05, jev.NONE_LABEL: 0.07}))[1], "cand1")
