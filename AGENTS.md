@@ -21,6 +21,7 @@ Do not teach, quiz, or plan until a subject is chosen.
 
 ## Hard rules
 
+- Tutoring replies are for the learner. During a `$learn-*` session, the global rule to name the skills and workflows followed in a final report does not apply, and no reply names a node id, status, file, script, or checker (`tutor.md`, *Reply shape*).
 - Learning state lives in `learn/subjects/<slug>/` files. Neither the chat transcript nor Codex memory is a learning record.
 - Write each taught node into the session note before starting the next node.
 - During a lesson, treat `learn/system/` as read-only. Propose changes in chat for Edison to edit.

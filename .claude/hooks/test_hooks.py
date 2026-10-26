@@ -1994,6 +1994,13 @@ STRAND = rsubject("st", [rnode("n1", "decayed", "2026-09-24", name="Writing equa
 eq("a reward line drops the record's strand tag from a topic's name",
    status.reward_lines([STRAND], DUE_DAY, subject="st", session="03"),
    ["Slipped: Writing equals. Get it right in a later session and it counts as remembered again."])
+REPASSED = rsubject("rp", [rnode("n1", "checked", "2026-09-24", name="Horizontal slices")],
+                    [sourced("n1", "2026-09-10", "checked", "s01"),
+                     sourced("n1", "2026-09-24", "decayed", "s03"), sourced("n1", "2026-09-24", "checked", "s03")])
+eq("a topic that slipped and passed again in the same session says so",
+   status.reward_lines([REPASSED], DUE_DAY, subject="rp", session="03"),
+   ["Slipped: Horizontal slices (passed again this session). Get it right in a later session"
+    " and it counts as remembered again."])
 eq("a session that earned nothing and opened nothing prints nothing",
    status.reward_lines([LAPSE_ONLY], DUE_DAY, subject="l", session="09"), [])
 DUE_WEEK = rsubject("w", [rnode("n1", "checked", "2026-09-22", name="Omega"), rnode("n2", "checked", "2026-09-15")],
@@ -2284,6 +2291,56 @@ def exploding_ask(state, questions, **kwargs):
 
 jev.ask = exploding_ask
 eq("a thrown asker still lets the question through", pretool("toolu_boom", [DANGLER]), "")
+jev.ask = probe_ask
+
+
+section("Picker gate — math in the picker is held back once, because it shows as plain text")
+fresh(); note("calc", "s01")
+turn("/learn-resume calc")
+MATHQ = {"question": "What is int_0^2 int_0^1 6xy dy dx?", "options": [{"label": "6"}, {"label": "3"}]}
+decision = pretool("toolu_m1", [MATHQ])
+eq("a math question in the picker is denied", decision["hookSpecificOutput"]["permissionDecision"], "deny")
+reason = decision["hookSpecificOutput"]["permissionDecisionReason"]
+eq("the reason quotes the math it saw and sends it to chat",
+   "int_" in reason and "Ask it in chat" in reason, True)
+eq("the live log says it was withdrawn",
+   "Withdrawn before it was asked" in (VAULT / "learn/subjects/calc/log.md").read_text(), True)
+eq("the same question asked again goes through", pretool("toolu_m2", [MATHQ]), "")
+eq("code in backticks is not math",
+   pretool("toolu_m3", [{"question": "What does `x ^ y` print for x = 5, y = 3?",
+                          "options": [{"label": "6"}, {"label": "125"}]}]), "")
+eq("a price is not math", olive.picker_math({"question": "Rent rose from $900 to $1,200. Why?"}), "")
+
+
+section("Picker gate — a flagged probe in a turn with no visible material is withdrawn")
+def criteria_ask(state, questions, **kwargs):
+    return {"outside_reference": {"noul": 0.87 if "these six" in state["question"] else 0.02}}
+
+jev.ask = criteria_ask
+CRIT = {"question": "Do these six success criteria match what you want?",
+        "options": [{"label": "Yes, use them"}, {"label": "Edit them"}]}
+fresh(); note("calc", "s01")
+turn("/learn-start calc")
+olive.process(VAULT, {"session_id": "conv-a", "hook_event_name": "MessageDisplay", "message_id": "m1",
+                      "index": 0, "delta": "Setting up your subject folder now.", "final": True})
+decision = pretool("toolu_c1", [CRIT])
+eq("below the block line, a flag with only a status line on screen is still withdrawn",
+   decision["hookSpecificOutput"]["permissionDecision"], "deny")
+eq("and the reason says thinking does not count",
+   "thinking and files are invisible" in decision["hookSpecificOutput"]["permissionDecisionReason"], True)
+
+fresh(); note("calc", "s01")
+turn("/learn-start calc")
+olive.process(VAULT, {"session_id": "conv-a", "hook_event_name": "MessageDisplay", "message_id": "m2",
+                      "index": 0, "final": True, "delta": "Here are the six success criteria:\n\n" + "\n".join(
+                          "%d. Set up and evaluate a double integral of kind %d with correct limits." % (i, i)
+                          for i in range(1, 7))})
+eq("the same flag after the criteria were written as reply text only warns", pretool("toolu_c2", [CRIT]), "")
+jev.ask = lambda *a, **k: None
+fresh(); note("calc", "s01")
+turn("/learn-start calc")
+eq("with Jev unreachable, the regex alone still never withdraws, thin turn or not",
+   pretool("toolu_c3", [DANGLER]), "")
 jev.ask = probe_ask
 
 
@@ -3182,6 +3239,42 @@ run = subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault",
                      capture_output=True, text=True)
 eq("--brief without --subject is refused", run.returncode, 2)
 shutil.rmtree(XV)
+
+
+section("pace: real active minutes against plan estimates (learn-start, Fit the budget)")
+PV = Path(tempfile.mkdtemp(prefix="pacetest-"))
+def pace_subject(slug, rows, notes):
+    write(PV / "learn/subjects" / slug / "record.md", "---\nsubject: %s\ntitle: %s\nstatus: active\n---\n\n"
+          "## Nodes\n\n| Node | Status | Last checked | Evidence (latest) |\n| --- | --- | --- | --- |\n%s\n"
+          % (slug, slug, "\n".join("| %s Topic | %s | - | - |" % (node, st) for node, st, _ in rows)))
+    write(PV / "learn/subjects" / slug / "plan.md", "## Nodes\n\n| Id | Node | Est. min | Status |\n"
+          "| --- | --- | --- | --- |\n%s\n" % "\n".join("| %s | Topic | %s | %s |" % (node, est, st)
+                                                     for node, st, est in rows))
+    for stem, extra in notes:
+        write(PV / "learn/subjects" / slug / "sessions" / (stem + ".md"),
+              '---\nsubject: %s\nsession: "01"\ndate: "2026-10-01"\nstart: "10:00"\nend: "11:00"\n%s\n---\n\n# note\n'
+              % (slug, extra))
+pace_subject("math9-a", [("n1", "checked", 20), ("n2", "introduced", 20), ("n3", "planned", 50)],
+             [("2026-10-01-s01", "active_minutes: 50"), ("2026-10-02-s02", "active_minutes: 30"),
+              ("2026-10-03-s03", "kind: practice\nactive_minutes: 99")])
+pace_subject("math9-b", [("n1", "solid", 30)], [("2026-10-01-s01", "active_minutes: 30")])
+pace_subject("math9-c", [("n1", "checked", 30)], [("2026-10-01-s01", "active_minutes:")])
+pace_subject("cs9-a", [("n1", "checked", 10)], [("2026-10-01-s01", "active_minutes: 5")])
+loaded_p, _ = status.load_subjects(PV, datetime(2026, 10, 25, 9))
+rows_p, median_p = status.pace(loaded_p, course="math9")
+eq("only taught topics count, practice minutes do not, and a subject with a missing minute is left out",
+   [(slug, actual, estimated) for slug, actual, estimated, _ in rows_p], [("math9-a", 80, 40), ("math9-b", 30, 30)])
+eq("the median is over the course's subjects", median_p, 1.5)
+eq("without a course every subject counts", status.pace(loaded_p)[1], 1.0)
+run = subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(PV), "--pace",
+                      "--course", "math9"], capture_output=True, text=True)
+eq("--pace prints one line per subject and the median",
+   run.stdout.splitlines(), ["math9-a: 80 active min for 40 estimated (2.0x)",
+                             "math9-b: 30 active min for 30 estimated (1.0x)",
+                             "Median over 2 math9 subjects: 1.5x"])
+eq("a course with no usable subject says so", status.pace_report([], None, "bio1"),
+   "No bio1 subjects with recorded minutes and taught topics yet.\n")
+shutil.rmtree(PV)
 
 print()
 if FAILS:

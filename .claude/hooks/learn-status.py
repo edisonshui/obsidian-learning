@@ -126,6 +126,9 @@ def read_nodes(record_text, plan_text):
         entry["cross_prereqs"] = CROSS_PREREQ.findall(cell)
         entry["prereqs"] = NODE_ID.findall(CROSS_PREREQ.sub(" ", cell))
         entry["plan_status"] = row.get("Status", "").lower()
+        estimate = next((cell for key, cell in row.items() if key.startswith("Est")), "")
+        found = re.search(r"\d+", estimate or "")
+        entry["est"] = int(found.group()) if found else None
     # A prereq naming the node itself or an id not in the table is no edge.
     # It is dropped here and kept aside for consistency() to report.
     for node, entry in nodes.items():
@@ -166,6 +169,46 @@ def load_subjects(vault, now):
             "events": evidence_events(record_text, note_starts(folder)),
         })
     return subjects, missing
+
+
+def pace(subjects, course=None):
+    """How long taught topics really took against the plan's estimates.
+
+    Per subject: active minutes over every lesson session (diagnosis included,
+    practice left out) against the summed *Est. min* of every node that has been
+    taught. A subject with a lesson note whose minutes were never recorded is
+    left out rather than undercounted. Returns (rows, median ratio or None).
+    """
+    rows = []
+    for subject in subjects:
+        slug = subject["slug"]
+        if course and not slug.startswith(course + "-"):
+            continue
+        taught = [entry for entry in subject["nodes"].values()
+                  if entry["status"] not in ("", "planned", "skipped")]
+        estimated = sum(entry.get("est") or 0 for entry in taught)
+        lessons = [note for note in subject["notes"] if note.fields.get("kind") != "practice"]
+        minutes = [str(note.fields.get("active_minutes") or "").strip() for note in lessons]
+        if not estimated or not minutes or not all(m.isdigit() for m in minutes):
+            continue
+        actual = sum(int(m) for m in minutes)
+        if actual:
+            rows.append((slug, actual, estimated, actual / estimated))
+    ratios = sorted(row[3] for row in rows)
+    middle = len(ratios) // 2
+    median = None if not ratios else (
+        ratios[middle] if len(ratios) % 2 else (ratios[middle - 1] + ratios[middle]) / 2)
+    return rows, median
+
+
+def pace_report(rows, median, course=None):
+    scope = "%s subjects" % course if course else "subjects"
+    if not rows:
+        return "No %s with recorded minutes and taught topics yet.\n" % scope
+    lines = ["%s: %d active min for %d estimated (%.1fx)" % (slug, actual, estimated, ratio)
+             for slug, actual, estimated, ratio in rows]
+    lines.append("Median over %d %s: %.1fx" % (len(rows), scope, median))
+    return "\n".join(lines) + "\n"
 
 
 def rank_inputs(subjects):
@@ -874,8 +917,17 @@ def reward_lines(subjects, today, subject=None, session=None, review=None, sessi
     def name(found):
         return STRAND_TAG.sub("", found["name"])
     badge_lines = ["%s: %s" % (PLAIN_BADGE[found["kind"]], name(found)) for found in earned]
+    # A topic can slip and pass again in the same session. It still counts as
+    # slipped until a later session, but the line says so, or it contradicts
+    # the "passed today" line the closing block prints under it.
+    status_of = {(slug, node): entry.get("status")
+                 for slug, nodes, _, _ in subjects for node, entry in nodes.items()}
+
+    def slipped(r):
+        again = status_of.get((r["subject"], r["node"])) in ("checked", "solid")
+        return name(r) + (" (passed again this session)" if again else "")
     recovery = (["Slipped: %s. Get it right in a later session and it counts as remembered again."
-                 % ", ".join(name(r) for r in opened)] if opened else [])
+                 % ", ".join(slipped(r) for r in opened)] if opened else [])
     changed = ["%s: %d → %d" % (label, before["counts"][name], after["counts"][name])
                for name, label in COUNT_LABELS if before["counts"][name] != after["counts"][name]]
     counts = [" · ".join(changed)] if changed and review is None else []
@@ -2225,6 +2277,10 @@ def main():
     parser.add_argument("--brief", action="store_true",
                         help="with --subject, print the resume brief /learn-resume loads in "
                              "place of the full files, and write nothing (read-only)")
+    parser.add_argument("--pace", action="store_true",
+                        help="print real active minutes against plan estimates per subject, "
+                             "and the median ratio (read-only); --course narrows it")
+    parser.add_argument("--course", help="with --pace, only subjects whose slug starts <course>-")
     parser.add_argument("--semantic", action="store_true",
                         help="also run Jev-backed semantic checks (Phase 4). Off by "
                              "default: session start must stay offline, fast, and "
@@ -2271,6 +2327,11 @@ def main():
             print("learn-status: no subject %s" % args.subject, file=sys.stderr)
             return 1
         print(brief(chosen, loaded, stamp.date()), end="")
+        return 0
+
+    if args.pace:
+        rows, median = pace(loaded, course=args.course)
+        print(pace_report(rows, median, course=args.course), end="")
         return 0
 
     if args.next_action:
