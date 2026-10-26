@@ -774,8 +774,56 @@ REPAIR = ("Put the material the question depends on inside the question text, fe
           "its language (tutor.md, Self-containment), and ask again. If the probe does "
           "stand alone, re-issue the same question unchanged and it will go through.")
 
+# Math in the picker arrives as plain text: `int_0^2 int_0^1 6xy dy dx` was
+# unreadable and the learner turned the picker down (2026-10-25). Chat renders it.
+MATH_IN_PICKER = re.compile(
+    r"\$[^$\n]*[\\^_=][^$\n]*\$|\\(?:i?int|frac|sum|sqrt|theta|pi|cdot|le|ge|infty|partial|nabla)\b"
+    r"|\b(?:i?int|sum|lim)_|[A-Za-z0-9)\]]\^[-A-Za-z0-9({]|\bsqrt\(")
+CODE_SPANS = re.compile(r"```.*?```|`[^`\n]*`", re.S)
+MATH_REASON = ("This question has math in it (\"%s\"), and the question picker shows math as "
+               "plain text, which the learner could not read (2026-10-25). Ask it in chat "
+               "instead: the math rendered with $...$, lettered options, and the confidence "
+               "question in the same message.")
+MATH_REPAIR = ("If the match is code, not math, re-issue the same question unchanged and it "
+               "will go through.")
 
-def probe_guard(state, questions, tool_id):
+# A flagged probe in a turn whose reply text is this short has nothing visible for it
+# to point at. The six success criteria lived only in thinking twice (cs124-quiz8
+# 2026-10-20, math241-hw23 2026-10-25), flagged at p=0.80 and 0.87, under the block line.
+THIN_TURN_CHARS = 200
+THIN_REASON = ("Nothing the learner can read this turn holds that material: thinking and "
+               "files are invisible to them. Write it as reply text first, then ask.")
+
+
+def picker_math(question):
+    """The first math-looking snippet in a picker question or its options, or ""."""
+    parts = [str(question.get("question", ""))]
+    for option in question.get("options") or []:
+        parts += [str(option.get("label", "")), str(option.get("description") or "")]
+    text = CODE_SPANS.sub(" ", "\n".join(parts))
+    found = MATH_IN_PICKER.search(text)
+    return found.group(0) if found else ""
+
+
+def turn_reply_chars(state, canonical):
+    """Characters of reply text the learner has seen since their last message.
+
+    Read from both the live buffer and the transcript, since either can be
+    behind at PreToolUse; a text both hold counts once.
+    """
+    texts = set()
+    for items in (state.get("current", []), canonical or []):
+        tail = []
+        for item in items:
+            if item.get("role", "").startswith("You"):
+                tail = []
+            elif item.get("role") == "Claude" and str(item.get("text", "")).strip():
+                tail.append(str(item["text"]).strip())
+        texts.update(tail)
+    return sum(len(text) for text in texts)
+
+
+def probe_guard(state, questions, tool_id, canonical=None):
     """J1 inline: judge each question in a picker before the learner answers it.
 
     Returns the reason to deny the tool call with, or "" to let it through.
@@ -795,13 +843,29 @@ def probe_guard(state, questions, tool_id):
     Fails open at every level: no `jev` module, no key, no network, or a probe
     that takes longer than the budget all end with the question being asked.
     """
+    flagged = state.setdefault("probes_flagged", [])
+    reasons, repairs = [], []
+    for index, question in enumerate(questions):
+        snippet = picker_math(question)
+        if not snippet:
+            continue
+        digest = hashlib.sha256(("math:" + json.dumps(question, sort_keys=True)).encode()).hexdigest()[:16]
+        withdraw = digest not in flagged
+        if withdraw:
+            flagged.append(digest)
+            del flagged[:-FLAGGED_KEEP]
+            reasons.append(MATH_REASON % snippet)
+            repairs.append(MATH_REPAIR)
+        put_notice(state, {"key": "notice-math-%s-%d" % (tool_id, index),
+                           "anchor": "questions-" + tool_id, "role": NOTICE_ROLE, "time": now(),
+                           "text": (MATH_REASON % snippet) + "\n\n"
+                                   + (WITHDRAWN if withdraw else ASKED_ANYWAY)})
     try:
         import jev
     except Exception:  # noqa: BLE001 -- the mirror works with no semantic module at all
-        return ""
+        return (" ".join(reasons + repairs)) if reasons else ""
     deadline = time.monotonic() + PROBE_BUDGET
-    flagged = state.setdefault("probes_flagged", [])
-    reasons = []
+    thin = turn_reply_chars(state, canonical) < THIN_TURN_CHARS
     for index, question in enumerate(questions):
         try:
             text = jev.probe_text(question)
@@ -816,16 +880,20 @@ def probe_guard(state, questions, tool_id):
         if not level:
             continue
         digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+        # Jev's flag only: the offline regex never gets to withdraw a question.
+        if level == "warn" and thin and "Jev p=" in reason:
+            level, reason = "block", reason + " " + THIN_REASON
         withdraw = level == "block" and digest not in flagged
         if withdraw:
             flagged.append(digest)
             del flagged[:-FLAGGED_KEEP]
             reasons.append(reason)
+            repairs.append(REPAIR)
         put_notice(state, {"key": "notice-%s-%d" % (tool_id, index),
                            "anchor": "questions-" + tool_id, "role": NOTICE_ROLE,
                            "time": now(),
                            "text": reason + "\n\n" + (WITHDRAWN if withdraw else ASKED_ANYWAY)})
-    return (" ".join(reasons) + " " + REPAIR) if reasons else ""
+    return " ".join(reasons + list(dict.fromkeys(repairs))) if reasons else ""
 
 
 def status_text(payload, state):
@@ -909,7 +977,7 @@ def process(vault, payload, mode="hook"):
                 put_current(state, entry("questions-" + tool_id, "Claude — questions",
                                          questions_text(asked)))
                 if mode != "status":
-                    deny = probe_guard(state, asked, tool_id)
+                    deny = probe_guard(state, asked, tool_id, canonical)
             elif event == "PostToolUse":
                 result = payload.get("tool_response", {})
                 if isinstance(result, str):
