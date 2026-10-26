@@ -793,6 +793,12 @@ MATH_REPAIR = ("If the match is code, not math, re-issue the same question uncha
 THIN_TURN_CHARS = 200
 THIN_REASON = ("Nothing the learner can read this turn holds that material: thinking and "
                "files are invisible to them. Write it as reply text first, then ask.")
+# A thin turn gets a second hold, and its repair drops "re-issue unchanged". On
+# cs124-quiz9 2026-10-26 a p=0.91 block named only self-containment; the code was
+# already inline, so the tutor re-issued it unchanged while the rule it quizzed
+# lived only in thinking, and the learner said half the lesson was cut.
+THIN_REPAIR = ("Write what the question depends on as reply text, then ask again. A "
+               "re-issue while the reply is still this short is held back once more.")
 
 
 def picker_math(question):
@@ -881,14 +887,18 @@ def probe_guard(state, questions, tool_id, canonical=None):
             continue
         digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
         # Jev's flag only: the offline regex never gets to withdraw a question.
-        if level == "warn" and thin and "Jev p=" in reason:
+        thin_flag = thin and "Jev p=" in reason
+        if thin_flag:
             level, reason = "block", reason + " " + THIN_REASON
-        withdraw = level == "block" and digest not in flagged
+        key = digest
+        if thin_flag and digest in flagged:
+            key = "thin:" + digest
+        withdraw = level == "block" and key not in flagged
         if withdraw:
-            flagged.append(digest)
+            flagged.append(key)
             del flagged[:-FLAGGED_KEEP]
             reasons.append(reason)
-            repairs.append(REPAIR)
+            repairs.append(THIN_REPAIR if thin_flag else REPAIR)
         put_notice(state, {"key": "notice-%s-%d" % (tool_id, index),
                            "anchor": "questions-" + tool_id, "role": NOTICE_ROLE,
                            "time": now(),

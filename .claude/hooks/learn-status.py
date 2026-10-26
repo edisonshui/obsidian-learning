@@ -17,6 +17,7 @@ Run: python3 .claude/hooks/learn-status.py [--vault PATH]
      python3 .claude/hooks/learn-status.py --rewards --subject SLUG --session NN  (read-only)
      python3 .claude/hooks/learn-status.py --rewards --review NN  (read-only)
      python3 .claude/hooks/learn-status.py --due [--gen]  (read-only)
+     python3 .claude/hooks/learn-status.py --json [--host claude|codex]  (read-only; the app)
 """
 
 import argparse
@@ -2239,6 +2240,103 @@ def semantic_warnings(nodes, plan_text, subject, fields, sessions, folder, ask_f
     return ["semantic: " + warning for warning in warnings]
 
 
+# ------------------------------------------------------------ the app's data
+
+# The desktop app reads everything it shows from this one call, so its screens
+# and the Obsidian views come from the same parser and cannot disagree
+# (.scratch/vault-app/spec.md, *One parser*). Read-only, like --next.
+
+MAP_CARD_W, MAP_DUMMY_W = 236, 18  # a skill-map card plus its gap; the lane a long edge reserves
+
+
+def map_layout(nodes):
+    """Skill-map positions from the same layout as the progress page's tree:
+    ranks and bend points from layered(), x from bk(), with card-sized widths."""
+    if not nodes:
+        return None
+    rank_of, layers, up, down, chains, width = layered(nodes)
+    width = {v: (MAP_DUMMY_W if ">" in v else MAP_CARD_W) for v in width}
+    x = bk(layers, up, down, width)
+    low = min(x.values())
+    return {"x": {v: x[v] - low for v in x}, "rank": rank_of,
+            "chains": [[a, b, chain] for a, b, chain in chains]}
+
+
+def app_state(loaded, vault, stamp, host="claude"):
+    """Everything the app's screens show, as plain data."""
+    import skill_overlap
+    from vaultlib import theme_of
+    today = stamp.date()
+    inputs = rank_inputs(loaded)
+    rewards_on, setting_warning = rewards_setting(vault)
+    reward = rewards(inputs, today)
+    sigil = "$" if host == "codex" else "/"
+    heat_all, subjects, warnings, openings = {}, [], [], []
+    for s in loaded:
+        fields, nodes, events = s["fields"], s["nodes"], s["events"]
+        sessions = [dict(note.fields, file=note.name) for note in s["notes"]]
+        warnings += consistency(nodes, s["plan_text"], s["slug"], fields, sessions, s["folder"])
+        openings += open_notes(s["notes"], s["slug"], host=None)
+        heat = {}
+        for event in events:
+            if event["status"] in ("checked", "solid") and event["date"]:
+                heat[event["date"]] = heat.get(event["date"], 0) + 1
+                heat_all[event["date"]] = heat_all.get(event["date"], 0) + 1
+        upcoming = up_next(nodes)
+        subjects.append({
+            "slug": s["slug"],
+            "title": fields.get("title", s["slug"]),
+            "status": fields.get("status", ""),
+            "theme": theme_of(fields, s["slug"]),
+            "deadline": fields.get("deadline", ""),
+            "days_to_deadline": days_to_deadline(fields.get("deadline"), today),
+            "last_session": fields.get("last_session", ""),
+            "sessions": fields.get("sessions", ""),
+            "next": fields.get("next", ""),
+            "goal_met": fields.get("goal_met", ""),
+            "proven": proven_count(nodes),
+            "total": len(nodes),
+            "pending": pending_tag(nodes, fields, today),
+            "up_next": upcoming[0] if upcoming else None,
+            "recall_only": len(recall_only(nodes, events)),
+            "notes": [{"name": n.name, "status": n.status, "fields": n.fields} for n in s["notes"]],
+            "nodes": [dict(id=e["id"], name=e["name"], status=e["status"], checked=e["checked"],
+                           can_do=e.get("can_do", ""), prereqs=e.get("prereqs", []),
+                           due=is_due(e, today, fields.get("deadline")))
+                      for e in (nodes[k] for k in sorted(nodes, key=sort_key))],
+            "heat": heat,
+            "layout": map_layout(nodes),
+        })
+    ranked = rank(inputs, note_inputs(loaded), today)
+    for found in ranked:
+        found["typed"] = sigil + found["command"]
+    return {
+        "now": stamp.isoformat(timespec="minutes"),
+        "today": today.isoformat(),
+        "host": host,
+        "ranked": ranked,
+        "rewards_on": rewards_on,
+        "badges": reward["badges"],
+        "counts": reward["counts"],
+        "streak": dict(reward["streak"], weeks=[{"start": w["start"], "result": w["result"],
+                                                 "due": len(w["due"])}
+                                                for w in reward["streak"]["weeks"]]),
+        "heat": heat_all,
+        "subjects": subjects,
+        "open_notes": openings,
+        "warnings": warnings + ([setting_warning] if setting_warning else []),
+        "overlaps": skill_overlap.overlaps(subjects, {s["slug"]: s["record_text"] for s in loaded}),
+    }
+
+
+def json_default(value):
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    if isinstance(value, (set, frozenset)):
+        return sorted(value)
+    return str(value)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--vault", type=Path, default=Path(__file__).resolve().parents[2])
@@ -2281,6 +2379,9 @@ def main():
                         help="print real active minutes against plan estimates per subject, "
                              "and the median ratio (read-only); --course narrows it")
     parser.add_argument("--course", help="with --pace, only subjects whose slug starts <course>-")
+    parser.add_argument("--json", action="store_true", dest="as_json",
+                        help="print everything the desktop app shows as JSON, and write "
+                             "nothing (read-only); --host picks the command form")
     parser.add_argument("--semantic", action="store_true",
                         help="also run Jev-backed semantic checks (Phase 4). Off by "
                              "default: session start must stay offline, fast, and "
@@ -2332,6 +2433,11 @@ def main():
     if args.pace:
         rows, median = pace(loaded, course=args.course)
         print(pace_report(rows, median, course=args.course), end="")
+        return 0
+
+    if args.as_json:
+        import json
+        print(json.dumps(app_state(loaded, vault, stamp, host=args.host), default=json_default))
         return 0
 
     if args.next_action:
