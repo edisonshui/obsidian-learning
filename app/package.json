@@ -27,7 +27,10 @@
     "electron": "^45.0.0",
     "electron-builder": "^26.18.0"
   },
-  "author": "Edison Hui",
+  "author": {
+    "name": "Edison Hui",
+    "email": "edisonshui@users.noreply.github.com"
+  },
   "build": {
     "appId": "com.edisonshui.flash",
     "productName": "Flash",
@@ -70,11 +73,12 @@
         "deb"
       ],
       "category": "Education",
-      "maintainer": "Edison Hui"
+      "maintainer": "Edison Hui <edisonshui@users.noreply.github.com>"
     },
     "npmRebuild": false
   },
   "allowScripts": {
     "node-pty@1.1.0": true
-  }
+  },
+  "homepage": "https://github.com/edisonshui/obsidian-learning"
 }
