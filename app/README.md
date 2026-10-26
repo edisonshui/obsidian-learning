@@ -38,8 +38,15 @@ compiles it, which needs `make`, a C++ compiler, and Python.
 | Windows | `npm run dist:win` | `Flash Setup <version>.exe` |
 | Linux | `npm run dist:linux` | `.AppImage` and `.deb` |
 
-Builds are unsigned. On macOS, a friend opens the app the first time with
-right-click > Open. On Windows, SmartScreen shows "More info" > "Run anyway".
+Builds are not signed by a paid developer account (the Mac build is ad-hoc
+signed). The first time a friend opens Flash:
+
+- macOS 15 or later: open it once and macOS blocks it. Then System Settings >
+  Privacy & Security, scroll down, Open Anyway, and confirm. Later opens are normal.
+- Windows: SmartScreen says it protected the PC. Choose More info > Run anyway.
+- Linux: `chmod +x Flash-*.AppImage` and run it, or `sudo apt install ./flash_*.deb`.
+
+The Mac build is for Apple Silicon only.
 
 ## Tests
 

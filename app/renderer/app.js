@@ -719,14 +719,14 @@ function paintTermState() {
   if (T.running) { inkAction = null; return; }
   const resume = s && (S.ranked.find((x) => x.subject === s.slug && x.kind !== "Repair") || { command: `learn-resume ${s.slug}`, subject: s.slug, kind: "Resume" });
   const verb = s && s.status === "done" ? "Practice" : "Resume";
-  const typed = s ? (s.status === "done" ? command(`learn-practice ${s.slug}`) : resume.typed || command(resume.command)) : "";
+  const typed = s ? (s.status === "done" ? command(`learn-practice ${s.slug}`) : resume.typed || command(resume.command)) : command("learn-start");
   inkAction = () => startTutor(typed);
   empty.innerHTML = T.starting ? `<div class="t-ui ink2">Starting ${esc(tutorName())}…</div>` : `
-    <div class="t-head">${T.ended ? `${esc(tutorName())} stopped` : s ? `${verb} ${md(shortTitle(s))}` : `Start ${esc(tutorName())}`}</div>
+    <div class="t-head">${T.ended ? `${esc(tutorName())} stopped` : s ? `${verb} ${md(shortTitle(s))}` : "Start a subject"}</div>
     ${T.failed ? `<p>Could not start ${esc(tutorName())}: <span class="mono">${esc(T.failed)}</span>. Check that it runs in Terminal, then try again.</p>` : ""}
-    <p>${T.ended ? "The tutor's session ended. Your records are saved as the tutor left them." : `${esc(tutorName())} opens in your vault and runs ${s ? `<span class="mono">${esc(typed)}</span>` : "with no command"}. Reply in the terminal; the log on the right follows along.`}</p>
+    <p>${T.ended ? "The tutor's session ended. Your records are saved as the tutor left them." : `${esc(tutorName())} opens in your vault and runs <span class="mono">${esc(typed)}</span>. Reply in the terminal; the log on the right follows along.`}</p>
     <button class="btn ink" data-act="ink" data-tip="${key("↩")}">${T.ended ? "Start again" : s ? verb : "Start"}</button>
-    ${s ? `<button class="btn txt" data-act="tutor-start" data-arg="plain">Open with no command</button>` : ""}`;
+    <button class="btn txt" data-act="tutor-start" data-arg="plain">Open with no command</button>`;
   if (T.ended) inkAction = () => startTutor("");
 }
 
