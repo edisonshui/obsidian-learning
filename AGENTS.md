@@ -12,7 +12,7 @@ Codex does not expand Claude Code's `@file` imports, so read the files themselve
 
 The Codex `SessionStart` hook prints the date, a *Show the learner* block (the recommended action, the live review streak, notes left open, and subjects grouped by pending action), then for the agent only each subject's title, status, last session and next step, operational preferences, and open-note warnings. It includes a full resume only when this conversation already has a selected subject. If the hook did not run, use `date`, `python3 .claude/hooks/learn-status.py --next --host codex`, `python3 .claude/hooks/learn-status.py --open-notes --host codex`, the subjects' record frontmatter, and the operational preference summary, and show the learner the first `--next` line the same way as the block's recommended action.
 
-After selection, read that subject's `resume.md`, `record.md`, `plan.md`, and latest session note in full. Read `learn/system/records.md` before writing learning state.
+After selection, read that subject's `resume.md` and the resume brief, `python3 .claude/hooks/learn-status.py --brief --subject <slug>`, which stands in for `record.md`, `plan.md`, and the latest session note (`$learn-resume` step 1). Read `learn/system/records.md` before writing learning state.
 
 1. Reproduce the hook's *Show the learner* block verbatim.
 2. Ask which to do, offering the block's recommended command first and marked recommended, then `$learn-resume <slug>`, `$learn-start <slug>`, or something else.
@@ -21,6 +21,7 @@ Do not teach, quiz, or plan until a subject is chosen.
 
 ## Hard rules
 
+- Tutoring replies are for the learner. During a `$learn-*` session, the global rule to name the skills and workflows followed in a final report does not apply, and no reply names a node id, status, file, script, or checker (`tutor.md`, *Reply shape*).
 - Learning state lives in `learn/subjects/<slug>/` files. Neither the chat transcript nor Codex memory is a learning record.
 - Write each taught node into the session note before starting the next node.
 - During a lesson, treat `learn/system/` as read-only. Propose changes in chat for the learner to edit.
@@ -39,7 +40,7 @@ Claude Code writes each subject's `log.md`. Codex writes `codex-log.md` through 
 
 The Codex hook keeps its runtime state under `learn/.codex-runtime/`. `$learn-end` reads the clock with `python3 .codex/hooks/learning.py clock --subject <slug>`. If hooks are unavailable or not trusted, report `unknown` for the minute fields and continue maintaining the learning records.
 
-Obsidian renders mermaid, LaTeX, and embedded SVG figures. Follow `learn/system/diagrams.md` and use full-root wikilinks such as `[[learn/subjects/oop/record|OOP record]]`.
+Obsidian renders mermaid, LaTeX, and embedded SVG figures. Follow `learn/system/diagrams.md` and use full-root wikilinks such as `[[learn/subjects/personal-oop/record|OOP record]]`.
 
 For probes, put any code, data, or diagram inside the question itself. If a picker cannot display a long snippet, show it in chat, confirm the learner can see it, then ask. If they cannot see something, resend it before grading.
 

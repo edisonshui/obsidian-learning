@@ -11,6 +11,10 @@ open_note=0
 [ "${1:-}" = "--open-note" ] && open_note=1
 
 run_id="$(date +%Y%m%d-%H%M%S)"
+# The run id names the evidence folder, so two sandboxes made in the same second would share one.
+# mkdir is atomic, so it also claims the id against a parallel make-sandbox.sh.
+mkdir -p "$EVIDENCE_ROOT"
+until mkdir "$EVIDENCE_ROOT/$run_id" 2>/dev/null; do sleep 1; run_id="$(date +%Y%m%d-%H%M%S)"; done
 sandbox="$(cd "$(mktemp -d "/tmp/vault-verify-$run_id.XXXX")" && pwd -P)"
 
 # Learner data is excluded rather than copied and deleted, so it never lands in /tmp.
@@ -23,7 +27,7 @@ rsync -a \
   --exclude '/.claude/obsidian-live/' --exclude '/.claude/jev/' \
   --exclude '/.claude/worktrees/' --exclude '/.claude/verify-runs/' \
   --exclude '/.claude/skills/verify-vault/' \
-  --exclude '/.obsidian/workspace.json' \
+  --exclude '/.obsidian/workspace.json' --exclude '/.obsidian/plugins/learn-live/data.json' \
   "$VAULT/" "$sandbox/"
 
 mkdir -p "$sandbox/learn/subjects" "$sandbox/learn/me" "$sandbox/learn/reviews"

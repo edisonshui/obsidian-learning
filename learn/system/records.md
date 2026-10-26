@@ -11,7 +11,7 @@ The test for everything here: **could a fresh session with no transcript continu
 | `record.md` | The learner's knowledge of this subject: goal, strands, node statuses, misconceptions, evidence, what works | `/learn-start`, teach loop, `/learn-end` | Edited in place; evidence lines are appended |
 | `plan.md` | The ordered lesson plan and its dependency graph | `/learn-start`, `/learn-end` | Edited in place |
 | `resume.md` | Under-200-word summary for the next session | `/learn-end` | Rewritten from scratch every time |
-| `sessions/YYYY-MM-DD-sNN.md` | The notebook for one session: what was taught, diagrams, checks, results | Teach loop, `/learn-end` | Appended during the session, finalized at the end |
+| `sessions/YYYY-MM-DD-sNN.md` | The notebook for one session: what was taught, diagrams, checks, results. A practice session's note (`kind: practice`, template `practice-note.md`) holds problems under *Practice* instead of *Lesson* | Teach loop or `/learn-practice`, `/learn-end` | Appended during the session, finalized at the end |
 
 Session numbers `sNN` are per subject and never reused. Two sessions on one day are `s03` and `s04`, not `s03a`.
 
@@ -22,9 +22,9 @@ Session numbers `sNN` are per subject and never reused. Two sessions on one day 
 | Status | Meaning | Set when |
 | --- | --- | --- |
 | `planned` | Not yet taught | Plan written |
-| `skipped` | Diagnosis showed the learner already has it | Diagnosis |
+| `skipped` | Diagnosis showed the learner already has it, by a free-response answer or two right probes worded differently. One right pick does not skip a node | Diagnosis |
 | `introduced` | Taught, no check passed yet | After *establish* |
-| `checked` | Passed a check in the session it was taught | After *check* |
+| `checked` | Passed a check in the session it was taught, unaided, on an item the teaching did not show. A pass after a hint keeps the node `introduced` until a fresh item passes without one | After *check* |
 | `solid` | Passed a retrieval check in a later session | Decay check on resume |
 | `decayed` | Failed a retrieval check in a later session | Decay check on resume; re-teach briefly, then back to `checked` |
 
@@ -34,13 +34,17 @@ Session numbers `sNN` are per subject and never reused. Two sessions on one day 
 
 **Plan table** (in `plan.md`): the plan's node table has a `Can do` column right after `Check type`: one can-do statement per node, a bare verb phrase that reads after "You can now", with no node id, testable by the node's check. `/learn-start` writes it; it changes only when the node's scope changes. A missing one falls back to the node name.
 
+The *Prereqs* cell names this subject's nodes by id, and a node in another subject as `<slug>/nN`. `learn-status.py` keeps a cross-subject prerequisite out of the graph check and lists it on the Dashboard when that node slipped, is not yet passed, or needed help when it last passed. It is not drawn in the mermaid graph. The plan's *Chains* section lists, for each final check, the nodes it runs through in order. *Session groups* splits into *Core*, the nodes the chains need, and *If time*, the rest.
+
 ## Evidence rule
 
-An evidence line is `YYYY-MM-DD sNN: <what was asked> → <what they answered> → <verdict>`, or `YYYY-MM-DD rNN: …` when the check came from a cross-subject review (see *Reviews* below). Only answers to diagnostic probes, check questions, practice tasks, decay checks, and review checks produce evidence lines. Statements like "makes sense" or "I already know this" are recorded, if at all, as claims, never as evidence.
+An evidence line is `YYYY-MM-DD sNN: <what was asked> → <what they answered> → <verdict>`, or `YYYY-MM-DD rNN: …` when the check came from a cross-subject review (see *Reviews* below). Only answers to diagnostic probes, check questions, practice tasks, practice problems, decay checks, and review checks produce evidence lines. Statements like "makes sense" or "I already know this" are recorded, if at all, as claims, never as evidence.
 
 Every evidence line from a check that concerns a node ends with a transition marker per node, `→ nN <status>`, giving the node's status after that line even when it did not change: `2026-09-30 s05: … → correct → n9 solid`. A line that concerns several nodes ends with one marker each. Nothing follows the last marker. A line that concerns no node, such as a diagnostic probe before the plan exists, has none. Rewards are derived from these markers (`CONTEXT.md`, *Transition marker*), so a missing or wrong marker is a wrong reward.
 
 A generation check (`tutor.md`, *Checks and quizzes*), including a re-derivation decay check, carries the generation tag `[gen]` right after the colon that ends the date and source: `2026-10-02 s06: [gen] predict … from <truth> → … → correct → n4 checked`. The tag anywhere else does not count, and it never goes among the markers, so the markers parse as they would without it. A fallback retrieval question for a node with no unconditional truth is untagged, and so is the re-check after re-establishing a decayed node. A generation question that covers several nodes gets one evidence line per node, each with its own verdict and its one marker: a tagged line with more than one marker passes no node. A tagged line passes its node only when the marker is `checked` or `solid` and the verdict, the segment just before the marker, starts with `correct` or `right` and names no help or doubt (no hint, rung, pointer, supplied, after, partial, but, though, or guess). `learn-status.py` lists a `checked` or `solid` node as *recall-only* on the dashboard when no tagged line passed it. A node whose *Rests on* cell in `plan.md` is empty, starts with a dash, or says it has no (new) unconditional truth is left out, since no generation check can be asked of it. Recall-only is a report, not a status: it changes no status, reward, or `--due` ranking.
+
+A practice problem (`/learn-practice`, `learn/system/practice.md`) carries the practice tag `[practice]` in the same place, names its nodes in the text, and ends with no transition marker: `2026-10-25 s06: [practice] p3 n4 n6 · combine · new setting: … → … → wrong, rung 2, mix-up, confidence 70%`. Practice records evidence and moves no node (decided 2026-10-25), and a marker is what moves one. With no marker, the line changes no status, reward, *Last checked* date, or `--due` ranking.
 
 ## Update rules
 
@@ -84,6 +88,7 @@ last_session: YYYY-MM-DD
 sessions: <count>
 next: <one line: the first thing the next session does>
 deadline: YYYY-MM-DD   # optional: the exam or quiz this subject prepares for
+budget: <minutes>      # optional: the time the learner has for this subject; the plan's core fits it
 goal_met: YYYY-MM-DD   # set by /learn-end when status becomes done; never cleared
 ---
 ```
@@ -101,10 +106,11 @@ paused: HH:MM     # set by `/learn-end break`; cleared on resume
 active_minutes: <int>   # from the UserPromptSubmit clock; `unknown` if the hook reported nothing
 idle_minutes: <int>     # time the learner was away; not counted toward the 45-minute block
 nodes: [<node ids touched>]
+kind: practice    # only in a practice note
 ---
 ```
 
-`nodes:` lists every node this session has evidence for, whether that evidence is a `### nN` Lesson entry (taught) or a mention in the *Retrieval checks* section (decay-checked, or a gate/mixed-check node whose own content lives there, e.g. a "mixed retrieval check" node). A consistency check over `nodes:` must match against the union of both locations, not `### nN` headers alone — decided 2026-09-22 after `cs124-quiz4 s01`'s n4 (gate node, documented only under *Retrieval checks*) and `math241-exam1-review s02`'s n5/n6 (decay-checked, not re-taught) both turned out to be correctly-touched nodes that a Lesson-entries-only match would have wrongly flagged.
+`nodes:` lists every node this session has evidence for, whether that evidence is a `### nN` Lesson entry (taught), a mention in the *Practice* section of a practice note, or a mention in the *Retrieval checks* section (decay-checked, or a gate/mixed-check node whose own content lives there, e.g. a "mixed retrieval check" node). A consistency check over `nodes:` must match against the union of both locations, not `### nN` headers alone — decided 2026-09-22 after `cs124-quiz4 s01`'s n4 (gate node, documented only under *Retrieval checks*) and `math241-exam1-review s02`'s n5/n6 (decay-checked, not re-taught) both turned out to be correctly-touched nodes that a Lesson-entries-only match would have wrongly flagged.
 
 **Closing an open note.** A note with `end` empty is either a live break or a cut-off. The difference is *elapsed hours*, never calendar date:
 

@@ -22,7 +22,7 @@ eval "$($S/make-sandbox.sh)"                 # sets SANDBOX and EVIDENCE
 eval "$($S/make-sandbox.sh --open-note)"     # same, plus an open s02 note dated today (for /learn-end)
 ```
 
-`make-sandbox.sh` rsyncs the vault, excluding `.git`, `.env`, learner data, generated views, `Claude outputs/`, hook runtime state, worktrees, and this skill. It then installs `fixtures/` (subject `vfx-binary-search` with one closed session, synthetic `learn/me/preferences.md`, empty `learn/reviews/`) and commits a git baseline in the sandbox, so a stray write to a tracked system file shows in `git status`. `/learn-end` step 7 no longer reads git; it compares `write-check.py` hashes. Ready means it printed `SANDBOX=` and `EVIDENCE=`.
+`make-sandbox.sh` rsyncs the vault, excluding `.git`, `.env`, learner data (including the `learn-live` plugin's `data.json` code drafts), generated views, `Claude outputs/`, hook runtime state, worktrees, and this skill. It then installs `fixtures/` (subject `vfx-binary-search` with one closed session, synthetic `learn/me/preferences.md`, empty `learn/reviews/`) and commits a git baseline in the sandbox, so a stray write to a tracked system file shows in `git status`. `/learn-end` step 7 no longer reads git; it compares `write-check.py` hashes. Ready means it printed `SANDBOX=` and `EVIDENCE=`. The run id is the creation second and names the evidence folder; the script claims it atomically and waits a second if it is taken, so several sandboxes can be made in a row or in parallel.
 
 ## Doctor
 
@@ -51,7 +51,9 @@ $S/claude-turn.sh "$SANDBOX" end-2 "<the learner's reply>" "$sid"     # next tur
 
 `claude-turn.sh` runs `claude -p` with `--permission-mode default`, so the vault's own `allow`/`ask` rules in `.claude/settings.json` apply. Under `-p` an `ask` rule (edits to `learn/me/**`, `learn/system/**`) is a denial. That is how to test honest reporting of a blocked write. `MODEL=sonnet` overrides the model and `BUDGET=2` caps spend (default 5 USD). Each turn is a real API call billed to the Agent SDK credit, so drive one feature per turn and do not loop.
 
-The `/learn-*` skills are interactive. `AskUserQuestion` has no human under `-p`, so a skill that asks a question ends the turn. Answer with the next `claude-turn.sh ... "$sid"`. See each feature file for the turn sequence.
+The `/learn-*` skills are interactive. Under `-p` the tool list has no `AskUserQuestion`, so the model prints questions and options in chat and the turn ends there. Answer with the next `claude-turn.sh ... "$sid"`. See each feature file for the turn sequence. The `Skill` tool is denied under `-p`, so when a skill hands off to another one (practice to `/learn-end`), send that command as its own turn.
+
+Pass a multi-word command to `step.sh` as separate words or a bash array. In zsh an unquoted `$CMD` stays one word and the step records exit 127.
 
 Surface 3 (Obsidian) is optional and unproven. See `features/obsidian-render.md`.
 
@@ -61,7 +63,7 @@ Surface 3 (Obsidian) is optional and unproven. See `features/obsidian-render.md`
 
 | File | What it proves |
 | --- | --- |
-| `cmd.txt`, `exit.txt` | the exact action |
+| `cmd.txt`, `exit.txt`, `stdin.txt` | the exact action, and the payload fed with `--stdin` |
 | `stdout.txt`, `stderr.txt` | what the user or the model saw (hook output; for `claude -p`, the stream-json) |
 | `diff.txt` | every file added, changed, or removed under `learn/`, `Claude outputs/`, `.claude/obsidian-live/`, read from disk by hash |
 | `files/` | a copy of each added or changed file, as it stood after the step |
@@ -91,7 +93,7 @@ All in `scripts/`, all executable, usage in each file's header comment.
 | --- | --- |
 | `make-sandbox.sh [--open-note]` | build a sandbox; prints `SANDBOX=` / `EVIDENCE=` |
 | `doctor.sh <sandbox>` | read-only health and safety check |
-| `step.sh <sandbox> <name> [--stdin f] -- cmd...` | run one command, snapshot, diff, copy changed files |
+| `step.sh <sandbox> <name> [--stdin f] -- cmd...` | run one command, save the payload, snapshot, diff, copy changed files |
 | `claude-turn.sh <sandbox> <name> "<prompt>" [sid]` | one `claude -p` turn through `step.sh` |
 | `snapshot.py take <sandbox> <out>` / `diff <a> <b>` | used by `step.sh` |
 | `cleanup.sh <sandbox>` | delete sandbox and its transcripts, keep evidence |

@@ -21,9 +21,9 @@ Claude Code reads `CLAUDE.md`; Codex reads `AGENTS.md`. SessionStart prints a su
 
 ## Phase 1 — Start a project (`/learn-start`)
 
-1. **Goal capture.** Ask at most three questions, together, not in rounds: what does *done* look like as something observable; why this, why now; any deadline or context (a course, an interview, curiosity). Turn the answer into 3–6 **success criteria** the learner could be tested on. Write them to `record.md`. Record a deadline as `deadline:` in `record.md`.
-2. **Diagnose.** Identify the 3–6 **strands** the goal depends on (prerequisite threads, e.g. for a math topic: notation, the previous concept, the computational skill; for a programming topic: the language feature, the mental model, the design judgment). Start with one attempt problem, then probe by binary search only the strands the attempt left unclear, as `tutor.md` describes under *Checks and quizzes*. "I don't know" ends the probing on that strand, and two blank strands end the diagnosis. Budget: 5–10 minutes, one attempt plus at most 5 probes, so the first lesson starts in the same session. Every probe result goes into `record.md` as evidence. If the learner's stated prerequisites are already in another subject's record, read that record instead of re-probing.
-3. **Plan.** Write `plan.md`: an ordered list of concept **nodes** from each strand's floor to the goal. Each node: what unconditional truth it rests on, its discovery question, the check type, a can-do statement, estimated minutes, and its prerequisite nodes. Mark nodes the diagnosis already demonstrated as `skipped`. Draw the dependency graph as a mermaid DAG. Group nodes into sessions of 45–60 minutes. If the diagnosis ended early on blank strands, the plan may be **provisional**: write the first one or two nodes in full in the Nodes table, sketch the rest as plain bullets under *Where the learner starts*, and say "provisional" in the five-line summary. The fact check and the approval cover the written nodes only. The plan is finished at that session's `/learn-end`, so the learner is taught in the same session instead of waiting on a full plan.
+1. **Goal capture.** Ask at most three questions, together, not in rounds: what does *done* look like as something observable; why this, why now; any deadline or context (a course, an interview, curiosity), with how much time there is and any notes or homework to work from. Turn the answer into 3–6 **success criteria** the learner could be tested on. Write them to `record.md`. Record a deadline as `deadline:` and the time as `budget:` (minutes) in `record.md`, and list material paths under *Materials*.
+2. **Diagnose.** Identify the 3–6 **strands** the goal depends on (prerequisite threads, e.g. for a math topic: notation, the previous concept, the computational skill; for a programming topic: the language feature, the mental model, the design judgment). Start with one attempt problem, then probe by binary search only the strands the attempt left unclear, as `tutor.md` describes under *Checks and quizzes*. A flat "I don't know" ends the probing on that strand (one the learner then reasons out anyway is an attempt, and probing continues), and two blank strands end the diagnosis. Budget: 5–10 minutes, one attempt plus at most 5 probes, so the first lesson starts in the same session. Every probe result goes into `record.md` as evidence. If the learner's stated prerequisites are already in another subject's record, reuse an evidence line there instead of re-probing, but only one that shows the same skill done unaided. A status alone is not evidence.
+3. **Plan.** Write `plan.md`: an ordered list of concept **nodes** from each strand's floor to the goal. Each node: what unconditional truth it rests on, its discovery question, the check type, a can-do statement, estimated minutes, and its prerequisite nodes. Mark nodes the diagnosis already demonstrated as `skipped` (one right pick is not enough; `records.md`, *Status vocabulary*). Write *Chains* first, the nodes each final check runs through, and cut any node on no chain from the core. Draw the dependency graph as a mermaid DAG. Group nodes into sessions of 45–60 minutes, split into *Core* and *If time*, with the core inside `budget:`. If the diagnosis ended early on blank strands, the plan may be **provisional**: write the first one or two nodes in full in the Nodes table, sketch the rest as plain bullets under *Where the learner starts*, and say "provisional" in the five-line summary. The fact check and the approval cover the written nodes only. The plan is finished at that session's `/learn-end`, so the learner is taught in the same session instead of waiting on a full plan.
 4. **Review.** Run the `fact-checker` subagent on every factual claim the plan rests on, and the `plan-reviewer` subagent against `record.md` and `preferences.md`, both in the background while the learner reads the plan. Fix what they flag; record unresolved uncertainty in the plan. Teaching waits for the fact check.
 5. **Present and approve.** Show the learner the graph and a five-line summary: what they already have, what the first session covers, what the last node is, how many sessions, what they will be able to do at the end. Wait for approval or edits. The plan is a contract the learner can inspect, not a hidden agenda.
 6. Open a session note and enter the teach loop.
@@ -32,7 +32,7 @@ Claude Code reads `CLAUDE.md`; Codex reads `AGENTS.md`. SessionStart prints a su
 
 For the current node, in order:
 
-1. **Motivate** with the discovery question. One message.
+1. **Motivate** with the discovery question, and let the learner answer it before you do. One message.
 2. **Establish** the concept one reasoning step per message, check question after each non-trivial step. Use a diagram when structure is the point.
 3. **Connect** it to earlier nodes and, if it clarifies, to the learner's interests.
 4. **Check** with a retrieval or application question. Grade it. Log the question, the answer, and the verdict. Every evidence line ends with its transition marker (`records.md`, *Evidence rule*).
@@ -64,7 +64,7 @@ In this order:
 
 ## Phase 5 — Resume (`/learn-resume`)
 
-1. Read, in order: `resume.md`, `record.md`, `plan.md`, the most recent session note. Read them in full; do not skim.
+1. Read `resume.md` and the resume brief (`learn-status.py --brief --subject <slug>`), which stands in for `record.md`, `plan.md`, and the latest session note. Open a full file when a step needs it.
 2. Give a recap of at most eight lines: where we are in the plan, what was remembered on a later day, what passed but has not been re-checked on a later day, what the open misconceptions are, and what today covers.
 3. Run a **decay check**: one retrieval question on each of the last 1–2 checked nodes before teaching anything new, asking the learner to re-derive the node from its unconditional truth rather than recall it (a generation check, `tutor.md`, *Checks and quizzes*), logged with the generation tag `[gen]`, right after the colon that ends the date and source, or untagged as ordinary retrieval when the node has no unconditional truth. Pass moves the node to `solid`; fail marks it `decayed`, and you re-establish it briefly before continuing.
 4. Open a new session note and continue the teach loop from the plan.
@@ -80,6 +80,14 @@ A review is not one of the phases. It opens no session note, teaches nothing, an
 3. **Log the split**, per `records.md`, *Reviews*: the narrative to `learn/reviews/YYYY-MM-DD-rNN.md`, the evidence and status moves to each subject's `record.md`, and nothing else in any subject. Close with `learn-status.py --rewards --review <NN>` and paste its lines verbatim.
 
 A node that fails a review is `decayed`, which is the signal to run `/learn-resume` on that subject. A review never re-teaches it.
+
+## Practicing a subject (`/learn-practice`)
+
+Lesson checks ask about an idea that is still in mind. Practice asks for taught ideas from problems that do not name them, so the learner has to bring the idea to mind from what the problem shows. The method is `learn/system/practice.md`.
+
+1. **A session of one subject.** It opens a practice note from `templates/practice-note.md` with the next `sNN`, so the clock, `log.md`, and `/learn-end` work as for a lesson.
+2. **Problems, one at a time.** Free response, solved by the tutor before posing, hints one rung at a time, and the next problem only when the learner says next.
+3. **Evidence without status.** Each problem gets a `[practice]` evidence line with no transition marker (`records.md`, *Evidence rule*). No node status, *Last checked* date, or `plan.md` row changes. Every miss is retested in a new setting before the session ends.
 
 ## Changing subject
 

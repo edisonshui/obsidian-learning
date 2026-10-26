@@ -113,6 +113,12 @@ class LearningHookTest(unittest.TestCase):
         self.assertNotIn("OOP reply", pointers_log)
         self.assertNotIn("Pointers reply", (self.vault / "learn/subjects/oop/codex-log.md").read_text())
 
+    def test_practice_prompt_routes_to_subject(self):
+        self.event("SessionStart", "start")
+        self.event("UserPromptSubmit", "t1", prompt="$learn-practice pointers")
+        self.event("Stop", "t1", last_assistant_message="Practice problem 1")
+        self.assertIn("Practice problem 1", (self.vault / "learn/subjects/pointers/codex-log.md").read_text())
+
     def test_select_routes_natural_prompt(self):
         self.event("SessionStart", "start")
         self.event("UserPromptSubmit", "t1", prompt="Teach me about classes")

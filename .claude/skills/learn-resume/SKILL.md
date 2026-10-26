@@ -2,17 +2,17 @@
 name: learn-resume
 description: Resume an existing learning project from its saved records — recap, decay-check the last nodes, then continue teaching from the plan. Use when the learner wants to continue a subject, or after a break.
 argument-hint: <subject-slug>
-allowed-tools: Read, Write, Edit, Glob, Bash(xmllint *), Bash(date *), Bash(python3 .claude/hooks/mc-preflight.py*), AskUserQuestion, Agent, WebSearch, WebFetch
+allowed-tools: Read, Write, Edit, Glob, Bash(xmllint *), Bash(date *), Bash(python3 .claude/hooks/mc-preflight.py*), Bash(python3 .claude/hooks/learn-status.py*), AskUserQuestion, Agent, WebSearch, WebFetch
 ---
 
 Resume the learning project `$0`. Follow Phase 5 of `learn/system/workflow.md`.
 
-## 1. Load state (read fully, in this order)
+## 1. Load state
 
-1. `learn/subjects/$0/resume.md`
-2. `learn/subjects/$0/record.md`
-3. `learn/subjects/$0/plan.md`
-4. The most recent file in `learn/subjects/$0/sessions/`
+1. `learn/subjects/$0/resume.md`, in full.
+2. The resume brief: `python3 .claude/hooks/learn-status.py --brief --subject $0`. It carries the state, the nodes this session works on with their plan rows and recent evidence, open misconceptions, cross-subject prerequisites, and the latest note's hand-off.
+
+The brief replaces reading `record.md`, `plan.md`, and the latest session note in full (decided 2026-10-25). Open a full file only when a step needs it: finalizing an open note (step 3), re-teaching a node (read its *Lesson* entry in the note that taught it), or a brief line that does not make sense on its own. To update `record.md` frontmatter, read only its first 15 lines before editing them.
 
 If `record.md` does not exist, stop: the right command is `/learn-start $0`. If `record.md` says `status: not-started` or `diagnosing`, say so and continue with the corresponding step of `/learn-start` instead.
 
@@ -24,13 +24,13 @@ At most eight lines: where we are in the plan, what was remembered on a later da
 
 ## 3. Open the session note
 
-Run `date`. Then look at the most recent session note and take exactly one of these branches. The rule is in `learn/system/records.md`, under *Closing an open note*; it is repeated here because this is the only place that acts on it.
+Run `date`. Then take the most recent session note's `date`, `start`, `end`, and `paused` from the brief's *Latest session note* section and take exactly one of these branches. The rule is in `learn/system/records.md`, under *Closing an open note*; it is repeated here because this is the only place that acts on it.
 
 **If `end:` is already filled** — the last session ended cleanly. Go to *Open a new note* below.
 
 **If `end:` is empty**, work out how long the note has been open. Combine the note's `date:` with its `paused:` time (or, with no `paused:`, its `start:`) into a single timestamp, and subtract it from the time `date` just printed. Do this as elapsed hours across dates — not "is this the same calendar day", which gets a 23:50→00:10 break wrong in one direction and an 08:00→23:00 abandonment wrong in the other.
 
-- **`paused:` set, under 6 hours ago** → a live break. Keep using that note, clear `paused:`, and **skip the decay check** in step 4. Do not increment `sessions` in `record.md`; this is the same session.
+- **`paused:` set, under 6 hours ago** → a live break. Keep using that note, clear `paused:`, and **skip the decay check** in step 4. Do not increment `sessions` in `record.md`; this is the same session. A paused practice note (`kind: practice`) is not a lesson to continue: finalize it instead and open a new note.
 - **`paused:` set, 6 hours or more ago** → a stale pause. The learner did not come back. Finalize the note (below), say in one line that s`<NN>` was paused at `<time>` and never reopened, then go to *Open a new note*.
 - **No `paused:`** → the session was cut off without `/learn-end`. Finalize the note (below), say so, then go to *Open a new note*.
 

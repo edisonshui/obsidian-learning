@@ -29,11 +29,11 @@ from types import MappingProxyType
 
 from vaultlib import STALE_HOURS, note_datetime, section, split_frontmatter
 
-NODE_ID = re.compile(r"\bn\d+\b")
+NODE_ID = re.compile(r"\bn\d+[a-z]?\b")
 
 # A node entry: `### nN` and whatever follows on its line. A repeated id (`### n7
 # continued`) is a second entry for the same node, not a defect.
-ENTRY = re.compile(r"^###\s+(n\d+)\b(.*)$")
+ENTRY = re.compile(r"^###\s+(n\d+[a-z]?)\b(.*)$")
 
 # A logged check is `Q: <question> / A: <answer> / Verdict: <verdict>`, with the
 # separators varying by note (`/`, an arrow, or plain whitespace) and the Q
@@ -113,6 +113,7 @@ class Note:
     misplaced: tuple         # node entries anywhere else
     retrieval: str           # the *Retrieval checks* section body
     retrieval_nodes: tuple   # node ids named there, first mention first
+    practice_nodes: tuple    # node ids named under *Practice*, in a practice note
     checks: tuple
     keys: tuple              # every key field, well-formed or not, in order
     malformed: tuple
@@ -264,6 +265,7 @@ def parse(text, name="", now=None):
         misplaced=tuple(placed["misplaced"]),
         retrieval=retrieval,
         retrieval_nodes=tuple(dict.fromkeys(NODE_ID.findall(retrieval))),
+        practice_nodes=tuple(dict.fromkeys(NODE_ID.findall(section(body, "Practice")))),
         checks=tuple(LoggedCheck(check["line"], check["text"], check["question"],
                                  check["options"], check["correct"]) for check in checks),
         keys=tuple(keys),

@@ -7,6 +7,7 @@ last_session:
 sessions: 0
 next: Run /learn-start {{slug}} to capture the goal and diagnose.
 deadline:
+budget:
 goal_met:
 ---
 
@@ -23,6 +24,10 @@ goal_met:
 1.
 2.
 3.
+
+## Materials
+
+*(Notes, slides, or homework the learner works from, as file paths, with what each covers. "None" if there are none.)*
 
 ## Strands
 
