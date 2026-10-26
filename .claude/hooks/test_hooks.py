@@ -3258,6 +3258,32 @@ eq("--brief writes nothing", sorted(str(path) for path in XV.rglob("*")), before
 run = subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(XV), "--brief"],
                      capture_output=True, text=True)
 eq("--brief without --subject is refused", run.returncode, 2)
+
+section("app data: learn-status.py --json (the desktop app's one parser)")
+before = sorted((str(path), path.stat().st_mtime) for path in XV.rglob("*"))
+run = subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(XV), "--json"],
+                     capture_output=True, text=True)
+eq("--json runs and prints one JSON object", run.returncode, 0)
+app = json.loads(run.stdout)
+eq("--json writes nothing, not even the views",
+   sorted((str(path), path.stat().st_mtime) for path in XV.rglob("*")), before)
+by_slug = {s["slug"]: s for s in app["subjects"]}
+eq("every subject is in it", sorted(by_slug), sorted(s["slug"] for s in loaded_x))
+eq("node statuses are the record's",
+   [(n["id"], n["status"]) for n in by_slug["calc-b"]["nodes"]][:2],
+   [(n["id"], status.read_nodes(calc_b["record_text"], calc_b["plan_text"])[n["id"]]["status"])
+    for n in by_slug["calc-b"]["nodes"]][:2])
+eq("the recommended actions match --next, best first",
+   [r["command"] for r in app["ranked"]],
+   [r["command"] for r in status.rank(status.rank_inputs(loaded_x), status.note_inputs(loaded_x),
+                                      datetime.now().date())])
+eq("each action carries the command as typed for the host", app["ranked"][0]["typed"],
+   "/" + app["ranked"][0]["command"])
+codex = json.loads(subprocess.run([sys.executable, str(HOOKS / "learn-status.py"), "--vault", str(XV),
+                                   "--json", "--host", "codex"], capture_output=True, text=True).stdout)
+eq("and in Codex's form with --host codex", codex["ranked"][0]["typed"], "$" + codex["ranked"][0]["command"])
+eq("a subject with nodes has a map layout with a position per node",
+   set(by_slug["calc-b"]["layout"]["x"]) >= {n["id"] for n in by_slug["calc-b"]["nodes"]}, True)
 shutil.rmtree(XV)
 
 
