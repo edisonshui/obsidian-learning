@@ -1181,16 +1181,18 @@ ACTIONS = {
                     "both sightings, and delete the matched line from *Candidates*."),
         "new": ("first sighting -- append it to *Candidates* in preferences.md with today's "
                 "sighting. Write nothing to *Observed*."),
-        "ask": ("middle band -- Jev is not sure these are the same claim. Carry the question "
-                "into the closing block for the learner, and default to `new` if they do not decide."),
+        "ask": ("middle band -- Jev is not sure these are the same claim. Treat it as `new`, and end "
+                "the line you write with (possible match: \"<the existing line, shortened>\", "
+                "Jev p=<p>). Do not ask the learner in the closing block."),
     },
     "misconception": {
         "promote": ("this is sighting two -- promote it into record.md's *Misconceptions* with "
                     "the evidence from both sightings."),
         "new": ("first sighting -- leave it as a candidate in this session's note. It does not "
                 "go into record.md yet."),
-        "ask": ("middle band -- Jev is not sure these are the same claim. Carry the question "
-                "into the closing block for the learner, and default to `new` if they do not decide."),
+        "ask": ("middle band -- Jev is not sure these are the same claim. Treat it as `new`, and end "
+                "the line you write with (possible match: \"<the existing line, shortened>\", "
+                "Jev p=<p>). Do not ask the learner in the closing block."),
     },
 }
 
