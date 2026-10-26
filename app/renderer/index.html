@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: vault-file:; font-src 'self' data:; connect-src 'self' vault-file:">
+<title>Flash</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- The guideline's drawn icons (vault-design/icons), plus terminal from Lucide. -->
+  <symbol id="book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20"/></symbol>
+  <symbol id="cards" viewBox="0 0 24 24"><rect x="4" y="6" width="13" height="14" rx="2"/><path d="M8 3.5h10a2 2 0 0 1 2 2V16"/></symbol>
+  <symbol id="chart" viewBox="0 0 24 24"><path d="M4 20h16M7 16v-4M12 16V8M17 16v-7"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="code" viewBox="0 0 24 24"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></symbol>
+  <symbol id="down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></symbol>
+  <symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></symbol>
+  <symbol id="home" viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V20H4z"/><path d="M9.5 20v-5.5h5V20"/></symbol>
+  <symbol id="map" viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="6" r="2.2"/><circle cx="17" cy="17" r="2.2"/><path d="M7.8 16.7l7.6-8.9M8.2 18h6.6"/></symbol>
+  <symbol id="note" viewBox="0 0 24 24"><path d="M6 3.5h9l4 4V20.5H6z"/><path d="M9 11h7M9 15h7"/></symbol>
+  <symbol id="panel" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M14.5 4v16"/></symbol>
+  <symbol id="play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></symbol>
+  <symbol id="refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4.5V11h-6.5"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></symbol>
+  <symbol id="send" viewBox="0 0 24 24"><path d="M12 19V6M6.5 11.5L12 6l5.5 5.5"/></symbol>
+  <symbol id="sidebar" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M9.5 4v16"/></symbol>
+  <symbol id="star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.25 4.1 1 5.8L12 16.9l-5.25 2.7 1-5.8L3.5 9.7l5.9-.9z"/></symbol>
+  <symbol id="stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/></symbol>
+  <symbol id="terminal" viewBox="0 0 24 24"><path d="M5 17l6-5-6-5M13 18h6"/></symbol>
+  <symbol id="week" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+  <symbol id="x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="tb">
+    <button class="tbbtn" id="sideBtn" data-act="toggle-side" aria-label="Hide sidebar"><svg class="i"><use href="#sidebar"/></svg></button>
+    <span class="ttl" id="ttl">Flash</span>
+    <div class="r">
+      <button class="tbbtn" id="searchBtn" data-act="palette" aria-label="Search and commands"><svg class="i"><use href="#search"/></svg></button>
+      <button class="tbbtn" id="panelBtn" data-act="toggle-panel" aria-label="Hide panel"><svg class="i"><use href="#panel"/></svg></button>
+    </div>
+  </header>
+  <div class="shell">
+    <nav class="rail" id="rail" aria-label="Screens"></nav>
+    <aside class="side" id="side" aria-label="Subjects"></aside>
+    <main class="main" id="main">
+      <div class="ambient" id="ambientBg"></div>
+      <section class="screen" id="screen" tabindex="-1"></section>
+      <section class="session hidden" id="session">
+        <div class="termcol" id="termcol">
+          <div class="ambient"></div>
+          <div class="termhead" id="termhead"></div>
+          <div class="termcard" id="termcard">
+            <div id="term" style="height:100%"></div>
+            <div class="termempty" id="termempty"></div>
+          </div>
+          <div class="termacts" id="termacts"></div>
+        </div>
+        <aside class="wpanel" id="wpanel">
+          <div class="resizer" id="resizer" aria-hidden="true"></div>
+          <div class="tabs" id="tabs"></div>
+          <div class="panel-body" id="panelBody"></div>
+          <button class="pill float newpill" id="newPill" data-act="log-bottom"><svg class="i sm"><use href="#down"/></svg>New messages</button>
+        </aside>
+      </section>
+    </main>
+  </div>
+</div>
+<div class="scrim" id="scrim"></div>
+<div class="toast card float" id="toast" role="status" aria-live="polite"></div>
+
+<script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+<script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+<script src="../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
+<script src="markdown.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

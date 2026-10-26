@@ -1,0 +1,184 @@
+/*
+ * Vault learning app tokens, from "Vault brand guideline v0.1" (16 Oct 2026),
+ * page 17, and the CSS of its source file .scratch/vault-brand/brand-guideline.html.
+ * Names are lowercase with dashes so they map to Swift, CSS, and JSON.
+ * Values marked "source HTML" are drawn in the guideline but missing from its
+ * token table. Night values for the rest come from page 19, added 16 Oct 2026.
+ */
+
+:root {
+  /* Base colors. About 60% paper, 22% surface, 12% ink, 4% status, 2% indigo. */
+  --color-paper: #F6F5F2;        /* app background */
+  --color-paper-2: #EEECE7;      /* sidebar, insets, neutral buttons, disabled fill */
+  --color-surface: #FFFFFF;      /* cards, panels, options */
+  --color-line: #E4E1DA;         /* hairlines, card borders. Never text. */
+  --color-line-strong: #CFCBC2;  /* inputs, tile lips, dividers. Never text. */
+  --color-ink: #1B1A17;          /* text and the Ink button. 17.4:1 on white */
+  --color-ink-2: #4A4741;        /* secondary text. 9.3:1 on white */
+  --color-ink-3: #646059;        /* captions, placeholders. Lightest text allowed. 6.3:1 white, 5.7:1 paper,
+                                    4.56:1 on the ambient light at its strongest. Was #6E6A62 until 18 Oct 2026,
+                                    which measured 3.9:1 on the ambient light (Claude's call, flagged to Edison). */
+
+  /* Interaction. Indigo means "you are interacting here" and nothing else. */
+  --color-indigo: #4D3EE2;       /* selection, links, citations, focus */
+  --color-indigo-soft: #ECEAFD;  /* citation chips, selected rows; organic shapes in focus mode */
+
+  /* Status colors. Use them only where the learning record put them. */
+  --color-gold: #F6CF5F;         /* Solid: passed again later */
+  --color-gold-deep: #8A600A;    /* gold as text */
+  --color-gold-soft: #FCF1CF;    /* top of the gold wash */
+  --color-green: #17865F;        /* Checked: passed a check */
+  --color-green-soft: #DDF1E8;
+  --color-ember: #E5603A;        /* Up next (one node per subject), and the streak */
+  --color-ember-text: #C2482A;   /* ember as text */
+  --color-ember-soft: #FCE4DB;   /* up-next halo; also blush in focus mode */
+  --color-untaught: #D9D5CC;     /* Not yet: dashed outline */
+
+  /* Heatmap: checks passed per day, empty to most (source HTML). */
+  --heat-0: #EEECE7;
+  --heat-1: #CDE7DB;
+  --heat-2: #8CCAB0;
+  --heat-3: #3FA27D;
+  --heat-4: #17865F;
+
+  /* Proof objects, from the guideline's source HTML. The same in night mode, like gold. */
+  --coin-gold: radial-gradient(circle at 35% 30%, #FFF3C4 0, #F6CF5F 45%, #E7B53C 100%);
+  --coin-gold-lip: #C9962A;
+  --coin-green: radial-gradient(circle at 35% 30%, #4FB58C 0, #17865F 60%, #11704F 100%);
+  --coin-green-lip: #0E5F43;
+  --foil-gold: conic-gradient(from 210deg, #FFE7A6, #FDC090, #F6CF5F, #FFF3C4, #EAC56A, #FFE7A6);
+  --foil-mint: conic-gradient(from 210deg, #CFEFE3, #9FDCC3, #D3E5E8, #E8F7F0, #8CCAB0, #CFEFE3);
+  --foil-goal: conic-gradient(from 200deg, #FDC090, #FACAAF, #EACAD9, #CFE3F7, #CFEFE3, #FFE7A6, #FDC090);
+
+  /* Subject colors, shown as a dot, an icon tint, or a 6% wash, and on the All skills map as its branches,
+     constellation lines, and glow. The same in night mode. */
+  --subject-code: #4A6FA5;
+  --subject-math: #267C88;
+  --subject-circuits: #8E4FA0;
+  --subject-literature: #B5505F;
+  --subject-design: #66762E;
+  --subject-calm: #7A746A;
+
+  /* Type. All three ship in the app bundle; the system font is never used. */
+  --font-display: "Bricolage Grotesque";      /* 600, 700. Titles, heads, timer, count tiles */
+  --font-sans: "Atkinson Hyperlegible Next";  /* 400, 600, 700. Body, UI, buttons, chat */
+  --font-mono: "Atkinson Hyperlegible Mono";  /* 400, 600. Code, runner, key chips, citations */
+
+  /* Space and shape. Phone values in pt, desktop in px. */
+  --space-unit-desktop: 4;
+  --space-unit-phone: 8;
+  --margin-phone: 20;
+  --gutter-phone: 12;
+  --radius-card-phone: 20;
+  --radius-card-desktop: 10;
+  --radius-row-phone: 16;
+  --radius-option: 12;
+  --radius-input-phone: 14;
+  --radius-input-desktop: 8;
+  --radius-tile: 14;             /* count tiles (source HTML) */
+  --radius-button: 999;
+  --row-height-phone: 44;
+  --row-height-desktop: 28;
+  --touch-min-phone: 44;
+  --button-height-phone: 44;
+  --button-height-desktop: 32;   /* to 40 */
+  --reading-max: 720;            /* chat and notes on desktop; 60 to 72 characters */
+  --rail-desktop: 48;
+  --sidebar: 230;                /* to 280 */
+  --right-panel: 320;            /* to 420 */
+
+  /* Effects */
+  --shadow-float: 0 14px 34px rgba(27, 26, 23, 0.12), 0 2px 6px rgba(27, 26, 23, 0.06);
+  --focus-ring: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--color-indigo);
+  --scrim: rgba(27, 26, 23, 0.28); /* plus a 6px blur; command palette only */
+  /* Subject glow, All skills only (Edison, 17 Oct 2026): a radial fade of the subject colour
+     from this opacity at the centre to 0, behind each subject and, in ink, behind You. */
+  --glow-subject: 0.55;
+  --glow-you: 0.28;
+  --glow-reach: 26;              /* px past the subject's ring */
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 140ms;        /* hover, press */
+  --duration-base: 220ms;        /* panels, sheets */
+  --duration-proof: 320ms;       /* a disc becomes Solid. Reduced motion: cross-fade */
+}
+
+/* Night: graphite. Status colors keep their hue and lift for contrast. Gold is the same in both. */
+[data-theme="night"] {
+  --color-paper: #141416;
+  --color-surface: #1C1C1F;
+  --color-raised: #26262A;       /* night only */
+  --color-line: #303035;
+  --color-ink: #F2F1EE;
+  --color-ink-2: #B9B7B1;        /* source HTML, not in the token table */
+  --color-indigo: #9890FF;
+  --color-green: #3FB98A;
+  --color-ember: #F07A52;
+  /* Page 19 of the guideline, approved by Edison on 16 Oct 2026. */
+  --color-paper-2: #0E0E10;      /* darker than paper, as in light mode */
+  --color-line-strong: #46464C;
+  --color-ink-3: #8F8D87;        /* 5.5:1 paper, 5.1:1 surface, 4.5:1 raised */
+  --color-indigo-soft: #302F43;
+  --color-gold-deep: #F6CF5F;    /* plain gold reads as text on graphite */
+  --color-gold-soft: #342E20;
+  --color-green-soft: #223530;
+  --color-ember-text: #F07A52;   /* the same as night ember */
+  --color-ember-soft: #422D28;   /* also blush in focus mode */
+  --color-untaught: #3A3A40;     /* the skill map's dashed outline */
+  --heat-0: #0E0E10;
+  --heat-1: #1A392E;
+  --heat-2: #27644D;
+  --heat-3: #338E6C;
+  --heat-4: #3FB98A;
+}
+
+/* The skill map and lesson graph are always graphite, even in light mode. */
+.skill-map {
+  background-color: #141416;
+  background-image: radial-gradient(#34343A 1.3px, transparent 1.4px);
+  background-size: 14px 14px;    /* 14 to 18 */
+}
+
+/*
+ * Holo light, from "Vault brand guideline v0.2: Holo light" (18 Oct 2026),
+ * .scratch/vault-brand/holo-guideline.html. Built from the Holo mood board picks
+ * (Natural AI, MLS, QUITTR, ChatGPT, Langdock, Clay). Edison approved its six
+ * decisions on 18 Oct 2026; the skill text adopts it in stage 3.
+ * The gradient is light: each screen has at most one light source, and text sits
+ * on Paper or Surface, never on the light itself (the check frame and the progress
+ * card are the two exceptions, and only Ink text goes on them).
+ * Each subject's light takes the stops of its `theme:` in record.md, the same
+ * stops the Obsidian notes used on 13 Oct.
+ */
+:root {
+  --holo-code: conic-gradient(from 210deg, #fda4af, #fde68a, #86efac, #67e8f9, #c4b5fd, #fda4af);
+  --holo-math: conic-gradient(from 150deg, #93c5fd, #67e8f9, #5eead4, #c4b5fd, #a5b4fc, #93c5fd);
+  --holo-circuits: conic-gradient(from 60deg, #bef264, #86efac, #67e8f9, #fde68a, #a7f3d0, #bef264);
+  --holo-literature: conic-gradient(from 300deg, #fdba74, #fda4af, #fde68a, #f9a8d4, #fcd34d, #fdba74);
+  --holo-design: conic-gradient(from 210deg, #f9a8d4, #fdba74, #fde68a, #c4b5fd, #fda4af, #f9a8d4);
+  --holo-calm: conic-gradient(from 210deg, #c4b5fd, #a5b4fc, #bae6fd, #f5d0fe, #ddd6fe, #c4b5fd);
+
+  --holo-bloom-size: 280;        /* px, desktop Home bloom; phone 200 */
+  --holo-bloom-blur: 48;         /* px */
+  --holo-ambient-strength: 0.4;  /* the ambient light behind every page but Home (option A, Edison 18 Oct 2026) */
+  --holo-ambient-floor: 0.4;     /* Paper's share at the bottom of the ambient light, so color reaches the dock */
+  --holo-glow-strength: 0.55;    /* opacity of the light inside a lit card */
+  --holo-wash-strength: 0.48;    /* opacity of the full-bleed wash, desktop Home only */
+  --holo-card-radius-desktop: 14;
+  --holo-card-radius-phone: 24;
+  --duration-holo: 12s;          /* one slow turn of the bloom; Reduce motion: still */
+}
+
+/* Night: the light becomes the Aurora glows on graphite, as in MLS. */
+[data-theme="night"] {
+  --holo-code: conic-gradient(from 210deg, #8b5cf6, #06b6d4, #ec4899, #8b5cf6);
+  --holo-math: conic-gradient(from 150deg, #3b82f6, #14b8a6, #8b5cf6, #3b82f6);
+  --holo-circuits: conic-gradient(from 60deg, #22c55e, #06b6d4, #84cc16, #22c55e);
+  --holo-literature: conic-gradient(from 300deg, #f97316, #e11d48, #d946ef, #f97316);
+  --holo-design: conic-gradient(from 210deg, #ec4899, #f97316, #a855f7, #ec4899);
+  --holo-calm: conic-gradient(from 210deg, #8b5cf6, #6366f1, #0ea5e9, #8b5cf6);
+  --holo-glow-strength: 0.38;
+  --holo-wash-strength: 0.32;
+  --holo-ambient-strength: 0.38;
+}
