@@ -248,7 +248,8 @@ function buildMenu() {
       { label: "Restart the Tutor", click: cmd("restart") },
     ] },
     { label: "View", submenu: [
-      { label: "Toggle Sidebar", accelerator: a("\\"), click: cmd("toggle-side") },
+      { label: "Fold Sidebar", accelerator: a("\\"), click: cmd("toggle-side") },
+      { label: "Hide Sidebar", accelerator: isMac ? "Shift+Cmd+\\" : "Ctrl+Shift+Alt+\\", click: cmd("hide-side") },
       { label: "Toggle Plan", accelerator: isMac ? "Alt+Cmd+0" : "Ctrl+Shift+Alt+0", click: cmd("toggle-panel") },
       { label: "Show Terminal", accelerator: "Ctrl+`", click: cmd("toggle-term") },
       { label: "Show Session Note", accelerator: isMac ? "Alt+Cmd+2" : "Ctrl+Shift+Alt+2", click: cmd("tab:note") },

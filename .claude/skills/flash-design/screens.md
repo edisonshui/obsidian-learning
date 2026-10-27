@@ -20,6 +20,8 @@ Hard rule: Resume is the only filled button and the recommended card holds the o
 
 The thread runs at 660px, centered, under the [header islands](components.md#header-islands). The [composer](components.md#composer) docks at the bottom. The [plan panel](components.md#plan-panel) sits on the right, and the right island's panel button hides it. The terminal still runs the tutor. It opens in a drawer from the Terminal button and never shows by default.
 
+- The composer is always live. With no tutor running, Enter starts the tutor with the resume command and sends the message once the terminal has been quiet for 1.5s.
+- A `/learn-*` command in the log reads as a centered caption ("Session saved · 17:56"), not as a message bubble.
 - The thread renders `log.md`: tutor text, your bubbles, questions as cards, and the step list. Thinking folds into the first step ("Thinking · 14s"). Each record write the tutor makes becomes a "✓" step. The hook does not log record writes yet. Until it does, show only Thinking.
 - The status line in the right island says what was saved and when.
 - The model and effort in the composer come from the same source as the terminal's status bar.
@@ -28,18 +30,19 @@ Hard rule: never move what the learner is reading. A streaming reply grows in pl
 
 ## Skill map (`paintMap`) and Progress (`paintProgress`)
 
-The second and third tabs in the left island. Not drawn yet.
+The second and third tabs in the left island. Not drawn in the guideline; built 27 Oct 2026 and reviewed in three rounds.
 
-- Skill map: the subject's nodes as [discs](components.md#skill-discs) on the dot grid, linked by hairlines in the line color. The up-next node has the amber ring. Clicking a node opens its can-do line and evidence in a popover.
+- Both maps sit in a dark sky: a viewport inset 60px from the panel's top and 8px from its sides, with `data-theme="night"` on the viewport only. The header islands, search box, and map controls keep the app theme. Edison asked for the dark look from his constellation reference (27 Oct 2026). Setting `mapTheme: "light"` in the config turns the sky off.
+- Skill map: the subject's nodes as cards on the dot grid, with the subject's glow behind them. A node with a can-do line is a full card; a not-yet node is a compact pill. Edges end at each node's measured height. It opens at the fit view, or on the up-next node when the fit is too small to read.
 - Progress: the content column, with the can-do statements, then counts, then the session list, newest first.
 
 Hard rule: a disc's state comes from the record, and nothing else on these screens uses status color.
 
 ## All skills (`paintSystem`)
 
-Every subject's map on one dot grid. Each subject's group carries its subject tile and name. Not drawn yet.
+A constellation, from Edison's reference (27 Oct 2026). Each subject is a petal of its skills reaching out from the center, foundations nearest the middle, in a soft glow of its subject color. Domains keep sectors sized by how much they hold, with at least 11 degrees per petal; subjects keep their orbits (active, paused, done). Subject titles hold about 12px on screen at any zoom; skill names appear past zoom 1.05. Titles that would overlap wait for hover or zoom, active subjects first. A search box finds a skill and flies to it. Clicking a petal flies the camera into it, then opens its Skill map; coming back restores the view.
 
-Hard rule: subject color stays on the tiles. Lines and labels stay neutral.
+Hard rule: subject color stays in the glows. Stars carry status color only, and lines and labels stay neutral.
 
 ## Dashboard (`paintDashboard`)
 

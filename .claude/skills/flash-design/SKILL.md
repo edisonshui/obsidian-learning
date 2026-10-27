@@ -84,7 +84,7 @@ Build hierarchy from size and weight: one heavy heading per region, small quiet 
 
 ## Layout and shape
 
-- The window is one sidebar (240px, folds to 56px, hides with ⌘\), a white panel inset 8px in the grey frame, and on Session a 290px plan panel. Regions are told apart by grey steps, not borders.
+- The window is one sidebar (240px, folds to 56px with ⌘\, hides with ⇧⌘\; subjects grouped by course), a white panel inset 8px in the grey frame, and on Session a 290px plan panel. Regions are told apart by grey steps, not borders.
 - Session's header is two floating islands: the subject switcher and the tabs (Session, Skill map, Progress) on the left, the status line and icon buttons on the right.
 - Everything sits on a 4px grid of `--space-*` steps. The thread is 660px. Home and other content columns are 900px.
 - Radii: cards 10, the composer and islands 12, options and tabs 8, chips 4, buttons are pills.
@@ -99,6 +99,10 @@ Short and calm, and nothing bounces. Every duration uses `--ease-out`. With Redu
 - Sidebar fold: 200ms, width only. Labels fade in the first 80ms.
 - New message: 180ms, fades in and rises 4px. A streaming reply grows in place.
 - A disc turns Solid, or a goal seal lands: 320ms. These are the only motions tied to a reward.
+- The selected tab is a pill that slides to the new tab. A screen change cross-fades the panel only; the sidebar, header islands, and plan panel never fade.
+- Menus grow from where they were opened (150ms). Rows, cards, and icon buttons press to 98%.
+- Map moves are camera flights with a cubic ease-out: zoom buttons 240ms, Fit 360ms, flying into a subject 460ms.
+- A refresh that changes nothing repaints nothing: `put()` in `app.js` skips identical markup.
 
 ## Icons
 

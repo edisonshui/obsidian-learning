@@ -32,14 +32,15 @@ svg.i.dn{width:13px;height:13px;color:var(--color-ink-3)}
 .mono{font-family:var(--font-mono)}
 
 /* ---------- window ---------- */
-.window{display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr);height:100vh;background:var(--color-bg)}
-.window.icons{grid-template-columns:var(--sidebar-icons) minmax(0,1fr)}
-.window.bare{grid-template-columns:minmax(0,1fr)}
+.window{display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr) 0px;height:100vh;background:var(--color-bg);transition:grid-template-columns var(--duration-base) var(--ease-out)}
+.window.icons{grid-template-columns:var(--sidebar-icons) minmax(0,1fr) 0px}
+.window.bare{grid-template-columns:0px minmax(0,1fr) 0px}
 .window.planned{grid-template-columns:var(--sidebar) minmax(0,1fr) var(--plan-panel)}
 .window.icons.planned{grid-template-columns:var(--sidebar-icons) minmax(0,1fr) var(--plan-panel)}
-.window.bare.planned{grid-template-columns:minmax(0,1fr) var(--plan-panel)}
-.window.bare .sidebar{display:none}
-.panel{position:relative;overflow:hidden;min-width:0;background:var(--color-surface);border:1px solid var(--color-line);border-radius:var(--radius-card);margin:8px 8px 8px 0;display:flex}
+.window.bare.planned{grid-template-columns:0px minmax(0,1fr) var(--plan-panel)}
+.window.bare .sidebar{opacity:0;pointer-events:none}
+.window:not(.planned) .plan{opacity:0;pointer-events:none;padding-left:0;padding-right:0;border-width:0;margin-left:0;margin-right:0}
+.panel{position:relative;overflow:hidden;min-width:0;background:var(--color-surface);border:1px solid var(--color-line);border-radius:var(--radius-card);margin:8px 8px 8px 0;display:flex;transition:margin var(--duration-base) var(--ease-out)}
 .window.bare .panel{margin-left:8px}
 .win .panel{margin-top:38px}
 .win .window.planned .plan{margin-top:38px}
@@ -49,7 +50,7 @@ svg.i.dn{width:13px;height:13px;color:var(--color-ink-3)}
 .session{flex:1;min-width:0;position:relative;display:flex;flex-direction:column}
 
 /* ---------- sidebar ---------- */
-.sidebar{background:var(--color-side);display:flex;flex-direction:column;min-height:0;overflow:hidden;padding:0 10px 10px}
+.sidebar{background:var(--color-side);display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden;padding:0 10px 10px;transition:opacity var(--duration-fast) var(--ease-out),padding var(--duration-base) var(--ease-out)}
 .side-top{height:38px;flex:none;-webkit-app-region:drag}
 .win .side-top{height:8px}
 .brand{display:flex;align-items:center;gap:9px;padding:2px 6px 12px}
@@ -79,20 +80,19 @@ svg.i.dn{width:13px;height:13px;color:var(--color-ink-3)}
 .streak-card:hover{background:var(--color-selected)}
 .streak-card .lbl b{display:block;font:var(--type-ui-strong)}.streak-card .lbl>span{font:var(--type-caption);color:var(--color-ink-3)}
 .streak-card>svg.i{margin-left:auto;color:var(--color-ink-3)}
-/* folded to icons */
-.window.icons .sidebar{padding:0 8px 10px;align-items:center}
-.window.icons .side-scroll{align-items:center;width:100%}
+/* Folded to icons. Every icon keeps the x position it has in the full sidebar,
+   so the fold only narrows the column and nothing jumps sideways. */
 .window.icons .sidebar .lbl,.window.icons .nav-row .n,.window.icons .brand b,.window.icons .brand .icon-btn{display:none}
-.window.icons .brand{padding:2px 0 12px}
-.window.icons .side-label{width:24px;height:1px;background:var(--color-line-strong);margin:12px auto;font-size:0}
-.window.icons .nav-row{width:36px;justify-content:center;padding:0}
-.window.icons .nav-row.subject{margin:2px 0}
-.window.icons .nav-row.subject.on{background:none;box-shadow:none}
-.window.icons .tile-icon.side-tile{width:28px;height:28px;border-radius:8px}
-.window.icons .tile-icon.side-tile svg.i{width:18px;height:18px;stroke-width:1.9}
-.window.icons .nav-row.subject.on .tile-icon{box-shadow:0 0 0 2px var(--color-side),0 0 0 3.5px var(--c)}
-.window.icons .streak-card{width:36px;padding:8px;justify-content:center;border-radius:var(--radius-option)}
+.window.icons .side-label{width:18px;height:1px;background:var(--color-line-strong);margin:12px 9px;font-size:0}
+.window.icons .nav-row{width:36px}
+.window.icons .nav-row.child{display:none}
+.window.icons .nav-row.subject.on,.window.icons .nav-row.course{background:none;box-shadow:none}
+.window.icons .nav-row.subject.on .tile-icon,.window.icons .nav-row.course.has-on .tile-icon{box-shadow:0 0 0 2px var(--color-side),0 0 0 3.5px var(--c)}
+.window.icons .streak-card{width:36px;padding:8px 9px;border-radius:var(--radius-option)}
 .window.icons .streak-card>svg.i:last-child{display:none}
+.nav-row.course{color:var(--color-ink);font-weight:600}
+.nav-row.child{padding-left:36px;height:30px}
+.side-scroll{-webkit-mask-image:linear-gradient(to bottom,black calc(100% - 24px),transparent);padding-bottom:18px}
 
 /* ---------- small parts ---------- */
 .tile-icon{width:20px;height:20px;border-radius:var(--radius-icon);display:inline-grid;place-items:center;flex:none;background:color-mix(in srgb,var(--c) var(--subject-soft),var(--color-surface));color:var(--c)}
@@ -108,8 +108,8 @@ svg.i.dn{width:13px;height:13px;color:var(--color-ink-3)}
 
 /* ---------- buttons ---------- */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--button-height);padding:0 18px;border-radius:var(--radius-pill);font:var(--type-ui-strong);background:var(--color-action);color:var(--color-action-ink);white-space:nowrap;transition:background var(--duration-fast) var(--ease-out),transform var(--duration-fast) var(--ease-out),color var(--duration-fast) var(--ease-out)}
-.btn:hover:not(:disabled){background:color-mix(in srgb,var(--color-action) 88%,var(--color-ink))}
-.btn:active:not(:disabled){background:color-mix(in srgb,var(--color-action) 78%,var(--color-ink));transform:scale(.98)}
+.btn:hover:not(:disabled){background:color-mix(in srgb,var(--color-action) 86%,var(--color-surface))}
+.btn:active:not(:disabled){background:color-mix(in srgb,var(--color-action) 76%,var(--color-surface));transform:scale(.98)}
 .btn:disabled{background:var(--color-selected);color:var(--color-ink-3)}
 .btn.neutral{background:var(--color-surface);border:1px solid var(--color-line-strong);color:var(--color-ink-2);font-weight:400}
 .btn.neutral:hover:not(:disabled){background:var(--color-selected);color:var(--color-ink)}
@@ -241,7 +241,7 @@ svg.i.dn{width:13px;height:13px;color:var(--color-ink-3)}
 .heat i.h3{background:color-mix(in srgb,var(--color-green) 78%,var(--color-track))}
 .heat i.h4{background:var(--color-green)}
 .heat i.fut{opacity:.35}
-.disc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:18px 8px}
+.disc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:18px 8px}
 .disc-cell{text-align:center}
 .disc-cell .cap{margin-top:8px}
 .check-list{list-style:none;margin-top:4px}
@@ -264,8 +264,6 @@ svg.i.dn{width:13px;height:13px;color:var(--color-ink-3)}
 .sys text{font-family:var(--font-sans)}
 .sys .plink{fill:none;stroke:var(--color-line-strong);transition:stroke var(--duration-fast) var(--ease-out),opacity var(--duration-fast) var(--ease-out)}
 .sys .planet{cursor:pointer}
-.sys.focus .plink,.sys.focus .planet,.sys.focus .moon{opacity:.25}
-.sys.focus .hot{opacity:1!important}
 .sys.focus .plink.hot{stroke:var(--color-ink-2)}
 .m-solid{fill:var(--color-gold);stroke:var(--color-gold-edge);stroke-width:1}.m-checked{fill:var(--color-green)}.m-up{fill:var(--color-surface);stroke:var(--color-amber);stroke-width:2}
 .m-learn{fill:var(--color-surface);stroke:var(--color-ink-2);stroke-width:1.6}.m-not{fill:none;stroke:var(--color-untaught);stroke-width:1.2;stroke-dasharray:2 2}
@@ -277,7 +275,7 @@ svg.i.dn{width:13px;height:13px;color:var(--color-ink-3)}
 .islands>*{pointer-events:auto;-webkit-app-region:no-drag}
 .mapctl,.brand .icon-btn{-webkit-app-region:no-drag}
 .mac .window.bare .islands{left:84px}
-.session::before{content:"";position:absolute;left:0;right:0;top:0;height:64px;background:linear-gradient(var(--color-surface) 55%,transparent);z-index:3;pointer-events:none}
+.session::before{content:"";position:absolute;left:0;right:0;top:0;height:84px;background:linear-gradient(var(--color-surface) 56px,transparent 84px);z-index:3;pointer-events:none}
 .island{display:inline-flex;align-items:center;gap:4px;height:var(--island-height);padding:0 4px;background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-input);box-shadow:0 1px 3px rgba(17,24,39,.05);min-width:0}
 .island .divider{width:1px;height:20px;background:var(--color-line);margin:0 4px;flex:none}
 .island .mark{width:30px;height:30px;margin-left:1px}
@@ -349,7 +347,7 @@ a.lnk{color:var(--color-ink);text-decoration:underline;text-decoration-thickness
 .convo-sep::before,.convo-sep::after{content:"";flex:1;height:1px;background:var(--color-line)}
 .earlier{margin:4px 0 8px}
 .thread-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:16vh 20px 0}
-.thread-empty .empty-icon{width:40px;height:40px;border-radius:10px;border:1.5px dashed var(--color-untaught);display:grid;place-items:center;color:var(--color-ink-3);margin-bottom:6px}
+.empty-icon{width:40px;height:40px;border-radius:10px;border:1.5px dashed var(--color-untaught);display:grid;place-items:center;color:var(--color-ink-3);margin-bottom:6px}
 .thread-empty p{font:var(--type-ui);color:var(--color-ink-2);max-width:420px;margin-bottom:10px}
 .note{font:var(--type-reading);color:var(--color-read)}
 .newpill{position:absolute;left:50%;bottom:150px;transform:translateX(-50%);z-index:5;display:none;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:var(--radius-pill);border:1px solid var(--color-line-strong);background:var(--color-surface);box-shadow:var(--shadow-float);font:var(--type-caption);color:var(--color-ink)}
@@ -382,7 +380,8 @@ a.lnk{color:var(--color-ink);text-decoration:underline;text-decoration-thickness
 .termcard .xterm-viewport::-webkit-scrollbar-thumb{background:var(--color-line-strong);border-radius:5px;border:3px solid var(--color-surface)}
 
 /* ---------- plan panel ---------- */
-.plan{background:var(--color-surface);border:1px solid var(--color-line);border-radius:var(--radius-card);margin:8px 8px 8px 0;padding:14px;display:flex;flex-direction:column;gap:8px;overflow:auto;min-width:0}
+.plan{background:var(--color-surface);border:1px solid var(--color-line);border-radius:var(--radius-card);margin:8px 8px 8px 0;padding:14px;display:flex;flex-direction:column;gap:8px;overflow-x:hidden;overflow-y:auto;min-width:0;transition:opacity var(--duration-base) var(--ease-out)}
+.plan>*{min-width:258px}
 .plan-head{display:flex;align-items:center}
 .plan-head b{font:var(--type-section)}
 .plan-head .icon-btn{margin-left:auto;width:28px;height:28px}
@@ -461,4 +460,107 @@ a.lnk{color:var(--color-ink);text-decoration:underline;text-decoration-thickness
 .side-scroll::-webkit-scrollbar{width:6px}.side-scroll::-webkit-scrollbar-thumb{background:transparent;border:0}.side-scroll:hover::-webkit-scrollbar-thumb{background:var(--color-line-strong)}
 .side-foot{flex:none;display:flex;flex-direction:column;border-top:1px solid var(--color-line);margin-top:6px}
 .side-foot .side-label{margin-top:12px}
-.window.icons .side-foot{align-items:center;width:100%}
+
+
+/* ---------- motion (flash-design Motion; impeccable animate, 27 Oct 2026) ---------- */
+/* Labels fade before the sidebar folds, so text never squeezes. */
+.sidebar .lbl,.sidebar .nav-row .n,.sidebar .side-label,.brand b,.streak-card>svg.i{transition:opacity 80ms var(--ease-out)}
+.window.folding .sidebar .lbl,.window.folding .sidebar .nav-row .n,.window.folding .sidebar .side-label,.window.folding .brand b{opacity:0}
+/* Screen changes cross-fade the panel only; the sidebar and plan never move. */
+.sidebar{view-transition-name:sidebar}
+.panel{view-transition-name:panel}
+.plan{view-transition-name:plan}
+::view-transition-group(*){animation-duration:var(--duration-base);animation-timing-function:var(--ease-out)}
+::view-transition-old(panel){animation:none}
+.islands{view-transition-name:islands}
+::view-transition-old(islands){display:none}
+::view-transition-new(islands){animation:none}
+::view-transition-new(panel){animation:vt-in var(--duration-base) var(--ease-out) both}
+@keyframes vt-out{to{opacity:0}}
+@keyframes vt-in{from{opacity:0}}
+/* The selected tab is a pill that slides. */
+.tabs{position:relative}
+.tabs .ind{position:absolute;left:0;top:2px;bottom:2px;border-radius:7px;background:var(--color-surface);box-shadow:0 0 0 1px var(--color-line-strong);transition:transform var(--duration-base) var(--ease-out),width var(--duration-base) var(--ease-out);pointer-events:none}
+.tabs button{position:relative;z-index:1}
+.tabs:has(.ind) button.on{background:none;box-shadow:none}
+/* Press feedback on everything you click. */
+.nav-row,.week-row,.plan-card,.subject-card,.count-tile,.streak-card,.menu-item,.icon-btn{transition-property:background,color,border-color,box-shadow,transform,opacity}
+.nav-row:active:not(:disabled),.week-row:active,.plan-card:active,.subject-card:active,.streak-card:active,.menu-item:active,.icon-btn:active:not(:disabled){transform:scale(.98)}
+/* Menus grow from where they were opened. */
+.menu{transform-origin:top left;animation:menu-in 150ms var(--ease-out)}
+@keyframes menu-in{from{opacity:0;transform:scale(.97) translateY(-3px)}}
+/* The new-messages pill rises in instead of popping. */
+.newpill{display:inline-flex;opacity:0;pointer-events:none;transform:translate(-50%,6px);transition:opacity var(--duration-fast) var(--ease-out),transform var(--duration-base) var(--ease-out)}
+.newpill.on{opacity:1;pointer-events:auto;transform:translate(-50%,0)}
+/* Home's first paint of a launch eases in, in reading order; later visits are instant. */
+.content.intro>*{animation:enter 320ms var(--ease-out) both}
+.content.intro>:nth-child(2){animation-delay:30ms}.content.intro>:nth-child(3){animation-delay:60ms}
+.content.intro>:nth-child(4){animation-delay:100ms}.content.intro>:nth-child(5){animation-delay:140ms}
+.count-tile{transition-duration:var(--duration-fast)}
+
+/* ---------- the constellation (All skills) and the dark map room ---------- */
+.mapwrap.space{background-color:var(--color-side);background-image:none}
+.map-glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 60% 55% at 50% 55%,color-mix(in srgb,var(--c) 16%,transparent),transparent 72%)}
+.sys .edge{stroke:var(--color-ink-3);stroke-opacity:.45;stroke-width:1}
+.sys .plink{fill:none;stroke:var(--color-ink-3);stroke-opacity:.25;stroke-width:1;stroke-dasharray:2 5}
+.sys .star{transition:r var(--duration-fast) var(--ease-out)}
+.sys .star.m-not{fill:var(--color-ink-2);opacity:.75}
+.sys .nl{font:500 6.5px/1 var(--font-sans);font-size:clamp(5px,calc(9.5px / var(--k,1)),9px);fill:var(--color-ink-3);opacity:0;transition:opacity var(--duration-base) var(--ease-out);pointer-events:none}
+.canvas.near .sys .nl{opacity:1}
+.sys .ttl{font:600 13px var(--font-sans);font-size:clamp(12px,calc(12px / var(--k,1)),19px);fill:var(--color-ink);pointer-events:none}
+.sys .you{fill:var(--color-ink-3);opacity:.6}
+.sys .hit{fill:transparent}
+.sys .planet{cursor:pointer;transition:opacity var(--duration-base) var(--ease-out)}
+.sys .planet:hover .ttl{fill:var(--color-ink)}
+.sys.focus .planet:not(.hot),.sys.focus .plink:not(.hot){opacity:.22}
+.sys.focus .plink.hot{stroke-opacity:.7}
+.sys .node{transition:opacity var(--duration-base) var(--ease-out)}
+.sys.searching .node{opacity:.15}
+.sys.searching .node.hit{opacity:1}
+.sys.searching .node.hit .nl{opacity:1;fill:var(--color-ink)}
+.sys .nebula{pointer-events:none}
+.map-search{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;width:340px;max-width:calc(100% - 40px);height:38px;padding:0 12px;border-radius:var(--radius-input);background:var(--color-surface);border:1px solid var(--color-line-strong);color:var(--color-ink-3);z-index:3;-webkit-app-region:no-drag;transition:border-color var(--duration-fast) var(--ease-out),box-shadow var(--duration-fast) var(--ease-out)}
+.map-search:focus-within{border-color:var(--color-action);box-shadow:0 0 0 3px var(--color-action-soft)}
+.map-search input{flex:1;min-width:0;border:0;outline:0;background:none;font:var(--type-ui);font-size:13.5px;color:var(--color-ink)}
+.map-search input:focus-visible{box-shadow:none}
+.map-search input::placeholder{color:var(--color-ink-3)}
+.map-search .cap{white-space:nowrap}
+
+/* round 1 review fixes */
+.cmd-line{display:flex;align-items:center;gap:10px;margin:18px 0;font:var(--type-caption);color:var(--color-ink-3)}
+.cmd-line::before,.cmd-line::after{content:"";flex:1;height:1px;background:var(--color-line)}
+.drawer-empty{position:absolute;left:0;right:0;top:40px;bottom:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;background:var(--color-surface);z-index:2;padding:20px}
+.drawer-empty.on{display:flex}
+.drawer-empty p{font:var(--type-ui);color:var(--color-ink-2);max-width:380px;margin-bottom:8px}
+.drawer{position:absolute}
+.mapwrap.space.grid{background-image:radial-gradient(var(--color-line) 1.2px,transparent 1.3px);background-size:16px 16px}
+.home-two{align-items:start}
+
+/* round 2 review fixes */
+/* The map's dark sky is a viewport inside the panel; the islands and controls stay in the app theme. */
+.mapwrap.space{inset:60px 8px 8px 8px;border-radius:var(--radius-card);border:1px solid var(--color-line-strong)}
+.mapwrap.space:not([data-theme]){border-color:var(--color-line)}
+.mapctl{right:18px;bottom:18px}
+.map-search{top:12px}
+.planet.done .ttl{opacity:0;transition:opacity var(--duration-base) var(--ease-out)}
+.canvas.near .planet.done .ttl,.planet.done:hover .ttl,.sys.focus .planet.done.hot .ttl{opacity:1}
+.home-two{align-items:stretch}
+.week-card{display:flex;flex-direction:column}
+.week-foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:12px;border-top:1px solid var(--color-line);font:var(--type-caption);color:var(--color-ink-2);text-align:left}
+.week-foot .streak-weeks{margin-top:0;gap:4px}
+.week-foot .streak-weeks i{width:14px;height:14px}
+.week-foot .streak-weeks i svg.i{width:8px;height:8px}
+.week-foot:hover{color:var(--color-ink)}
+.drawer::before{content:"";position:absolute;left:0;right:0;top:-24px;height:24px;background:linear-gradient(transparent,var(--color-surface));pointer-events:none}
+.mini{display:none}
+.window.icons .nav-row:has(.mini){height:44px;flex-direction:column;justify-content:center;gap:2px;padding:0;width:36px;align-items:center;margin-left:-1px}
+.window.icons .mini{display:block;font:600 8.5px/1 var(--font-sans);color:var(--color-ink-3);letter-spacing:.02em}
+.window.icons .nav-row.on .mini,.window.icons .nav-row.has-on .mini{color:var(--color-ink)}
+.window.icons .nav-row.child .mini{display:none}
+
+/* round 3 review fixes */
+.sys .tl.crowd{opacity:0;transition:opacity var(--duration-base) var(--ease-out)}
+.sys .planet:hover .tl.crowd,.sys.focus .planet.hot .tl.crowd{opacity:1}
+.week-row.quiet{cursor:default}
+.week-row.quiet .cap{color:var(--color-ink-3)}
+.window.icons .nav-row:has(.mini) .tile-icon{margin-bottom:2px}
