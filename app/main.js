@@ -19,7 +19,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: "vault-file", privileges: { stan
 
 // ---------- settings ----------
 const CONFIG = path.join(app.getPath("userData"), "config.json");
-const DEFAULTS = { vault: null, host: "claude", theme: "system", sidebar: true, panel: true, panelWidth: 400 };
+const DEFAULTS = { vault: null, host: "claude", theme: "system", sidebar: true, sidebarMode: "full", panel: true, panelWidth: 400 };
 let config = { ...DEFAULTS };
 try { config = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(CONFIG, "utf8")) }; } catch { /* first run */ }
 function saveConfig() {
@@ -178,6 +178,11 @@ ipcMain.handle("vault:choose", async () => {
   return { dir };
 });
 ipcMain.handle("state:get", () => readState());
+// The composer's attach button: the learner picks a file, and its path goes into the message.
+ipcMain.handle("file:choose", async () => {
+  const result = await dialog.showOpenDialog(win, { title: "Attach a file", properties: ["openFile"], defaultPath: config.vault || undefined });
+  return result.canceled ? null : result.filePaths[0] || null;
+});
 ipcMain.handle("session:get", (_e, slug) => readSession(slug));
 ipcMain.handle("pty:start", (_e, opts) => {
   try { return startTerminal(opts || {}); } catch (e) { term = null; console.error("tutor failed to start", e); return { error: String(e.message || e) }; }
@@ -244,8 +249,8 @@ function buildMenu() {
     ] },
     { label: "View", submenu: [
       { label: "Toggle Sidebar", accelerator: a("\\"), click: cmd("toggle-side") },
-      { label: "Toggle Panel", accelerator: isMac ? "Alt+Cmd+0" : "Ctrl+Shift+Alt+0", click: cmd("toggle-panel") },
-      { label: "Show Log", accelerator: isMac ? "Alt+Cmd+1" : "Ctrl+Shift+Alt+1", click: cmd("tab:log") },
+      { label: "Toggle Plan", accelerator: isMac ? "Alt+Cmd+0" : "Ctrl+Shift+Alt+0", click: cmd("toggle-panel") },
+      { label: "Show Terminal", accelerator: "Ctrl+`", click: cmd("toggle-term") },
       { label: "Show Session Note", accelerator: isMac ? "Alt+Cmd+2" : "Ctrl+Shift+Alt+2", click: cmd("tab:note") },
       { type: "separator" },
       { label: "Zoom In", accelerator: a("="), click: cmd("zoom-in") },
@@ -266,10 +271,10 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1360, height: 860, minWidth: 980, minHeight: 600,
     title: APP_NAME,
-    backgroundColor: night ? "#141416" : "#F6F5F2",
+    backgroundColor: night ? "#1E1F22" : "#F4F6F8",
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
     trafficLightPosition: { x: 14, y: 13 },
-    ...(process.platform === "darwin" ? {} : { titleBarOverlay: { color: night ? "#0E0E10" : "#EEECE7", symbolColor: night ? "#B9B7B1" : "#4A4741", height: 38 } }),
+    ...(process.platform === "darwin" ? {} : { titleBarOverlay: { color: night ? "#1E1F22" : "#F4F6F8", symbolColor: night ? "#AEB2B9" : "#4B525C", height: 38 } }),
     show: false,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false },
   });

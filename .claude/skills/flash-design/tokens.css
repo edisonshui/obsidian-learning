@@ -1,0 +1,169 @@
+/*
+ * Flash design tokens, "Calm tool" (guideline v1, 26 Oct 2026).
+ * Light is option C (cool mist), night is option E (graphite dim), with color
+ * strategy 4 (subject color, ink actions, status color). Edison picked all three
+ * on 26 Oct 2026. On 26 Oct 2026, after a benchmark of the 18 apps on Mobbin's
+ * Popular list, Edison approved: ink in place of the violet action color, neutral
+ * bubbles for his own messages, a white reading panel in a grey frame, a white
+ * selected row, and softer night status colors. Every value the app and the guideline use lives here.
+ * Each color has one job, written beside it. Night values sit under
+ * [data-theme="night"], the attribute Flash's applyTheme() sets.
+ */
+
+:root, [data-theme="light"] {  /* the light block also answers to data-theme="light", so a light preview can sit inside night mode */
+  /* Neutrals. About 70% background and surface, 20% ink, 10% color. */
+  --color-bg: #F4F6F8;            /* the frame: behind the sidebar and the main panel */
+  --color-side: #ECEFF3;          /* the sidebar */
+  --color-surface: #FBFCFD;       /* the main panel you read in, cards, the composer, options, menus */
+  --color-selected: #E4E8EE;      /* active tab, today's column, Thinking toggle, hover on rows */
+  --color-bubble: #E4E8EE;        /* your own messages in the thread, with ink text */
+  --color-row-selected: #FBFCFD;  /* the selected sidebar row: a white pill, lighter than the sidebar */
+  --color-line: #E1E5EA;          /* hairlines between rows and regions. Never text. */
+  --color-line-strong: #DCE1E7;   /* card and input borders. Never text. */
+  --color-ink: #1F2328;           /* headings, labels, button text on neutral */
+  --color-ink-2: #4B525C;         /* secondary text */
+  --color-ink-3: #5E6570;         /* captions, counts, placeholders. Lightest text allowed. */
+  --color-read: #2A2F36;          /* the tutor's replies and notes, a step softer than ink */
+
+  /* Action. Ink means "press here": the one filled button, the send button
+     once there is text, focus rings, the picked answer. Links are ink text with
+     an underline. Ink replaced violet on 26 Oct 2026. */
+  --color-action: #1F2328;
+  --color-action-ink: #FFFFFF;    /* text on action */
+  --color-action-soft: #EDF0F4;   /* picked-answer fill, composer focus wash */
+
+  /* Status. Color that carries a fact from the record or the calendar. */
+  --color-coral: #C93A3F;         /* now: due today, to repair (shapes) */
+  --color-coral-text: #A82B31;    /* coral as text */
+  --color-coral-soft: #FBE7E7;    /* coral chip fill */
+  --color-amber: #B45309;         /* coming up: the up-next node, due tomorrow or the next day (shapes) */
+  --color-amber-text: #924207;    /* amber as text */
+  --color-amber-soft: #FDF0DC;    /* amber chip fill, up-next halo */
+  --color-green: #1F7A55;         /* passed: a checked skill, the right answer, filled bars */
+  --color-green-soft: #DDF2E8;    /* right-answer fill */
+  --color-gold: #E2B23A;          /* Solid: a skill passed again later. Shapes only, never text. */
+  --color-gold-edge: #9A7110;     /* the 1.5px rim on a gold disc, so the disc reads at 3:1 */
+  --color-gold-ink: #3D2E06;      /* the icon on a gold disc or seal */
+  --color-untaught: #8A929D;      /* the dashed outline of a Not yet node; empty radios */
+  --color-track: #E1E5EA;         /* empty part of a progress bar */
+
+  /* Subject colors, from theme: in record.md. Shown as a tinted icon tile, a chip,
+     a bar fill, or a wash at the top of the subject's card. Never body text. */
+  --subject-code: #4A6FA5;
+  --subject-math: #267C88;
+  --subject-circuits: #8E4FA0;
+  --subject-literature: #B5505F;
+  --subject-design: #66762E;
+  --subject-calm: #7A746A;
+  --subject-soft: 13%;            /* how much subject color goes into its tint */
+  --subject-wash: 9%;             /* top of a subject's card */
+  --tile-tint: 9%;                /* Home count tile fill: its status color mixed into surface (soft tiles, Edison 26 Oct 2026) */
+  --tile-edge: 20%;               /* Home count tile border, same mix */
+
+  /* Type. Two faces, both SIL OFL, bundled with the app. */
+  --font-sans: "Figtree";         /* 400, 500, 600, 700. Everything you read and tap. */
+  --font-mono: "Geist Mono";      /* 400, 500. Code, math lines, keys. */
+
+  /* Type scale, desktop px: size / line height / weight / tracking. */
+  --type-greeting: 700 36px/42px var(--font-sans);     /* Home's greeting; tracking -0.025em */
+  --type-title: 700 30px/34px var(--font-sans);        /* screen title; tracking -0.025em */
+  --type-heading: 700 21px/28px var(--font-sans);      /* card title; tracking -0.015em */
+  --type-section: 700 15px/22px var(--font-sans);      /* section heads: This week, Subjects */
+  --type-reading: 400 15px/25px var(--font-sans);      /* tutor replies, notes */
+  --type-ui: 400 13px/18px var(--font-sans);           /* rows, buttons, inputs */
+  --type-ui-strong: 600 13px/18px var(--font-sans);    /* row titles, buttons */
+  --type-caption: 400 12px/16px var(--font-sans);      /* dates, counts, hints */
+  --type-code: 400 13.5px/21px var(--font-mono);       /* code blocks, math lines */
+  --type-key: 500 11px/14px var(--font-mono);          /* key chips, option numbers */
+  --tracking-title: -0.025em;
+  --tracking-heading: -0.015em;
+
+  /* Space and shape. 4px grid. */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --sidebar: 240px;               /* the one sidebar: screens, subjects, Today (Browserbase pattern, Edison 26 Oct 2026) */
+  --sidebar-icons: 56px;          /* sidebar folded to subject icons */
+  --plan-panel: 290px;            /* the Session's plan panel on the right; the header's panel button hides it */
+  --island-height: 40px;          /* the floating header islands (Replit pattern, option A, Edison 26 Oct 2026) */
+  --reading-max: 660px;           /* thread and notes column */
+  --content-max: 900px;           /* Home and subject pages */
+  --row-height: 28px;
+  --radius-card: 10px;
+  --radius-input: 12px;           /* the composer */
+  --radius-option: 8px;           /* answer options, segmented tabs, small buttons */
+  --radius-chip: 4px;             /* deadline chips */
+  --radius-icon: 6px;             /* 20px subject icon; 8px at 28 to 30px */
+  --radius-pill: 999px;           /* buttons and quick actions */
+  --button-height: 34px;
+
+  /* Icons. Drawn line icons from icons.js (Edison picked option A, 26 Oct 2026).
+     Each size has its own stroke so every line lands near 1.4px on screen.
+     At rest ink 3, hovered or selected ink. A subject icon is its subject
+     color on a --subject-soft tint of that color, inside a 20px tile. */
+  --icon-ui: 18px;  --icon-ui-stroke: 1.8;     /* sidebar rows, header islands, folded-sidebar tiles */
+  --icon-sm: 15px;  --icon-sm-stroke: 2;       /* text buttons, status rows, pills, send */
+  --icon-tile: 14px; --icon-tile-stroke: 2.1;  /* inside a 20px subject tile */
+
+  /* Badges. Flat seals drawn like the skill discs, louder the rarer they are
+     (Edison picked tiered option B, 26 Oct 2026). */
+  --seal-solid: 26px;             /* Remembered on a later day: stacked by day, quietest */
+  --seal-recovered: 30px;         /* Remembered again after slipping: its own row */
+  --seal-goal: 40px;              /* Goal reached: on the subject's card; the one badge that animates */
+
+  /* Effects. Resting things get a border; only floating things get a shadow. */
+  --shadow-float: 0 12px 32px rgba(17, 24, 39, 0.12), 0 2px 6px rgba(17, 24, 39, 0.06);
+  --focus-ring: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-action);
+  --scrim: rgba(17, 24, 39, 0.32);
+
+  /* Motion. Short and calm; nothing bounces. */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-fast: 120ms;         /* hover, press, toggles */
+  --duration-base: 200ms;         /* panels, the sidebar fold, screen cross-fade */
+  --duration-message: 180ms;      /* a new message fades in and rises 4px */
+  --duration-proof: 320ms;        /* a disc turns Solid. Reduced motion: no animation. */
+}
+
+[data-theme="night"] {
+  --color-bg: #1E1F22;
+  --color-side: #1A1B1E;
+  --color-surface: #25262A;
+  --color-selected: #2C2E33;
+  --color-bubble: #2C2E33;
+  --color-row-selected: #25262A;
+  --color-line: #2E3035;
+  --color-line-strong: #33353B;
+  --color-ink: #E3E4E7;
+  --color-ink-2: #AEB2B9;
+  --color-ink-3: #959AA2;
+  --color-read: #D6D8DC;
+
+  --color-action: #E3E4E7;
+  --color-action-ink: #1E1F22;
+  --color-action-soft: #34363C;
+
+  /* Night status colors are softer than light's (Fey, 26 Oct 2026). */
+  --color-coral: #E28F92;
+  --color-coral-text: #E28F92;
+  --color-coral-soft: #413338;
+  --color-amber: #DDAE6F;
+  --color-amber-text: #DDAE6F;
+  --color-amber-soft: #433A2F;
+  --color-green: #78BE9C;
+  --color-green-soft: #2A3D35;
+  --color-gold: #E8BE4F;
+  --color-gold-edge: #E8BE4F;
+  --color-untaught: #737882;
+  --color-track: #2E3035;
+
+  --subject-code: #8FA9D6;
+  --subject-math: #5FB3BE;
+  --subject-circuits: #C29AD3;
+  --subject-literature: #E08592;
+  --subject-design: #A9BA6E;
+  --subject-calm: #B3ADA3;
+  --subject-soft: 16%;
+  --subject-wash: 12%;
+
+  --shadow-float: 0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --scrim: rgba(0, 0, 0, 0.5);
+}

@@ -125,10 +125,10 @@ async function typeset(el) {
       window.mermaid.initialize({
         startOnLoad: false, theme: "base", securityLevel: "strict",
         themeVariables: {
-          fontFamily: "Atkinson Hyperlegible Next", fontSize: "13px",
+          fontFamily: "Figtree", fontSize: "13px",
           primaryColor: v("--color-surface"), primaryBorderColor: v("--color-line-strong"), primaryTextColor: v("--color-ink"),
-          lineColor: v("--color-ink-3"), secondaryColor: v("--color-paper-2"), tertiaryColor: v("--color-paper"),
-          noteBkgColor: v("--color-paper-2"), noteTextColor: v("--color-ink"), actorBkg: v("--color-surface"), actorBorder: v("--color-line-strong"),
+          lineColor: v("--color-ink-3"), secondaryColor: v("--color-side"), tertiaryColor: v("--color-bg"),
+          noteBkgColor: v("--color-side"), noteTextColor: v("--color-ink"), actorBkg: v("--color-surface"), actorBorder: v("--color-line-strong"),
         },
       });
     }
