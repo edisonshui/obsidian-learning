@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld("flash", {
   setupCheck: () => ipcRenderer.invoke("setup:check"),
   chooseVault: () => ipcRenderer.invoke("vault:choose"),
   chooseFile: () => ipcRenderer.invoke("file:choose"),
+  closeOut: (slug) => ipcRenderer.invoke("tutor:close", slug || ""),
+  saveImage: (bytes, type) => ipcRenderer.invoke("image:save", bytes, type),
   state: () => ipcRenderer.invoke("state:get"),
   session: (slug) => ipcRenderer.invoke("session:get", slug),
   openExternal: (url) => ipcRenderer.invoke("open:external", url),

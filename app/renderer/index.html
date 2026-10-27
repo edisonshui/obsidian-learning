@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: vault-file:; font-src 'self' data:; connect-src 'self' vault-file:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: vault-file:; font-src 'self' data:; connect-src 'self' vault-file:">
 <title>Flash</title>
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css">
@@ -57,9 +57,11 @@
       <div class="dock" id="dock"><div class="dock-in">
         <div class="acts" id="acts"></div>
         <div class="composer" id="composer">
-          <textarea id="msg" rows="1" placeholder="Reply to your tutor, or paste a screenshot" aria-label="Message to your tutor" spellcheck="true"></textarea>
+          <div class="attach" id="attach"></div>
+          <div class="msg" id="msg" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Message to your tutor" data-placeholder="Reply to your tutor, or paste a screenshot" spellcheck="true"></div>
           <div class="composer-row">
             <button class="icon-btn" data-act="attach" aria-label="Attach a file" data-tip="Attach a file" data-tip-side="up"><svg class="i sm"><use href="#i-plus"/></svg></button>
+            <button class="icon-btn" data-act="math" aria-label="Insert math" data-tip="Math  $ or ⌘E" data-tip-side="up"><svg class="i sm"><use href="#i-math"/></svg></button>
             <button class="model" id="model" data-act="model"></button>
             <button class="send" id="send" data-act="send" aria-label="Send" disabled><svg class="i sm"><use href="#i-send"/></svg></button>
           </div>
@@ -80,6 +82,7 @@
 <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
 <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
 <script src="../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
+<script src="../node_modules/mathlive/mathlive.min.js"></script>
 <script src="markdown.js"></script>
 <script src="app.js"></script>
 </body>

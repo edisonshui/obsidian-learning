@@ -223,7 +223,7 @@ function paintSide() {
   const streak = S.rewards_on ? `<button class="streak-card" data-act="go" data-arg="dashboard"${tip(`${S.streak.current}-week review streak`)}><span class="status-icon coral">${icon("streak")}</span><span class="lbl"><b>${S.streak.current}-week review streak</b><span>Best ${S.counts.best_streak} ${S.counts.best_streak === 1 ? "week" : "weeks"}</span></span>${icon("chev", "xs")}</button>` : "";
   const top = el.scrollTop;
   if (!put(el, `<div class="side-top"></div>
-    <div class="brand"><span class="mark">${icon("bolt")}</span><b>${esc(info.name)}</b><button class="icon-btn" data-act="palette" aria-label="Search and commands" data-tip="Search  ${key("K")}" data-tip-side="left-down">${icon("search")}</button></div>
+    <div class="brand"><span class="mark">${icon("bolt")}</span><b>${esc(info.name)}</b><button class="icon-btn search" data-act="palette" aria-label="Search and commands" data-tip="Search  ${key("K")}" data-tip-side="left-down">${icon("search")}</button><button class="icon-btn side-toggle" data-act="toggle-side" aria-label="${sideMode() === "icons" ? "Open" : "Fold"} sidebar" data-tip="${sideMode() === "icons" ? "Open" : "Fold"} sidebar  ${key("\\")}" data-tip-side="${sideMode() === "icons" ? "right" : "left-down"}">${icon("sidebar")}</button></div>
     <div class="side-scroll">
       ${nav("home", "home", "Home", "1")}${nav("system", "skills", "All skills", "3")}${nav("dashboard", "dashboard", "Dashboard", "4")}
       <h4 class="side-label">Subjects</h4>
@@ -252,7 +252,7 @@ function paintIslands() {
   const bare = sideMode() === "hidden";
   const tabs = [["session", "Session", "2"], ["map", "Skill map", "6"], ["progress", "Progress", "5"]]
     .map(([r, l, k]) => `<button role="tab" aria-selected="${route.name === r}" class="${route.name === r ? "on" : ""}" data-act="go-subject" data-arg="${r}" data-tip="${key(k)}">${l}</button>`).join("");
-  const left = `<div class="island">${bare ? `<button class="mark" data-act="go" data-arg="home" aria-label="Home" data-tip="Home  ${key("1")}">${icon("bolt")}</button><span class="divider"></span>` : ""}
+  const left = `<div class="island">${bare ? `<button class="icon-btn" data-act="hide-side" aria-label="Show sidebar" data-tip="Show sidebar  ${keyShift("\\")}">${icon("sidebar")}</button><button class="mark" data-act="go" data-arg="home" aria-label="Home" data-tip="Home  ${key("1")}">${icon("bolt")}</button><span class="divider"></span>` : ""}
     <button class="switcher" id="switcher" data-act="switcher" aria-haspopup="menu" aria-expanded="false" title="${esc(s.title)}">${tileIcon(s)}<span class="lbl">${esc(nick(s))}</span>${icon("down", "dn")}</button>
     <span class="divider"></span><div class="tabs" role="tablist">${tabs}</div></div>`;
   const right = route.name === "session" ? `<div class="island"><span class="status-line" id="statusLine"></span><span class="divider"></span>
@@ -373,6 +373,48 @@ function discEl(n, s, size = "") {
 }
 const STATUS_WORD = { solid: "Solid", checked: "Checked", decayed: "Worth a refresh", introduced: "Learning", planned: "Not yet" };
 let homeShown = false;
+// Session notes left open: cut off, or paused and never resumed. A live break
+// (paused under 6 hours ago) is not listed, since resuming picks it back up.
+function leftOpen() {
+  return (S.open_notes || []).map((line) => line.match(/^(\S+) (\S+): (.*)$/)).filter((m) => m && !/a live break/.test(m[3]))
+    .map((m) => ({ slug: m[1], note: m[2], s: subj(m[1]) })).filter((x) => x.s);
+}
+// Settling a left-open note happens on that subject's Session, beside Resume,
+// so the learner closes only the sessions they have stopped working on.
+// Close out means the learner is finished with a subject: /learn-close settles
+// any session it left open and moves it to Done. Every subject not yet done
+// has the button. The first click arms it and a second within 4s runs it, since
+// it changes the record. Close-outs run one at a time (each is a background
+// tutor run of about a minute), so a click while another runs waits in line.
+let closing = null, armed = null, armTimer = null;
+const closeQueue = [];
+const isLeftOpen = (slug) => leftOpen().some((x) => x.slug === slug);
+const closePending = (slug) => closing === slug || closeQueue.includes(slug);
+const canClose = (s) => !!s && (s.status !== "done" || closePending(s.slug));
+function repaintClose() { if (route.name === "session") { paintActs(); if (LOG.data) paintThread(false); } }
+ACTIONS["close-open"] = (slug) => {
+  const s = subj(slug);
+  if (!s || closePending(slug) || s.status === "done") return;
+  if (armed !== slug) {
+    armed = slug; clearTimeout(armTimer);
+    armTimer = setTimeout(() => { armed = null; repaintClose(); }, 4000);
+    return repaintClose();
+  }
+  armed = null; clearTimeout(armTimer);
+  closeQueue.push(slug);
+  if (closing) { repaintClose(); toast("Queued. It closes out once the one running now finishes."); }
+  else nextClose();
+};
+async function nextClose() {
+  closing = closeQueue.shift() || null;
+  repaintClose();
+  if (!closing) return;
+  const slug = closing, s = subj(slug);
+  const result = await F.closeOut(slug);
+  closing = null;
+  toast(result.ok ? `Closed out ${s ? nick(s) : "the subject"}. It's in Done now, and its skills still come up for review.` : `Couldn't close out ${s ? nick(s) : "the session"}: ${result.text.split("\n").pop().slice(0, 160)}`);
+  nextClose();
+}
 function paintHome() {
   const top = S.ranked[0], s = top && top.subject ? subj(top.subject) : null;
   inkAction = () => run(top);
@@ -997,7 +1039,7 @@ async function startTutor(prompt) {
   }
   T.running = true; T.startedAt = Date.now(); T.ended = null; T.failed = null;
   afterTermChange();
-  if (T.drawer) T.term.focus(); else $("msg").focus();
+  if (T.drawer) T.term.focus(); else focusMsg();
 }
 // Type into the running tutor as the learner would: the text, then Return.
 // Several lines go in as one bracketed paste, so the first line break does not send.
@@ -1006,8 +1048,14 @@ async function startTutor(prompt) {
 // an extra press on an empty box does nothing, so Flash presses it generously.
 // Each press goes alone: sent in one burst with the text, Claude Code reads the
 // whole burst as a paste and Return no longer sends.
-async function tutorSend(text) {
-  if (!text) return;
+// A message is its text, or { text, images } when screenshots were pasted. Each
+// image is saved to a temp file and its path pasted before the text, which
+// Claude Code attaches as an image; it shows there as [Image #N].
+const msgText = (m) => (typeof m === "string" ? m : (m && m.text) || "");
+const msgImages = (m) => (m && typeof m === "object" && m.images) || [];
+async function tutorSend(message) {
+  const text = msgText(message), images = msgImages(message);
+  if (!text && !images.length) return;
   if (!T.running) return startTutor(text);
   await ensureTerm();
   if (T.interrupted) {
@@ -1015,12 +1063,18 @@ async function tutorSend(text) {
     T.interrupted = 0;
     for (let i = 0; i < presses; i++) { F.pty.write("\x15"); await new Promise((r) => setTimeout(r, 30)); }
   }
-  F.pty.write(text.includes("\n") ? `\x1b[200~${text}\x1b[201~` : text);
+  for (const image of images) {
+    const file = await F.saveImage(image.bytes, image.type);
+    F.pty.write(`\x1b[200~${file}\x1b[201~`);
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  const body = images.length && text ? ` ${text}` : text;
+  if (body) F.pty.write(body.includes("\n") ? `\x1b[200~${body}\x1b[201~` : body);
   setTimeout(() => F.pty.write("\r"), 90);
   // Right after an interrupt, Claude Code can drop that Return. If the message
   // still sits in its input box 1.5s later, press Return once more.
   const probe = text.split("\n")[0].trim().slice(0, 24);
-  setTimeout(() => { if (T.running && probe && inputLine().startsWith(probe)) F.pty.write("\r"); }, 1500);
+  setTimeout(() => { if (T.running && probe && inputLine().includes(probe)) F.pty.write("\r"); }, 1500);
   T.lastSent = text;
   noteRoute(text);
   LOG.stick = true;
@@ -1040,15 +1094,15 @@ function inputLine() {
 // session is open for it (never resumed, or saved with /learn-end), Flash
 // resumes first and sends the message once the tutor is quiet.
 const OWN_ROUTE = /^\s*[/$]learn-(start|resume|practice|review|end)\b/;
-function say(text) {
-  const s = subj(route.slug);
+function say(message) {
+  const s = subj(route.slug), text = msgText(message);
   if (s && T.running && T.route !== s.slug && !OWN_ROUTE.test(text)) {
-    T.queue.unshift(text);
+    T.queue.unshift(message);
     LOG.stick = true;
     if (route.name === "session" && LOG.data) paintThread(false);
     return tutorSend(command(`${s.status === "done" ? "learn-practice" : "learn-resume"} ${s.slug}`));
   }
-  tutorSend(text);
+  tutorSend(message);
 }
 // Queued messages wait for a quiet terminal, and never go into a question the
 // tutor is waiting on or into Claude Code's trust question.
@@ -1077,9 +1131,9 @@ ACTIONS.trust = (answer) => {
   T.trust = false;
   if (answer === "yes") { F.pty.write("\x1b[B"); setTimeout(() => F.pty.write("\r"), 120); }
   else {
-    const kept = T.queue.filter((q) => !/^\s*[/$]learn-/.test(q)).join("\n\n");
+    const kept = T.queue.map(msgText).filter((q) => q && !/^\s*[/$]learn-/.test(q)).join("\n\n");
     T.queue = [];
-    if (kept && !$("msg").value.trim()) { $("msg").value = kept; sizeComposer(); }
+    if (kept && msgEmpty()) setMsg(kept);
     F.pty.write("\r");
   }
   afterTermChange();
@@ -1090,7 +1144,7 @@ ACTIONS["toggle-term"] = () => {
   $("drawer").classList.toggle("on", T.drawer);
   paintIslands();
   paintDrawerNote();
-  if (T.drawer) { fitSoon(); setTimeout(() => T.term && T.term.focus(), 220); } else $("msg").focus();
+  if (T.drawer) { fitSoon(); setTimeout(() => T.term && T.term.focus(), 220); } else focusMsg();
 };
 ACTIONS["open-term"] = () => { if (!T.drawer) ACTIONS["toggle-term"](); else if (T.term) T.term.focus(); };
 function paintDrawerNote() {
@@ -1124,7 +1178,7 @@ async function paintSession() {
     paintIslands(); paintComposer();
     paintThread(true);
   } else paintThread(false);
-  if (!T.drawer) $("msg").focus({ preventScroll: true });
+  if (!T.drawer) focusMsg();
 }
 function resumeTyped(s) {
   const found = S.ranked.find((x) => x.subject === s.slug && x.kind !== "Repair") || { command: `learn-resume ${s.slug}`, subject: s.slug };
@@ -1144,13 +1198,19 @@ function paintActs() {
   inkAction = T.ended && !s ? () => startTutor("") : () => startTutor(typed);
   const verb = T.ended ? "Start again" : s ? (s.status === "done" ? "Practice" : "Resume") : "Start";
   const hasLog = logEntries().some((e) => e.key.includes(":"));
-  el.innerHTML = hasLog ? `<button class="btn sm" data-act="ink" data-tip="${key("↩")}" data-tip-side="up">${icon("resume", "sm")}${verb}</button>` : "";
+  const close = hasLog && canClose(s) ? closeBtn(s) : "";
+  el.innerHTML = (hasLog ? `<button class="btn sm" data-act="ink" data-tip="${key("↩")}" data-tip-side="up">${icon("resume", "sm")}${verb}</button>` : "") + close;
+}
+function closeBtn(s, big) {
+  const state = closing === s.slug ? "run" : closeQueue.includes(s.slug) ? "wait" : armed === s.slug ? "armed" : "";
+  const tip = state === "wait" ? "Waiting for the close-out running now" : state === "armed" ? "Moves this subject to Done" : "Finished with this subject? Settles any open session and moves it to Done";
+  const label = state === "run" ? `<i class="spin"></i>Closing out` : state === "wait" ? `${icon("pause", "sm")}Queued` : state === "armed" ? `${icon("check", "sm")}Click again to close out` : `${icon("check", "sm")}Close out`;
+  return `<button class="btn neutral ${big ? "" : "sm"} ${state === "armed" ? "armed" : ""}" data-act="close-open" data-arg="${s.slug}" ${state === "run" || state === "wait" ? "disabled" : ""} data-tip="${tip}" data-tip-side="up">${label}</button>`;
 }
 function paintComposer() {
   const msg = $("msg");
   const s = subj(route.slug);
-  msg.disabled = false;
-  msg.placeholder = T.running && !sessionOpen() ? (T.routeEnded ? "Session saved. Send a message to start a new one" : `Message your tutor to resume ${subName(s)}`)
+  msg.dataset.placeholder = T.running && !sessionOpen() ? (T.routeEnded ? "Session saved. Send a message to start a new one" : `Message your tutor to resume ${subName(s)}`)
     : T.running ? "Reply to your tutor, or paste a screenshot" : T.starting ? `Starting ${tutorName()}…` : s ? `Message your tutor to resume ${subName(s)}` : "Message your tutor to start";
   const convos = (LOG.data && LOG.data.conversations) || [];
   const model = prettyModel([...convos].reverse().map((c) => c.model).find(Boolean));
@@ -1160,26 +1220,27 @@ function paintComposer() {
   paintSend();
 }
 function paintSend() {
-  const send = $("send"), msg = $("msg");
+  const send = $("send");
   if (!send) return;
-  const stop = busy() && !msg.value.trim();
+  const stop = busy() && msgEmpty() && !ATT.length;
   send.dataset.act = stop ? "interrupt" : "send";
   send.setAttribute("aria-label", stop ? "Stop the tutor" : "Send");
   send.innerHTML = icon(stop ? "stop" : "send", "sm");
-  send.disabled = !stop && !msg.value.trim();
+  send.disabled = !stop && msgEmpty() && !ATT.length;
 }
 ACTIONS.send = () => {
-  const msg = $("msg"), text = msg.value.trim();
-  if (!text) return;
+  const text = msgValue().trim();
+  if (!text && !ATT.length) return;
+  const message = ATT.length ? { text, images: ATT.splice(0) } : text;
+  if (message.images) rememberSent(text, message.images);
+  paintAttach();
   if (!T.running) {
     const s = subj(route.slug);
-    T.queue = [text];
+    T.queue = [message];
     LOG.stick = true;
     startTutor(s ? resumeTyped(s) : "");
-  } else say(text);
-  msg.value = "";
-  sizeComposer();
-  paintSend();
+  } else say(message);
+  setMsg("");
 };
 ACTIONS.model = () => {
   if (!T.running) return toast(`Start the tutor first, then change its model with ${sigil()}model.`);
@@ -1189,27 +1250,152 @@ ACTIONS.model = () => {
 ACTIONS.attach = async () => {
   const file = await F.chooseFile();
   if (!file) return;
-  const msg = $("msg");
-  const at = msg.selectionStart ?? msg.value.length;
-  const ins = `@${file.includes(" ") ? `"${file}"` : file} `;
-  msg.value = msg.value.slice(0, at) + ins + msg.value.slice(at);
-  msg.focus();
-  sizeComposer(); paintSend();
+  focusMsg();
+  document.execCommand("insertText", false, `@${file.includes(" ") ? `"${file}"` : file} `);
 };
-function sizeComposer() { const m = $("msg"); m.style.height = "auto"; m.style.height = `${Math.min(180, m.scrollHeight)}px`; }
-$("msg").addEventListener("input", () => { sizeComposer(); paintSend(); });
-$("msg").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); ACTIONS.send(); }
+// ---------- the message box ----------
+// Editable text with inline math chips, Desmos style. $ or ⌘E opens a chip
+// (MathLive's <math-field>) at the caret: / stacks a fraction, ^ raises an
+// exponent, int, sqrt, sum, and pi turn into symbols. Arrow past either end,
+// Escape, or $ leaves the chip; $ in an empty chip types a plain $ instead.
+// The tutor receives each chip as $LaTeX$, which the thread renders as math.
+const MSG = $("msg");
+if (window.MathLive) {
+  MathLive.MathfieldElement.soundsDirectory = null;
+  MathLive.MathfieldElement.plonkSound = null;
+}
+function msgValue() {
+  let out = "";
+  const walk = (node) => {
+    for (const n of node.childNodes) {
+      if (n.nodeType === 3) out += n.nodeValue;
+      else if (n.tagName === "MATH-FIELD") { const v = n.value.trim(); if (v) out += `$${v}$`; }
+      else if (n.tagName === "BR") out += "\n";
+      else { if (/^(DIV|P)$/.test(n.tagName) && out && !out.endsWith("\n")) out += "\n"; walk(n); }
+    }
+  };
+  walk(MSG);
+  return out.replace(/\u200b/g, "").replace(/\u00a0/g, " ");
+}
+const msgEmpty = () => !msgValue().trim();
+// A message with $…$ in it comes back as text and chips.
+function setMsg(text) {
+  MSG.textContent = "";
+  String(text || "").split(/(\$[^$\n]+\$)/).forEach((part) => {
+    if (/^\$[^$]+\$$/.test(part) && window.MathLive) MSG.append(makeChip(part.slice(1, -1)).chip, "\u200b");
+    else if (part) MSG.append(part);
+  });
+  afterMsgInput();
+}
+function focusMsg() {
+  if (MSG.contains(document.activeElement)) return;
+  MSG.focus({ preventScroll: true });
+  caretAt(MSG, "end");
+}
+function caretAt(node, where) {
+  const range = document.createRange(), sel = getSelection();
+  if (where === "end") { range.selectNodeContents(node); range.collapse(false); }
+  else if (where === "after") { range.setStartAfter(node); range.collapse(true); }
+  else { range.setStartBefore(node); range.collapse(true); }
+  sel.removeAllRanges(); sel.addRange(range);
+}
+// The field sits in a non-editable wrapper, so the box treats it as one unit.
+// (contenteditable="false" on the field itself stops MathLive taking keys.)
+function makeChip(latex) {
+  const chip = document.createElement("span");
+  chip.className = "chip-wrap";
+  chip.setAttribute("contenteditable", "false");
+  const mf = new MathLive.MathfieldElement();
+  mf.chip = chip;
+  chip.append(mf);
+  mf.mathVirtualKeyboardPolicy = "manual";
+  mf.value = latex || "";
+  mf.addEventListener("move-out", (e) => {
+    e.preventDefault();
+    leaveChip(mf, e.detail.direction === "backward" ? "before" : "after");
+  });
+  mf.addEventListener("input", () => paintSend());
+  mf.addEventListener("focusout", () => setTimeout(() => {
+    if (document.activeElement !== mf && !mf.value.trim()) { chip.remove(); afterMsgInput(); }
+  }));
+  return mf;
+}
+function leaveChip(mf, side) {
+  const chip = mf.chip || mf;
+  MSG.focus({ preventScroll: true });
+  if (side === "before") return caretAt(chip, "before");
+  let t = chip.nextSibling;
+  if (!t || t.nodeType !== 3) { t = document.createTextNode("\u200b"); chip.after(t); }
+  const r = document.createRange(), sel = getSelection();
+  r.setStart(t, t.nodeValue.startsWith("\u200b") ? 1 : 0); r.collapse(true);
+  sel.removeAllRanges(); sel.addRange(r);
+}
+function insertMath() {
+  if (!window.MathLive) return toast("The math editor didn't load. Type math as LaTeX between $ signs instead.");
+  if (route.name !== "session") return;
+  MSG.focus({ preventScroll: true });
+  const sel = getSelection();
+  let range = sel.rangeCount && MSG.contains(sel.anchorNode) ? sel.getRangeAt(0) : null;
+  if (!range) { range = document.createRange(); range.selectNodeContents(MSG); range.collapse(false); }
+  range.deleteContents();
+  const mf = makeChip("");
+  range.insertNode(mf.chip);
+  mf.chip.after("\u200b");
+  afterMsgInput();
+  requestAnimationFrame(() => mf.focus());
+}
+ACTIONS.math = () => insertMath();
+function afterMsgInput() {
+  // A box emptied by deleting keeps a stray <br>; clearing it brings the placeholder back.
+  if (!MSG.querySelector("math-field") && !MSG.textContent.replace(/\u200b/g, "").trim()) MSG.textContent = "";
+  paintSend();
+}
+MSG.addEventListener("input", afterMsgInput);
+// Capture phase, so a chip's keys are handled before MathLive sees them.
+MSG.addEventListener("keydown", (e) => {
+  const chip = e.target.closest && e.target.closest("math-field");
+  if (chip) {
+    if (e.key === "$") {
+      e.preventDefault(); e.stopPropagation();
+      if (!chip.value.trim()) { const box = chip.chip || chip, at = box.previousSibling; box.remove(); MSG.focus(); if (at) caretAt(at, "after"); document.execCommand("insertText", false, "$"); }
+      else leaveChip(chip, "after");
+    } else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); leaveChip(chip, "after"); }
+    else if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); ACTIONS.send(); }
+    return;
+  }
+  if (e.key === "$" && !e.metaKey && !e.ctrlKey && window.MathLive) { e.preventDefault(); insertMath(); }
+  else if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); ACTIONS.send(); }
   else if (e.key === "Escape" && busy()) { e.preventDefault(); ACTIONS.interrupt(); }
-});
-// A pasted screenshot goes to the tutor the way its terminal takes one: Ctrl+V
-// makes Claude Code read the image from the clipboard. Unverified in a live session.
-$("msg").addEventListener("paste", (e) => {
-  const img = [...(e.clipboardData ? e.clipboardData.items : [])].find((i) => i.type.startsWith("image/"));
-  if (!img || !T.running) return;
+}, true);
+// Pasted or dropped images wait in the composer as thumbnails, so you see what
+// you are sending, and go to the tutor with the message (tutorSend).
+const ATT = [];
+function addImage(file) {
+  if (!file || !file.type.startsWith("image/")) return false;
+  file.arrayBuffer().then((buf) => { ATT.push({ url: URL.createObjectURL(file), bytes: new Uint8Array(buf), type: file.type }); paintAttach(); focusMsg(); });
+  return true;
+}
+function paintAttach() {
+  const el = $("attach");
+  el.innerHTML = ATT.map((a, i) => `<span class="att"><img src="${a.url}" alt="Pasted image ${i + 1}"><button data-act="unattach" data-arg="${i}" aria-label="Remove image ${i + 1}" data-tip="Remove" data-tip-side="up">${icon("plus")}</button></span>`).join("");
+  el.classList.toggle("on", ATT.length > 0);
+  paintSend();
+}
+ACTIONS.unattach = (i) => { ATT.splice(Number(i), 1); paintAttach(); focusMsg(); };
+MSG.addEventListener("paste", (e) => {
+  if (e.target.closest && e.target.closest("math-field")) return;
+  const files = [...(e.clipboardData ? e.clipboardData.items : [])].filter((i) => i.type.startsWith("image/")).map((i) => i.getAsFile());
   e.preventDefault();
-  F.pty.write("\x16");
-  toast("Screenshot sent to the tutor. It shows as [Image] in the terminal until you send your message.");
+  if (files.length) return files.forEach(addImage);
+  // Text arrives plain, so no formatting from a web page lands in the box.
+  document.execCommand("insertText", false, (e.clipboardData && e.clipboardData.getData("text/plain")) || "");
+});
+$("composer").addEventListener("dragover", (e) => { if ([...e.dataTransfer.items].some((i) => i.type.startsWith("image/"))) e.preventDefault(); });
+$("composer").addEventListener("drop", (e) => {
+  const files = [...e.dataTransfer.files].filter((f) => f.type.startsWith("image/"));
+  if (!files.length) return;
+  e.preventDefault();
+  files.forEach(addImage);
 });
 
 function paintThread(full) {
@@ -1241,7 +1427,8 @@ function logEntries() {
   });
   if (T.trust) out.push({ key: "x:trust", html: trustHtml() });
   T.queue.forEach((q, i) => {
-    if (!/^\s*[/$]learn-/.test(q)) out.push({ key: `x:q${i}`, html: `<div class="me pending"><span class="bubble">${youText(q)}</span><span class="cap">Sends when the tutor is ready</span></div>` });
+    const text = msgText(q), shots = msgImages(q).map((im) => `<img src="${im.url}" alt="Screenshot you pasted">`).join("");
+    if (!/^\s*[/$]learn-/.test(text)) out.push({ key: `x:q${i}`, html: `<div class="me pending"><span class="bubble">${shots ? `<span class="shots">${shots}</span>` : ""}${youText(text)}</span><span class="cap">Sends when the tutor is ready</span></div>` });
   });
   return out;
 }
@@ -1302,8 +1489,30 @@ function itemHtml(it, waiting, k) {
   }
   return "";  // probe notices and the hook's own messages are plumbing
 }
+// Images you sent, so a bubble can show them at once. Claude Code logs a pasted
+// image as [Image #N], and the hook swaps in the saved file only a turn later.
+// The hook names that file by the first 16 hex digits of the image's SHA-256,
+// so the names kept here still find it after Flash restarts.
+const SENT = (() => { try { return JSON.parse(localStorage.getItem("flash-sent-images") || "[]"); } catch { return []; } })();
+async function rememberSent(text, images) {
+  const names = await Promise.all(images.map(async (im) => {
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", im.bytes));
+    const ext = { "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" }[im.type] || "png";
+    return [...digest.slice(0, 8)].map((b) => b.toString(16).padStart(2, "0")).join("") + "." + ext;
+  }));
+  SENT.push({ text: text.trim(), names, urls: images.map((im) => im.url) });
+  SENT.splice(0, Math.max(0, SENT.length - 50));
+  localStorage.setItem("flash-sent-images", JSON.stringify(SENT.map(({ text: t, names: n }) => ({ text: t, names: n }))));
+}
 function youText(t) {
-  return esc(t).replace(/!\[\[([^\]|]+?\.(?:png|jpe?g|gif|webp))(?:\|\d+)?\]\]/gi,
+  const plain = String(t).replace(/\[Image #\d+\]\s*/g, "").trim();
+  const sent = /\[Image #\d+\]/.test(t) ? [...SENT].reverse().find((x) => x.text === plain) : null;
+  let n = 0;
+  const shot = () => {
+    const i = n++, url = sent && ((sent.urls && sent.urls[i]) || (sent.names[i] && `vault-file:///${encodeURIComponent(sent.names[i])}`));
+    return url ? `<img class="shot" alt="Screenshot you sent" src="${url}">` : `<span class="shot-chip">${icon("note", "xs")}Screenshot</span>`;
+  };
+  return esc(t).replace(/\[Image #\d+\]\s*/g, () => shot()).replace(/!\[\[([^\]|]+?\.(?:png|jpe?g|gif|webp))(?:\|\d+)?\]\]/gi,
     (_, p) => `<img class="shot" alt="Screenshot you sent" src="vault-file:///${encodeURIComponent(p.replace(/&amp;/g, "&").split("/").pop())}">`).trim();
 }
 function threadEmpty() {
@@ -1311,10 +1520,16 @@ function threadEmpty() {
   if (T.running || T.starting) return `<div class="thread-empty"><span class="empty-icon">${icon("session")}</span><b class="t-sec">${T.starting ? `Starting ${esc(tutorName())}` : "The tutor is getting ready"}</b><p>The conversation shows here as the tutor writes. Reply in the box below.</p></div>`;
   const typed = s ? resumeTyped(s) : command("learn-start");
   const verb = s ? (s.status === "done" ? "Practice" : "Resume") : "Start";
+  const open = s && !T.ended && isLeftOpen(s.slug) ? leftOpen().find((x) => x.slug === s.slug) : null;
+  if (open) return `<div class="thread-empty"><span class="empty-icon">${icon("session")}</span>
+    <b class="t-sec">Your session from ${shortD(open.note.slice(0, 10))} was left open</b>
+    <p>Resume to pick it up where it stopped. If you're finished with this subject, close it out: the session is settled and the subject moves to Done.</p>
+    <div class="empty-acts"><button class="btn" data-act="ink" data-tip="${key("↩")}">${icon("resume", "sm")}${verb}</button>${closeBtn(s, true)}</div>
+</div>`;
   return `<div class="thread-empty"><span class="empty-icon">${icon("session")}</span>
     <b class="t-sec">${T.ended ? `${esc(tutorName())} stopped` : s ? `${verb} ${md(shortTitle(s))}` : "Start a subject"}</b>
     <p>${T.ended ? "The session ended. Your records are saved as the tutor left them." : `${esc(tutorName())} opens in your vault and runs <span class="mono">${esc(typed)}</span>. Its replies show here.`}</p>
-    <button class="btn" data-act="ink" data-tip="${key("↩")}">${icon("resume", "sm")}${T.ended ? "Start again" : verb}</button>
+    <div class="empty-acts"><button class="btn" data-act="ink" data-tip="${key("↩")}">${icon("resume", "sm")}${T.ended ? "Start again" : verb}</button>${s && !T.ended && canClose(s) ? closeBtn(s, true) : ""}</div>
 </div>`;
 }
 function paintLog(full) {
@@ -1513,7 +1728,7 @@ function closeOverlay() {
   const s = $("scrim");
   s.classList.remove("on", "clear"); s.innerHTML = ""; pal = null;
   const sw = $("switcher"); if (sw) sw.setAttribute("aria-expanded", "false");
-  if (route.name === "session") { if (T.drawer && T.term) T.term.focus(); else if (!$("msg").disabled) $("msg").focus(); }
+  if (route.name === "session") { if (T.drawer && T.term) T.term.focus(); else focusMsg(); }
 }
 
 async function chooseVault() {
@@ -1614,7 +1829,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   if (e.key === "Escape" && $("scrim").classList.contains("on")) { closeOverlay(); e.preventDefault(); }
-  else if (e.key === "Escape" && T.drawer && route.name === "session" && document.activeElement !== $("msg") && !document.activeElement.closest(".xterm")) { ACTIONS["toggle-term"](); e.preventDefault(); }
+  else if (e.key === "Escape" && T.drawer && route.name === "session" && !MSG.contains(document.activeElement) && !document.activeElement.closest(".xterm")) { ACTIONS["toggle-term"](); e.preventDefault(); }
 });
 F.onMenu((id) => {
   if ($("scrim").classList.contains("on") && !["palette", "settings"].includes(id)) closeOverlay();
@@ -1625,7 +1840,7 @@ F.onMenu((id) => {
     review: ACTIONS.review, check: ACTIONS.check, hint: ACTIONS.hint, break: ACTIONS.break, end: ACTIONS.end,
     start: ACTIONS.start, restart: ACTIONS.restart, "toggle-side": ACTIONS["toggle-side"], "hide-side": ACTIONS["hide-side"],
     "toggle-panel": () => { if (route.name === "session") ACTIONS["toggle-panel"](); },
-    "toggle-term": ACTIONS["toggle-term"],
+    "toggle-term": ACTIONS["toggle-term"], math: ACTIONS.math,
     "tab:note": () => { if (route.name !== "session") go("session"); ACTIONS["toggle-note"](); },
     "zoom-in": () => ACTIONS.zoom("in"), "zoom-out": () => ACTIONS.zoom("out"), "zoom-fit": () => ACTIONS.zoom("fit"),
   };
@@ -1641,7 +1856,7 @@ F.onState((state) => {
   // thread are never repainted by it.
   if (route.name === "session" && T.running) lastSaved = Date.now();
   paintSide();
-  if (route.name === "session") { paintStatus(); if (cfg.panel) paintPlan(); return; }
+  if (route.name === "session") { paintStatus(); if (cfg.panel) paintPlan(); if (!T.running) { paintActs(); if (LOG.data) paintThread(false); } return; }
   if (pal || $("scrim").classList.contains("on")) return;
   render();
   screen.scrollTop = top;

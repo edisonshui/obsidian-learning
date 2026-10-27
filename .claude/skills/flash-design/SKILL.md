@@ -84,7 +84,7 @@ Build hierarchy from size and weight: one heavy heading per region, small quiet 
 
 ## Layout and shape
 
-- The window is one sidebar (240px, folds to 56px with ⌘\, hides with ⇧⌘\; subjects grouped by course), a white panel inset 8px in the grey frame, and on Session a 290px plan panel. Regions are told apart by grey steps, not borders.
+- The window is one sidebar (240px, folds to 56px with ⌘\ or the sidebar button beside search, hides with ⇧⌘\ and comes back from the button in the left island; subjects grouped by course), a white panel inset 8px in the grey frame, and on Session a 290px plan panel. Regions are told apart by grey steps, not borders.
 - Session's header is two floating islands: the subject switcher and the tabs (Session, Skill map, Progress) on the left, the status line and icon buttons on the right.
 - Everything sits on a 4px grid of `--space-*` steps. The thread is 660px. Home and other content columns are 900px.
 - Radii: cards 10, the composer and islands 12, options and tabs 8, chips 4, buttons are pills.

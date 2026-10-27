@@ -25,6 +25,9 @@ The thread runs at 660px, centered, under the [header islands](components.md#hea
 - The thread renders `log.md`: tutor text, your bubbles, questions as cards, and the step list. Thinking folds into the first step ("Thinking · 14s"). Each record write the tutor makes becomes a "✓" step. The hook does not log record writes yet. Until it does, show only Thinking.
 - The status line in the right island says what was saved and when.
 - The model and effort in the composer come from the same source as the terminal's status bar.
+- The composer takes math inline, Desmos style (Edison picked inline chips, 27 Oct 2026). `$`, ⌘E, or the math button opens a MathLive chip at the caret: `/` stacks a fraction, `^` raises an exponent, `int`, `sqrt`, `sum`, and `pi` become symbols. An arrow past either end, Escape, or `$` leaves the chip; `$` in an empty chip types a plain `$`. The tutor receives each chip as `$LaTeX$`, and the thread renders it with KaTeX.
+- A pasted or dropped image waits in the composer as a thumbnail with a remove button. It goes to the tutor as a file path, which Claude Code attaches as an image, and your bubble shows it at once.
+- Every subject not yet done has a neutral *Close out* button beside Resume. It means the learner is finished with the subject: it runs `/learn-close <subject>` in the background on Sonnet, which settles any session note left open and moves the subject to Done. The first click arms it ("Click again to close out") and a second within 4 seconds runs it; a click while another close-out runs is queued. When a session was left open, the empty thread says so above the two buttons (Edison, 27 Oct 2026).
 
 Hard rule: never move what the learner is reading. A streaming reply grows in place. A new message never jumps the scroll position when the learner has scrolled up. Show a "New messages" pill instead.
 

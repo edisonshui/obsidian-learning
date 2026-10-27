@@ -209,7 +209,7 @@ svg.i.dn{width:13px;height:13px;color:var(--color-ink-3)}
 .hcomp .composer{max-width:var(--reading-max);margin:0 auto;flex-direction:row;align-items:center;padding:6px 6px 6px 16px;box-shadow:0 4px 16px rgba(17,24,39,.06)}
 .hcomp .composer input{flex:1;border:0;outline:0;background:none;font:var(--type-ui);font-size:14px;color:var(--color-ink);height:30px}
 .hcomp .composer input::placeholder{color:var(--color-ink-3)}
-.composer input:focus-visible,.composer textarea:focus-visible{box-shadow:none}
+.composer input:focus-visible,.composer textarea:focus-visible,.composer .msg:focus-visible{box-shadow:none}
 
 /* dashboard and progress */
 .page-head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
@@ -359,8 +359,15 @@ a.lnk{color:var(--color-ink);text-decoration:underline;text-decoration-thickness
 .acts{display:flex;gap:2px;margin:0 0 6px}
 .composer{display:flex;flex-direction:column;gap:8px;background:var(--color-surface);border:1px solid var(--color-line-strong);border-radius:var(--radius-input);padding:12px 10px 8px 14px;transition:border-color var(--duration-fast) var(--ease-out),box-shadow var(--duration-fast) var(--ease-out)}
 .composer:focus-within{border-color:var(--color-action);box-shadow:0 0 0 3px var(--color-action-soft)}
-.composer textarea{border:0;outline:0;resize:none;background:none;font:var(--type-ui);font-size:14px;line-height:20px;color:var(--color-ink);min-height:20px;max-height:180px;overflow-y:auto}
-.composer textarea::placeholder{color:var(--color-ink-3)}
+.composer .msg{border:0;outline:0;background:none;font:var(--type-ui);font-size:14px;line-height:22px;color:var(--color-ink);min-height:22px;max-height:180px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;cursor:text}
+.composer .msg:empty::before{content:attr(data-placeholder);color:var(--color-ink-3);pointer-events:none}
+/* Math chips in the message box: MathLive fields drawn like inline code, without its menu or keyboard toggles. */
+.composer .chip-wrap{display:inline-block;vertical-align:middle}
+.composer math-field{display:inline-block;vertical-align:middle;min-width:22px;margin:1px 2px;padding:1px 6px;border-radius:6px;border:1px solid var(--color-line-strong);background:var(--color-action-soft);color:var(--color-ink);font-size:17px;outline:none;
+  --caret-color:var(--color-ink);--selection-background-color:var(--color-selected);--selection-color:var(--color-ink);--contains-highlight-background-color:transparent;--placeholder-color:var(--color-ink-3);--primary:var(--color-ink);--smart-fence-color:var(--color-ink-3)}
+.composer math-field:focus-within{border-color:var(--color-ink)}
+.composer math-field::part(menu-toggle),.composer math-field::part(virtual-keyboard-toggle){display:none}
+.composer math-field::part(content){padding:0}
 .composer-row{display:flex;align-items:center;gap:6px}
 .composer-row .icon-btn{width:28px;height:28px;margin-left:-6px}
 .model{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font:var(--type-caption);color:var(--color-ink-2);padding:4px 8px;border-radius:7px;transition:background var(--duration-fast) var(--ease-out)}
@@ -576,3 +583,27 @@ a.lnk{color:var(--color-ink);text-decoration:underline;text-decoration-thickness
 .me.pending .bubble{opacity:.6}
 .me.pending .cap{font:var(--type-caption);color:var(--color-ink-3)}
 .trust-acts{display:flex;gap:8px;margin-top:12px}
+/* The sidebar's own fold button, beside search. Folded to icons, it stays as the one way back. */
+.brand .search{margin-left:auto}
+.brand .side-toggle{margin-left:-4px}
+.window.icons .brand{flex-direction:column;gap:10px}
+.window.icons .brand .side-toggle{display:inline-flex;align-items:center;justify-content:center;margin:0}
+/* Close out sits beside Resume on a subject with a session left open. */
+.acts .btn.neutral{margin-left:6px}
+.empty-acts{display:flex;gap:8px}
+/* Armed: the second click closes the subject out. */
+.btn.neutral.armed{border-color:var(--color-ink);color:var(--color-ink)}
+.empty-acts .spin{width:10px;height:10px;border-radius:50%;border:1.6px solid currentColor;border-right-color:transparent;animation:spin .9s linear infinite}
+.acts .spin,#acts .spin{width:10px;height:10px;border-radius:50%;border:1.6px solid currentColor;border-right-color:transparent;animation:spin .9s linear infinite}
+
+/* Pasted images: thumbnails in the composer until sent, and in your bubble while it waits. */
+.attach{display:none;flex-wrap:wrap;gap:8px}
+.attach.on{display:flex}
+.att{position:relative;width:64px;height:64px;border-radius:var(--radius-option);border:1px solid var(--color-line-strong);overflow:hidden;background:var(--color-selected)}
+.att img{width:100%;height:100%;object-fit:cover;display:block}
+.att button{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--color-ink);color:var(--color-action-ink);opacity:0;transition:opacity var(--duration-fast) var(--ease-out)}
+.att:hover button,.att button:focus-visible{opacity:1}
+.att button svg.i{width:12px;height:12px;transform:rotate(45deg)}
+.bubble .shots{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.bubble .shots img{max-width:220px;max-height:160px;border-radius:var(--radius-option);display:block}
+.shot-chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;margin-right:4px;border-radius:var(--radius-chip);background:var(--color-surface);font:var(--type-caption);color:var(--color-ink-2)}
