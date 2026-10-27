@@ -564,3 +564,15 @@ a.lnk{color:var(--color-ink);text-decoration:underline;text-decoration-thickness
 .week-row.quiet{cursor:default}
 .week-row.quiet .cap{color:var(--color-ink-3)}
 .window.icons .nav-row:has(.mini) .tile-icon{margin-bottom:2px}
+
+/* ---------- a session you can follow (27 Oct 2026, after the live run) ---------- */
+/* The row at the end of the thread while the tutor works, styled like a step. */
+.working{display:none;align-items:center;gap:8px;margin:6px 0 14px;padding-left:12px;border-left:1.5px solid var(--color-line-strong);font:var(--type-ui);color:var(--color-ink-3)}
+.working.on{display:flex;animation:enter var(--duration-message) var(--ease-out)}
+.working .spin{width:10px;height:10px;border-radius:50%;border:1.6px solid currentColor;border-right-color:transparent;animation:spin .9s linear infinite}
+.question.trust .q-text p+p{font:var(--type-ui);color:var(--color-ink-2)}
+/* A message Flash holds until the tutor is ready: your bubble, dimmed, with a caption. */
+.me.pending{flex-direction:column;align-items:flex-end;gap:4px}
+.me.pending .bubble{opacity:.6}
+.me.pending .cap{font:var(--type-caption);color:var(--color-ink-3)}
+.trust-acts{display:flex;gap:8px;margin-top:12px}

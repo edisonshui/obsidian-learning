@@ -884,7 +884,24 @@ function sysFocus(slug) {
 }
 
 // ---------- the tutor's terminal ----------
-const T = { term: null, fit: null, running: false, starting: false, startedAt: 0, ended: null, failed: null, drawer: false, lastData: 0 };
+const T = { term: null, fit: null, running: false, starting: false, startedAt: 0, ended: null, failed: null, drawer: false, lastData: 0,
+  queue: [], raw: "", trust: false, trustSeen: false, route: null, routeEnded: false, lastSent: "", interrupted: 0, typed: "", workFrom: 0 };
+// Claude Code asks once per folder whether to trust it, and its default answer is
+// "No, exit". Its text arrives split by cursor moves, so it is matched without spaces.
+const ANSI = /\x1b\[[0-9;?]*[ -\/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][0-9A-Za-z]|\x1b[=>78]/g;
+const TRUST_ASK = /Yes,Itrustthisfolder/;
+// The vault's hook files a message under a subject only after /learn-start,
+// /learn-resume, or /learn-practice names it, and stops after /learn-end's turn.
+// Flash follows the same rule so a message never lands outside the thread.
+const ROUTE_CMD = /^\s*[/$]learn-(start|resume|practice)\s+([A-Za-z0-9][A-Za-z0-9_.-]*)/;
+const END_CMD = /^\s*[/$]learn-end(?:\s|$)/;
+function noteRoute(text) {
+  const m = String(text).match(ROUTE_CMD);
+  if (m) { T.route = m[2].replace(/\.$/, "").replace(/\./g, "-"); T.routeEnded = false; }
+  else if (END_CMD.test(text)) { T.route = null; T.routeEnded = true; }
+  else return;
+  if (route.name === "session") paintComposer();
+}
 function termTheme() {
   const css = getComputedStyle(document.documentElement), v = (n) => css.getPropertyValue(n).trim();
   // ANSI colors come from the tokens, so the terminal keeps the app's contrast in both themes.
@@ -908,12 +925,28 @@ async function ensureTerm() {
   term.loadAddon(T.fit);
   term.loadAddon(new window.WebLinksAddon.WebLinksAddon((_e, url) => F.openExternal(url)));
   term.open($("term"));
-  term.onData((d) => { if (T.running) F.pty.write(d); });
+  term.onData((d) => {
+    if (!T.running) return;
+    F.pty.write(d);
+    // A command typed straight into the terminal still moves the route.
+    for (const ch of d) {
+      if (ch === "\r") { noteRoute(T.typed); T.typed = ""; }
+      else if (ch === "\x7f") T.typed = T.typed.slice(0, -1);
+      else if (ch >= " ") T.typed += ch;
+    }
+  });
   F.pty.onData((d) => {
     term.write(d);
     const was = busy();
     T.lastData = Date.now();
-    if (T.queue) { clearTimeout(T.queueTimer); T.queueTimer = setTimeout(() => { const q = T.queue; T.queue = null; if (q && T.running) tutorSend(q); }, 1500); }
+    if (!was) T.workFrom = T.lastData;
+    if (!T.trustSeen) {
+      T.raw = (T.raw + d).slice(-8000);
+      if (TRUST_ASK.test(T.raw.replace(ANSI, "").replace(/\s+/g, ""))) { T.trust = T.trustSeen = true; afterTermChange(); }
+    }
+    // Answered in the terminal instead: Claude Code's banner follows a yes.
+    else if (T.trust && /ClaudeCodev\d/.test(d.replace(ANSI, "").replace(/\s+/g, ""))) { T.trust = false; afterTermChange(); }
+    if (T.queue.length) { clearTimeout(T.queueTimer); T.queueTimer = setTimeout(flushQueue, 1500); }
     if (!was) paintStatus();
     clearTimeout(T.idle);
     T.idle = setTimeout(paintStatus, 1300);
@@ -921,6 +954,7 @@ async function ensureTerm() {
   F.pty.onExit(() => {
     T.running = false;
     T.ended = new Date();
+    T.trust = false; T.route = null; T.routeEnded = false;
     afterTermChange();
   });
   new ResizeObserver(() => fitSoon()).observe($("termcard"));
@@ -951,6 +985,8 @@ async function startTutor(prompt) {
   try { T.fit.fit(); } catch { /* drawer not laid out yet */ }
   T.term.clear();
   T.term.reset();
+  T.raw = ""; T.trust = T.trustSeen = false; T.interrupted = 0; T.typed = ""; T.route = null; T.routeEnded = false;
+  noteRoute(prompt || "");
   const result = await F.pty.start({ cols: T.term.cols, rows: T.term.rows, prompt: prompt || "" });
   T.starting = false;
   if (result && result.error) {
@@ -965,21 +1001,89 @@ async function startTutor(prompt) {
 }
 // Type into the running tutor as the learner would: the text, then Return.
 // Several lines go in as one bracketed paste, so the first line break does not send.
+// After Esc, Claude Code puts the interrupted message back in its input box, where
+// Flash can't see it. Ctrl+U deletes one screen line or line break per press, and
+// an extra press on an empty box does nothing, so Flash presses it generously.
+// Each press goes alone: sent in one burst with the text, Claude Code reads the
+// whole burst as a paste and Return no longer sends.
 async function tutorSend(text) {
   if (!text) return;
   if (!T.running) return startTutor(text);
   await ensureTerm();
+  if (T.interrupted) {
+    const presses = Math.min(60, T.interrupted + 4);
+    T.interrupted = 0;
+    for (let i = 0; i < presses; i++) { F.pty.write("\x15"); await new Promise((r) => setTimeout(r, 30)); }
+  }
   F.pty.write(text.includes("\n") ? `\x1b[200~${text}\x1b[201~` : text);
   setTimeout(() => F.pty.write("\r"), 90);
+  // Right after an interrupt, Claude Code can drop that Return. If the message
+  // still sits in its input box 1.5s later, press Return once more.
+  const probe = text.split("\n")[0].trim().slice(0, 24);
+  setTimeout(() => { if (T.running && probe && inputLine().startsWith(probe)) F.pty.write("\r"); }, 1500);
+  T.lastSent = text;
+  noteRoute(text);
   LOG.stick = true;
 }
+// The text in Claude Code's input box: the last line on screen that starts with
+// its ❯ prompt. Earlier ❯ lines are messages already sent.
+function inputLine() {
+  const b = T.term && T.term.buffer.active;
+  if (!b) return "";
+  for (let i = b.length - 1; i >= Math.max(0, b.length - 20); i--) {
+    const m = b.getLine(i).translateToString(true).match(/^\s*❯\s?(.*)$/);
+    if (m) return m[1].trim();
+  }
+  return "";
+}
+// What the learner says on a subject's Session goes to that subject. When no
+// session is open for it (never resumed, or saved with /learn-end), Flash
+// resumes first and sends the message once the tutor is quiet.
+const OWN_ROUTE = /^\s*[/$]learn-(start|resume|practice|review|end)\b/;
+function say(text) {
+  const s = subj(route.slug);
+  if (s && T.running && T.route !== s.slug && !OWN_ROUTE.test(text)) {
+    T.queue.unshift(text);
+    LOG.stick = true;
+    if (route.name === "session" && LOG.data) paintThread(false);
+    return tutorSend(command(`${s.status === "done" ? "learn-practice" : "learn-resume"} ${s.slug}`));
+  }
+  tutorSend(text);
+}
+// Queued messages wait for a quiet terminal, and never go into a question the
+// tutor is waiting on or into Claude Code's trust question.
+function flushQueue() {
+  if (!T.running || !T.queue.length) return;
+  if (T.trust || logEntries().some((e) => e.waiting)) return;
+  say(T.queue.shift());
+  if (route.name === "session" && LOG.data) paintThread(false);
+}
+const sessionOpen = () => !T.running || !subj(route.slug) || T.route === route.slug;
 ACTIONS["tutor-start"] = (arg) => startTutor(arg === "plain" ? "" : arg);
-ACTIONS.hint = () => T.running ? tutorSend("Can I have a hint?") : toast(`The tutor isn't running. Open Session to start ${tutorName()}.`);
-ACTIONS.check = () => T.running || route.slug ? tutorSend(command("learn-check")) : null;
-ACTIONS.break = () => T.running ? tutorSend(command("learn-end break")) : toast("No session is running.");
-ACTIONS.end = () => T.running ? tutorSend(command("learn-end")) : toast("No session is running.");
+ACTIONS.hint = () => T.running ? say("Can I have a hint?") : toast(`The tutor isn't running. Open Session to start ${tutorName()}.`);
+ACTIONS.check = () => T.running || route.slug ? say(command("learn-check")) : null;
+ACTIONS.break = () => T.running && sessionOpen() ? tutorSend(command("learn-end break")) : toast(T.running ? "This session is already saved." : "No session is running.");
+ACTIONS.end = () => T.running && sessionOpen() ? tutorSend(command("learn-end")) : toast(T.running ? "This session is already saved." : "No session is running.");
 ACTIONS.restart = async () => { await F.pty.stop(); T.running = false; startTutor(""); };
-ACTIONS.interrupt = () => { if (T.running) F.pty.write("\x1b"); };
+ACTIONS.interrupt = () => {
+  if (!T.running) return;
+  F.pty.write("\x1b");
+  const cols = Math.max(20, ((T.term && T.term.cols) || 80) - 6);
+  T.interrupted = T.lastSent.split("\n").reduce((n, line) => n + 2 + Math.floor(line.length / cols), 0);
+};
+// Claude Code's trust question, answered from the thread: down selects "Yes".
+ACTIONS.trust = (answer) => {
+  if (!T.running || !T.trust) return;
+  T.trust = false;
+  if (answer === "yes") { F.pty.write("\x1b[B"); setTimeout(() => F.pty.write("\r"), 120); }
+  else {
+    const kept = T.queue.filter((q) => !/^\s*[/$]learn-/.test(q)).join("\n\n");
+    T.queue = [];
+    if (kept && !$("msg").value.trim()) { $("msg").value = kept; sizeComposer(); }
+    F.pty.write("\r");
+  }
+  afterTermChange();
+};
 ACTIONS["toggle-term"] = () => {
   if (route.name !== "session") go("session");
   T.drawer = !T.drawer;
@@ -997,7 +1101,7 @@ function paintDrawerNote() {
 }
 
 // ---------- session ----------
-const LOG = { slug: null, data: null, tab: "log", showAll: false, think: {}, stick: true, asked: null };
+const LOG = { slug: null, data: null, tab: "log", showAll: false, think: {}, stick: true, asked: null, changedAt: 0 };
 const sessionCache = {};
 function prefetchSession(slug) { if (slug && !sessionCache[slug]) sessionCache[slug] = F.session(slug); }
 
@@ -1046,7 +1150,8 @@ function paintComposer() {
   const msg = $("msg");
   const s = subj(route.slug);
   msg.disabled = false;
-  msg.placeholder = T.running ? "Reply to your tutor, or paste a screenshot" : T.starting ? `Starting ${tutorName()}…` : s ? `Message your tutor to resume ${subName(s)}` : "Message your tutor to start";
+  msg.placeholder = T.running && !sessionOpen() ? (T.routeEnded ? "Session saved. Send a message to start a new one" : `Message your tutor to resume ${subName(s)}`)
+    : T.running ? "Reply to your tutor, or paste a screenshot" : T.starting ? `Starting ${tutorName()}…` : s ? `Message your tutor to resume ${subName(s)}` : "Message your tutor to start";
   const convos = (LOG.data && LOG.data.conversations) || [];
   const model = prettyModel([...convos].reverse().map((c) => c.model).find(Boolean));
   $("model").innerHTML = `${esc(model || tutorName())}${icon("down", "dn")}`;
@@ -1068,9 +1173,10 @@ ACTIONS.send = () => {
   if (!text) return;
   if (!T.running) {
     const s = subj(route.slug);
-    T.queue = text;
+    T.queue = [text];
+    LOG.stick = true;
     startTutor(s ? resumeTyped(s) : "");
-  } else tutorSend(text);
+  } else say(text);
   msg.value = "";
   sizeComposer();
   paintSend();
@@ -1133,8 +1239,39 @@ function logEntries() {
       if (html) out.push({ key: `${ci}:${i}`, html, waiting });
     });
   });
+  if (T.trust) out.push({ key: "x:trust", html: trustHtml() });
+  T.queue.forEach((q, i) => {
+    if (!/^\s*[/$]learn-/.test(q)) out.push({ key: `x:q${i}`, html: `<div class="me pending"><span class="bubble">${youText(q)}</span><span class="cap">Sends when the tutor is ready</span></div>` });
+  });
   return out;
 }
+function trustHtml() {
+  const folder = (cfg && cfg.vault ? cfg.vault.split(/[\\/]/).filter(Boolean).pop() : "") || "your vault";
+  return `<div class="question waiting trust"><div class="q-text"><p><b>Claude Code asks first: do you trust this folder?</b></p>
+    <p>It's your vault, <span class="mono">${esc(folder)}</span>. Claude Code reads, edits, and runs files there, so it asks once for each new folder. Your message waits until you answer.</p></div>
+    <div class="trust-acts"><button class="btn sm" data-act="trust" data-arg="yes">Trust this folder</button><button class="btn neutral sm" data-act="trust" data-arg="no">Not now</button></div></div>`;
+}
+// While the tutor works and nothing new has reached the thread, a row at its end
+// says so and counts the seconds. The terminal's output is the signal: Claude
+// Code animates its spinner for as long as a turn runs.
+const workEl = document.createElement("div");
+workEl.className = "working";
+workEl.setAttribute("aria-live", "polite");
+function paintWorking() {
+  const on = route.name === "session" && LOG.tab === "log" && T.running && !T.trust && busy() && Date.now() - LOG.changedAt > 1500;
+  if (on !== workEl.classList.contains("on")) {
+    const b = $("threadScroll"), near = b.scrollHeight - b.scrollTop - b.clientHeight < 80;
+    workEl.classList.toggle("on", on);
+    if (on) workEl.innerHTML = `<i class="spin"></i><span>Working</span>`;
+    if (on && near) b.scrollTop = b.scrollHeight;
+  }
+  if (on) {
+    const sec = Math.floor((Date.now() - T.workFrom) / 1000), t = sec >= 3 ? `Working · ${sec}s` : "Working";
+    const span = workEl.querySelector("span");
+    if (span.textContent !== t) span.textContent = t;
+  }
+}
+setInterval(paintWorking, 500);
 function itemHtml(it, waiting, k) {
   if (it.kind === "tutor") return `<div class="tutor">${renderMd(it.text)}</div>`;
   if (it.kind === "you" && /^[/$]learn-/.test(it.text)) {
@@ -1185,6 +1322,7 @@ function paintLog(full) {
   let entries = logEntries();
   if (!entries.some((e) => e.key.includes(":"))) {
     host.innerHTML = threadEmpty();
+    host.appendChild(workEl);
     paintActs();
     return;
   }
@@ -1219,6 +1357,8 @@ function paintLog(full) {
   }
   existing.forEach((n) => n.remove());
   changed.forEach((n) => typeset(n));
+  if (changed.length && !full) LOG.changedAt = Date.now();
+  if (host.lastChild !== workEl) host.appendChild(workEl);
   if (full || atBottom || LOG.stick) { scroller.scrollTop = scroller.scrollHeight; LOG.stick = false; $("newPill").classList.remove("on"); }
   else if (changed.length) $("newPill").classList.add("on");
   // A question the tutor is waiting on is answered in the terminal, so the drawer opens once for it.
