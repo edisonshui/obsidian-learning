@@ -19,7 +19,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: "vault-file", privileges: { stan
 
 // ---------- settings ----------
 const CONFIG = path.join(app.getPath("userData"), "config.json");
-const DEFAULTS = { vault: null, host: "claude", theme: "system", sidebar: true, panel: true, panelWidth: 400 };
+const DEFAULTS = { vault: null, host: "claude", theme: "system", sidebar: true, sidebarMode: "full", panel: true, panelWidth: 400 };
 let config = { ...DEFAULTS };
 try { config = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(CONFIG, "utf8")) }; } catch { /* first run */ }
 function saveConfig() {
@@ -178,6 +178,11 @@ ipcMain.handle("vault:choose", async () => {
   return { dir };
 });
 ipcMain.handle("state:get", () => readState());
+// The composer's attach button: the learner picks a file, and its path goes into the message.
+ipcMain.handle("file:choose", async () => {
+  const result = await dialog.showOpenDialog(win, { title: "Attach a file", properties: ["openFile"], defaultPath: config.vault || undefined });
+  return result.canceled ? null : result.filePaths[0] || null;
+});
 ipcMain.handle("session:get", (_e, slug) => readSession(slug));
 ipcMain.handle("pty:start", (_e, opts) => {
   try { return startTerminal(opts || {}); } catch (e) { term = null; console.error("tutor failed to start", e); return { error: String(e.message || e) }; }
@@ -186,6 +191,37 @@ ipcMain.handle("pty:running", () => !!term);
 ipcMain.on("pty:write", (_e, data) => { if (term) term.write(data); });
 ipcMain.on("pty:resize", (_e, { cols, rows }) => { if (term && cols > 0 && rows > 0) try { term.resize(cols, rows); } catch { /* exiting */ } });
 ipcMain.handle("pty:stop", () => { stopTerminal(); return true; });
+// A pasted image goes to the tutor as a file: Flash saves it to a temp folder
+// and the renderer pastes the file's path, which Claude Code attaches as an
+// image ([Image #N]). Your clipboard is left alone.
+let imageCount = 0;
+ipcMain.handle("image:save", (_e, bytes, type) => {
+  const dir = path.join(app.getPath("temp"), "flash-images");
+  fs.mkdirSync(dir, { recursive: true });
+  const ext = { "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp" }[type] || "png";
+  const file = path.join(dir, `${Date.now()}-${++imageCount}.${ext}`);
+  fs.writeFileSync(file, Buffer.from(bytes));
+  return file;
+});
+// Settles session notes left open with /learn-close, in the background and on
+// Sonnet: the skill edits a few lines, and the learner may be mid-session in the
+// terminal. Its stdin is closed at once, since `claude -p` waits on a piped stdin.
+let closing = null;
+ipcMain.handle("tutor:close", (_e, slug) => {
+  if (closing) return { ok: false, text: "Another close-out is still running. Try again in a minute." };
+  if (config.host !== "claude") return { ok: false, text: "Closing out runs on Claude Code. Resume the subject instead, and it closes the old session first." };
+  if (!config.vault) return { ok: false, text: "No vault is open." };
+  const cmd = [config.host, "-p", "--model", "sonnet", quote(`/learn-close${slug ? " " + slug : ""}`)].join(" ");
+  const args = isWin ? ["/d", "/s", "/c", cmd] : ["-ilc", `exec ${cmd}`];
+  closing = new Promise((resolve) => {
+    const child = execFile(env.loginShell(), args, { cwd: config.vault, env: tutorEnv(), timeout: 5 * 60 * 1000, maxBuffer: 4e6 }, (error, stdout, stderr) => {
+      closing = null;
+      resolve({ ok: !error, text: String(stdout || "").trim() || String(stderr || (error && error.message) || "").trim() });
+    });
+    child.stdin.end();
+  });
+  return closing;
+});
 ipcMain.handle("open:external", (_e, url) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); });
 ipcMain.handle("open:file", (_e, rel) => {
   if (!config.vault) return;
@@ -220,6 +256,7 @@ function buildMenu() {
       { role: "undo" }, { role: "redo" }, { type: "separator" },
       { role: "cut" }, { role: "copy", ...(isMac ? {} : { accelerator: "Ctrl+Shift+C" }) },
       { role: "paste", ...(isMac ? {} : { accelerator: "Ctrl+Shift+V" }) }, { role: "selectAll" },
+      { type: "separator" }, { label: "Insert Math", accelerator: a("E"), click: cmd("math") },
     ] },
     { label: "Go", submenu: [
       { label: "Home", accelerator: a("1"), click: cmd("go:home") },
@@ -243,9 +280,10 @@ function buildMenu() {
       { label: "Restart the Tutor", click: cmd("restart") },
     ] },
     { label: "View", submenu: [
-      { label: "Toggle Sidebar", accelerator: a("\\"), click: cmd("toggle-side") },
-      { label: "Toggle Panel", accelerator: isMac ? "Alt+Cmd+0" : "Ctrl+Shift+Alt+0", click: cmd("toggle-panel") },
-      { label: "Show Log", accelerator: isMac ? "Alt+Cmd+1" : "Ctrl+Shift+Alt+1", click: cmd("tab:log") },
+      { label: "Fold Sidebar", accelerator: a("\\"), click: cmd("toggle-side") },
+      { label: "Hide Sidebar", accelerator: isMac ? "Shift+Cmd+\\" : "Ctrl+Shift+Alt+\\", click: cmd("hide-side") },
+      { label: "Toggle Plan", accelerator: isMac ? "Alt+Cmd+0" : "Ctrl+Shift+Alt+0", click: cmd("toggle-panel") },
+      { label: "Show Terminal", accelerator: "Ctrl+`", click: cmd("toggle-term") },
       { label: "Show Session Note", accelerator: isMac ? "Alt+Cmd+2" : "Ctrl+Shift+Alt+2", click: cmd("tab:note") },
       { type: "separator" },
       { label: "Zoom In", accelerator: a("="), click: cmd("zoom-in") },
@@ -266,10 +304,10 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1360, height: 860, minWidth: 980, minHeight: 600,
     title: APP_NAME,
-    backgroundColor: night ? "#141416" : "#F6F5F2",
+    backgroundColor: night ? "#1E1F22" : "#F4F6F8",
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
     trafficLightPosition: { x: 14, y: 13 },
-    ...(process.platform === "darwin" ? {} : { titleBarOverlay: { color: night ? "#0E0E10" : "#EEECE7", symbolColor: night ? "#B9B7B1" : "#4A4741", height: 38 } }),
+    ...(process.platform === "darwin" ? {} : { titleBarOverlay: { color: night ? "#1E1F22" : "#F4F6F8", symbolColor: night ? "#AEB2B9" : "#4B525C", height: 38 } }),
     show: false,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false },
   });
@@ -304,13 +342,21 @@ app.on("second-instance", () => { if (win) { if (win.isMinimized()) win.restore(
 
 app.whenReady().then(async () => {
   nativeTheme.themeSource = config.theme === "night" ? "dark" : config.theme === "light" ? "light" : "system";
-  // Screenshots the learner pasted, which the log embeds. Only image files, and
-  // only from the vault's attachments folder.
+  // Images the log embeds: screenshots the learner pasted, from the vault's
+  // attachments folder, and the tutor's SVG figures, found by file name in any
+  // subject's figures folder the way Obsidian finds them. Nothing else.
   protocol.handle("vault-file", (request) => {
-    const rel = decodeURIComponent(new URL(request.url).pathname.replace(/^\/+/, ""));
-    const base = path.resolve(config.vault || "/nonexistent", "Claude outputs", "attachments");
-    const full = path.resolve(base, path.basename(rel));
-    if (!/\.(png|jpe?g|gif|webp)$/i.test(full) || !fs.existsSync(full)) return new Response("not found", { status: 404 });
+    const name = path.basename(decodeURIComponent(new URL(request.url).pathname.replace(/^\/+/, "")));
+    const vault = config.vault || "/nonexistent";
+    let full = null;
+    if (/\.svg$/i.test(name)) {
+      const subjects = path.join(vault, "learn", "subjects");
+      const dirs = fs.existsSync(subjects) ? fs.readdirSync(subjects) : [];
+      full = dirs.map((d) => path.join(subjects, d, "figures", name)).find((f) => fs.existsSync(f)) || null;
+    } else if (/\.(png|jpe?g|gif|webp)$/i.test(name)) {
+      full = path.join(vault, "Claude outputs", "attachments", name);
+    }
+    if (!full || !fs.existsSync(full)) return new Response("not found", { status: 404 });
     return net.fetch(pathToFileURL(full).toString());
   });
   readFirstName();

@@ -9,8 +9,10 @@ function inline(t) {
   let h = esc(t);
   const codes = [];
   h = h.replace(/`([^`]+)`/g, (_, c) => { codes.push(c); return `\u0000${codes.length - 1}\u0000`; });
-  h = h.replace(/!\[\[([^\]|]+?\.(?:png|jpe?g|gif|webp))(?:\|\d+)?\]\]/gi,
-    (_, p) => `<img class="shot" alt="Screenshot you sent" src="vault-file:///${encodeURIComponent(p.replace(/&amp;/g, "&").split("/").pop())}">`);
+  h = h.replace(/!\[\[([^\]|]+?\.(?:png|jpe?g|gif|webp|svg))(?:\|\d+)?\]\]/gi, (_, p) => {
+    const name = p.replace(/&amp;/g, "&").split("/").pop(), svg = /\.svg$/i.test(name);
+    return `<img class="${svg ? "figure" : "shot"}" alt="${svg ? "Figure" : "Screenshot you sent"}" src="vault-file:///${encodeURIComponent(name)}">`;
+  });
   h = h.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "<span>$2</span>")
     .replace(/\[\[([^\]]+)\]\]/g, (_, p) => `<span>${p.split("/").pop()}</span>`)
     .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a class="lnk" data-href="$2">$1</a>')
@@ -125,10 +127,10 @@ async function typeset(el) {
       window.mermaid.initialize({
         startOnLoad: false, theme: "base", securityLevel: "strict",
         themeVariables: {
-          fontFamily: "Atkinson Hyperlegible Next", fontSize: "13px",
+          fontFamily: "Figtree", fontSize: "13px",
           primaryColor: v("--color-surface"), primaryBorderColor: v("--color-line-strong"), primaryTextColor: v("--color-ink"),
-          lineColor: v("--color-ink-3"), secondaryColor: v("--color-paper-2"), tertiaryColor: v("--color-paper"),
-          noteBkgColor: v("--color-paper-2"), noteTextColor: v("--color-ink"), actorBkg: v("--color-surface"), actorBorder: v("--color-line-strong"),
+          lineColor: v("--color-ink-3"), secondaryColor: v("--color-side"), tertiaryColor: v("--color-bg"),
+          noteBkgColor: v("--color-side"), noteTextColor: v("--color-ink"), actorBkg: v("--color-surface"), actorBorder: v("--color-line-strong"),
         },
       });
     }
