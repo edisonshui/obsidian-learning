@@ -9,8 +9,10 @@ function inline(t) {
   let h = esc(t);
   const codes = [];
   h = h.replace(/`([^`]+)`/g, (_, c) => { codes.push(c); return `\u0000${codes.length - 1}\u0000`; });
-  h = h.replace(/!\[\[([^\]|]+?\.(?:png|jpe?g|gif|webp))(?:\|\d+)?\]\]/gi,
-    (_, p) => `<img class="shot" alt="Screenshot you sent" src="vault-file:///${encodeURIComponent(p.replace(/&amp;/g, "&").split("/").pop())}">`);
+  h = h.replace(/!\[\[([^\]|]+?\.(?:png|jpe?g|gif|webp|svg))(?:\|\d+)?\]\]/gi, (_, p) => {
+    const name = p.replace(/&amp;/g, "&").split("/").pop(), svg = /\.svg$/i.test(name);
+    return `<img class="${svg ? "figure" : "shot"}" alt="${svg ? "Figure" : "Screenshot you sent"}" src="vault-file:///${encodeURIComponent(name)}">`;
+  });
   h = h.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "<span>$2</span>")
     .replace(/\[\[([^\]]+)\]\]/g, (_, p) => `<span>${p.split("/").pop()}</span>`)
     .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a class="lnk" data-href="$2">$1</a>')

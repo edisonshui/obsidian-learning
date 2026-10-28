@@ -342,13 +342,21 @@ app.on("second-instance", () => { if (win) { if (win.isMinimized()) win.restore(
 
 app.whenReady().then(async () => {
   nativeTheme.themeSource = config.theme === "night" ? "dark" : config.theme === "light" ? "light" : "system";
-  // Screenshots the learner pasted, which the log embeds. Only image files, and
-  // only from the vault's attachments folder.
+  // Images the log embeds: screenshots the learner pasted, from the vault's
+  // attachments folder, and the tutor's SVG figures, found by file name in any
+  // subject's figures folder the way Obsidian finds them. Nothing else.
   protocol.handle("vault-file", (request) => {
-    const rel = decodeURIComponent(new URL(request.url).pathname.replace(/^\/+/, ""));
-    const base = path.resolve(config.vault || "/nonexistent", "Claude outputs", "attachments");
-    const full = path.resolve(base, path.basename(rel));
-    if (!/\.(png|jpe?g|gif|webp)$/i.test(full) || !fs.existsSync(full)) return new Response("not found", { status: 404 });
+    const name = path.basename(decodeURIComponent(new URL(request.url).pathname.replace(/^\/+/, "")));
+    const vault = config.vault || "/nonexistent";
+    let full = null;
+    if (/\.svg$/i.test(name)) {
+      const subjects = path.join(vault, "learn", "subjects");
+      const dirs = fs.existsSync(subjects) ? fs.readdirSync(subjects) : [];
+      full = dirs.map((d) => path.join(subjects, d, "figures", name)).find((f) => fs.existsSync(f)) || null;
+    } else if (/\.(png|jpe?g|gif|webp)$/i.test(name)) {
+      full = path.join(vault, "Claude outputs", "attachments", name);
+    }
+    if (!full || !fs.existsSync(full)) return new Response("not found", { status: 404 });
     return net.fetch(pathToFileURL(full).toString());
   });
   readFirstName();

@@ -321,6 +321,7 @@ a.lnk{color:var(--color-ink);text-decoration:underline;text-decoration-thickness
 .bubble .codeblock{white-space:normal;margin:6px 0 0;background:var(--color-surface)}
 .bubble .cap{display:block;margin-bottom:4px}
 .shot{max-width:min(100%,360px);border:1px solid var(--color-line);border-radius:8px;display:block;margin:6px 0}
+.figure{max-width:min(100%,560px);height:auto;display:block;margin:8px 0}
 .steps{margin:6px 0 14px;border-left:1.5px solid var(--color-line-strong);padding-left:12px}
 .step{display:flex;align-items:center;gap:7px;font:var(--type-ui);color:var(--color-ink-3);padding:3px 0}
 .step button{display:inline-flex;align-items:center;gap:5px;color:var(--color-ink-3);border-radius:6px;padding:0 4px;margin-left:-4px}
